@@ -1123,17 +1123,16 @@ int drv_init_kms(struct driver* drv)
             ALOGW("cxt.process_devns_id for %d\n", cxt.process_devns_id);
             kms->lxc_id = cxt.process_devns_id;
         }
-        //    char lxc_prop[PROPERTY_VALUE_MAX];    
-        //    memset(lxc_prop, 0, sizeof(lxc_prop));
-        //    property_get("lxc.instance.no", lxc_prop, "1");
-        //    lxc_id = atoi(lxc_prop);    
     }
 #else
-    kms->lxc_id = 1;
+    {
+        char prop_id[PROPERTY_VALUE_MAX];
+        memset(prop_id, 0, sizeof(prop_id));
+        property_get("sys.container.id", prop_id, "0");
+        kms->lxc_id  = atoi(prop_id) + 1;
+    }
 #endif
     ALOGD("LXC id = %d", kms->lxc_id);    
-
-
 
     {
         uint32_t connector_id;
@@ -1161,7 +1160,7 @@ int drv_init_kms(struct driver* drv)
     }
 
     if(connected_count > 1) {
-        kms->lxc_id += LXC_SHIFT_DISPLAY;
+        kms->lxc_id = kms->lxc_id % connected_count + LXC_SHIFT_DISPLAY;
         ALOGD("LXC id = %d after shift", kms->lxc_id);
     }
 
