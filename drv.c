@@ -1178,14 +1178,21 @@ int drv_init_kms(struct driver* drv)
 
     edp = fetch_connector(kms, DRM_MODE_CONNECTOR_DisplayPort, type_id);
     if(!edp) {
-        edp = fetch_connector(kms, DRM_MODE_CONNECTOR_DisplayPort, type_id+1);        
-    }    
+        edp = fetch_connector(kms, DRM_MODE_CONNECTOR_DisplayPort, type_id+1);
+    }
     if(!edp) {
-        edp = fetch_connector(kms, DRM_MODE_CONNECTOR_eDP, type_id);        
-    }    
+        edp = fetch_connector(kms, DRM_MODE_CONNECTOR_DisplayPort, type_id+2);
+    }
+
     if(!edp) {
-        edp = fetch_connector(kms, DRM_MODE_CONNECTOR_eDP, type_id+1);        
-    }        
+        edp = fetch_connector(kms, DRM_MODE_CONNECTOR_eDP, type_id);
+    }
+    if(!edp) {
+        edp = fetch_connector(kms, DRM_MODE_CONNECTOR_eDP, type_id+1);
+    }
+    if(!edp) {
+        edp = fetch_connector(kms, DRM_MODE_CONNECTOR_eDP, type_id+2);
+    }
 
     if (edp) {
         kms->edp_available = 1;
