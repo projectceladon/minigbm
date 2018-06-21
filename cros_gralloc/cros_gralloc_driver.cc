@@ -43,15 +43,19 @@ int32_t cros_gralloc_driver::init()
 
 	int fd;
 	drmVersionPtr version;
-	//char const *str = "%s/renderD%d";
-	//const char *undesired[2] = { "vgem", nullptr };
-	//uint32_t num_nodes = 63;
-	//uint32_t min_node = 128;
 
+#if 1
+	char const *str = "%s/renderD%d";
+	const char *undesired[2] = { "vgem", nullptr };
+	uint32_t num_nodes = 63;
+	uint32_t min_node = 128;
+#else
 	char const *str = "%s/card%d";	
     const char *undesired[2] = { "vgem", nullptr };
 	uint32_t num_nodes = 1;
 	uint32_t min_node = 0;
+#endif
+
 	uint32_t max_node = (min_node + num_nodes);
 
 	for (uint32_t i = 0; i < ARRAY_SIZE(undesired); i++) {
