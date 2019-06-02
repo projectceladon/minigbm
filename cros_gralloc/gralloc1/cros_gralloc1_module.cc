@@ -32,6 +32,11 @@
 #include "../i915_private_android.h"
 #include "../i915_private_android_types.h"
 
+/* _ANDROID_AS_GUEST_ */
+#if TARGET_USE_GRALLOC_VHAL
+#define GRALLOC_IMP_HARDWARE_MODULE_ID "gralloc_imp"
+#endif
+
 template <typename PFN, typename T> static gralloc1_function_pointer_t asFP(T function)
 {
 	static_assert(std::is_same<PFN, T>::value, "Incompatible function pointer");
