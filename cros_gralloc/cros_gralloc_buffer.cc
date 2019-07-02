@@ -98,3 +98,9 @@ int32_t cros_gralloc_buffer::unlock()
 
 	return 0;
 }
+
+struct bo *cros_gralloc_buffer::get_bo() const
+{
+    return bo_;
+}
+

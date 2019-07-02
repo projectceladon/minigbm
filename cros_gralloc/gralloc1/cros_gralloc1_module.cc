@@ -22,7 +22,14 @@
 #include "cros_gralloc1_module.h"
 #include "drv.h"
 
+#include <stdlib.h>
+
 #include <hardware/gralloc.h>
+#include <hardware/fb.h>
+
+#include <log/log.h>
+#include <GLES2/gl2.h>
+
 
 #include <inttypes.h>
 #include "../i915_private_android.h"
@@ -123,8 +130,235 @@ namespace android
 
 /* CrosGralloc1 is a Singleton and pCrosGralloc1 holds pointer to its instance*/
 static CrosGralloc1 *pCrosGralloc1 = NULL;
-static uint32_t ref_count = 0;
-static SpinLock global_lock_;
+
+static uint32_t global_ref_count = 0;
+static SpinLock global_lock;
+static cros_gralloc_driver* global_driver = NULL; 
+
+cros_gralloc_driver* get_global_driver() {
+    static SpinLock global_lock;
+    if(global_driver) {
+        global_ref_count++;
+    }
+    else {
+        global_driver = new cros_gralloc_driver();
+        if(global_driver) {
+            if (global_driver->init() != 0) {
+        		cros_gralloc_error("Failed to initialize driver.");
+	        }
+            else {
+                global_ref_count = 1;
+            }         
+        }
+    }       
+
+    return global_driver;
+}
+
+
+void release_global_driver() {
+    static SpinLock global_lock;
+
+	if (global_ref_count > 0) {
+		global_ref_count--;
+	}
+
+	if (global_ref_count == 0) {
+		delete global_driver;
+        global_driver = nullptr;
+	}
+}
+
+
+
+
+/*
+  * framebuffer_device_t  implementation
+  */
+static int gralloc1_fb_setSwapInterval(struct framebuffer_device_t* dev, int interval)
+{
+    gralloc1_fb_dev_t* _device = (gralloc1_fb_dev_t*)dev; 
+    int ret = 0;
+    
+#if DEBUG_GRALLOC_API
+	ALOGI("%s: %d", __func__, __LINE__);
+#endif
+
+    if ((interval < dev->minSwapInterval) || (interval > dev->maxSwapInterval)) {
+	        ret = -EINVAL;
+    }
+    return ret;
+}
+
+static int gralloc1_fb_setUpdateRect(struct framebuffer_device_t* dev, int left, int top, int width, int height)
+{
+
+    gralloc1_fb_dev_t* _device = (gralloc1_fb_dev_t*)dev; 
+    int ret = 0;
+
+#if DEBUG_GRALLOC_API
+    ALOGI("%s: %d", __func__, __LINE__);
+#endif
+
+    return 0;
+}
+
+static int gralloc1_fb_post(struct framebuffer_device_t* dev, buffer_handle_t buffer)
+{
+    gralloc1_fb_dev_t* _device = (gralloc1_fb_dev_t*)dev; 
+    int ret = 0;
+
+#if DEBUG_GRALLOC_API	
+     ALOGI("%s : %d : (dev = %p, buffer = %p)", __func__, __LINE__, dev, (void*)buffer);
+#endif 
+
+	if(!buffer)
+        return -EINVAL;		
+
+    if(_device->driver) {
+       ret = _device->driver->kms_present(buffer); 
+    }
+
+#if DEBUG_GRALLOC_API
+    ALOGI("%s : %d : returns %d", __func__, __LINE__, ret);
+#endif 
+
+    return ret;
+}
+
+static int gralloc1_fb_compositionComplete(struct framebuffer_device_t* dev)
+{
+    gralloc1_fb_dev_t* _device = (gralloc1_fb_dev_t*)dev; 
+    int ret = 0;
+    
+#if DEBUG_GRALLOC_API
+    ALOGI("%s: %d", __func__, __LINE__);
+#endif
+
+  
+    // glFlush();
+    glFinish();
+    
+    return ret;
+}
+
+
+void gralloc1_fb_dump(struct framebuffer_device_t* dev, char *buff, int buff_len)
+{
+#if DEBUG_GRALLOC_API
+    ALOGI("%s: %d", __func__, __LINE__);
+#endif 
+
+}
+
+
+int gralloc1_fb_enableScreen(struct framebuffer_device_t* dev, int enable)
+{
+    gralloc1_fb_dev_t* _device = (gralloc1_fb_dev_t*)dev; 
+    int ret = 0;
+
+#if DEBUG_GRALLOC_API
+    ALOGI("%s: %d", __func__, __LINE__);
+#endif
+
+    return ret;
+}
+
+
+static int gralloc1_fb_close(struct hw_device_t* dev)
+{
+    gralloc1_fb_dev_t* _device = (gralloc1_fb_dev_t*)dev;
+    int ret = 0;
+    
+#if DEBUG_GRALLOC_API
+	ALOGI("%s: %d", __func__, __LINE__);
+#endif
+
+    if(_device->driver) {
+        release_global_driver();
+        _device->driver = nullptr;
+    }
+
+    free(_device);
+
+    return ret;
+}
+
+
+static int gralloc1_fb_open(const struct hw_module_t *mod, struct framebuffer_device_t **dev)
+{
+
+    gralloc1_fb_dev_t* _device = NULL;
+  
+
+#if DEBUG_GRALLOC_API
+	ALOGI("%s: %d, mod = %p", __func__, __LINE__, mod);
+#endif
+	
+    _device = (gralloc1_fb_dev_t*)malloc(sizeof(gralloc1_fb_dev_t));
+    if(_device == NULL) {
+        ALOGE("%s: %d : out of memory!", __func__, __LINE__);
+        return -ENOMEM;
+    }
+
+    _device->base.setSwapInterval       = gralloc1_fb_setSwapInterval;
+	_device->base.setUpdateRect         = gralloc1_fb_setUpdateRect;
+	_device->base.post                  = gralloc1_fb_post;
+    _device->base.compositionComplete   = gralloc1_fb_compositionComplete;
+    _device->base.dump                  = gralloc1_fb_dump;
+    _device->base.enableScreen          = gralloc1_fb_enableScreen;
+    _device->base.common.close          = gralloc1_fb_close;
+    _device->base.common.module         = const_cast<hw_module_t *>(mod);
+
+    _device->driver = get_global_driver();
+    if(!_device->driver) {
+        ALOGE("%s: %d : init driver failed!", __func__, __LINE__);
+        free(_device);
+        return -EINVAL;   
+    }
+
+
+    if(_device->driver->init_kms()) {
+        ALOGE("%s: %d : init kms failed!", __func__, __LINE__);
+        free(_device);
+        return -EINVAL;   
+    }
+    
+    kms_info_t info;      
+    memset(&info, 0, sizeof(kms_info_t));
+    _device->driver->get_kms_info(&info);
+    
+    const_cast<uint32_t&>(_device->base.flags)     	= info.flags;
+    const_cast<uint32_t&>(_device->base.width)      = info.width;
+    const_cast<uint32_t&>(_device->base.height)     = info.height;
+    const_cast<int&>(_device->base.stride)          = info.stride;
+
+    const_cast<int&>(_device->base.format)         	= info.format;
+    const_cast<float&>(_device->base.xdpi)          = info.xdpi;
+    const_cast<float&>(_device->base.ydpi)          = info.ydpi;
+    const_cast<float&>(_device->base.fps)           = info.fps;
+    const_cast<int&>(_device->base.minSwapInterval)	= info.minSwapInterval;
+    const_cast<int&>(_device->base.maxSwapInterval) = info.maxSwapInterval;
+    const_cast<int&>(_device->base.numFramebuffers) = info.numFramebuffers;
+
+    
+#if DEBUG_GRALLOC_API
+    ALOGI("fb.flags = 0x%x", _device->base.flags);
+    ALOGI("fb.width  %d", _device->base.width);
+    ALOGI("fb.height %d", _device->base.height);
+    ALOGI("fb.stride %d", _device->base.height);
+    ALOGI("fb.format 0x%x" , _device->base.format);
+    ALOGI("fb.xdpi   %f", _device->base.xdpi);
+    ALOGI("fb.ydpi   %f", _device->base.ydpi);
+    ALOGI("fb.fps    %f", _device->base.fps);
+#endif 
+
+    *dev = &_device->base;
+
+    return 0;
+}
+
+
 
 CrosGralloc1::CrosGralloc1()
 {
@@ -132,25 +366,25 @@ CrosGralloc1::CrosGralloc1()
 	getFunction = getFunctionHook;
 	common.tag = HARDWARE_DEVICE_TAG;
 	common.version = HARDWARE_MODULE_API_VERSION(1, 0);
-	common.close = HookDevClose;
+	common.close = HookGrallocClose;
 }
 
 CrosGralloc1::~CrosGralloc1()
 {
+    if(driver) {
+        release_global_driver();
+    }
 }
 
 bool CrosGralloc1::Init()
 {
-	if (driver)
-		return true;
-
-	driver = std::make_unique<cros_gralloc_driver>();
-	if (driver->init()) {
+    driver = get_global_driver();
+    if(!driver) {
 		cros_gralloc_error("Failed to initialize driver.");
-		return false;
-	}
+		return false;        
+    }
 
-	return true;
+    return true;
 }
 
 void CrosGralloc1::doGetCapabilities(uint32_t *outCount, int32_t *outCapabilities)
@@ -647,61 +881,58 @@ int32_t CrosGralloc1::getByteStride(buffer_handle_t buffer, uint32_t *outStride,
 }
 
 // static
+int CrosGralloc1::HookGrallocClose(hw_device_t * dev)
+{
+    CrosGralloc1* pGralloc1 = CrosGralloc1::getAdapter((gralloc1_device_t*)dev);
+
+    if(pGralloc1) {
+        delete pGralloc1;
+    }    
+	return 0;
+} // namespace android
+
+// static
 int CrosGralloc1::HookDevOpen(const struct hw_module_t *mod, const char *name,
 			      struct hw_device_t **device)
 {
-	if (strcmp(name, GRALLOC_HARDWARE_MODULE_ID)) {
-		ALOGE("Invalid module name- %s", name);
-		return -EINVAL;
-	}
 
-	ScopedSpinLock lock(global_lock_);
-	ref_count++;
+#if DEBUG_GRALLOC_API
+	ALOGI("%s: %d : mod = %p, name = %s)", __func__, __LINE__, mod, name);
+#endif
 
-	if (pCrosGralloc1 != NULL) {
-		*device = &pCrosGralloc1->common;
-		return 0;
-	} else
-		pCrosGralloc1 = new CrosGralloc1();
+    int ret = 0;
 
-	std::unique_ptr<CrosGralloc1> ctx(pCrosGralloc1);
-	if (!ctx) {
-		ALOGE("Failed to allocate CrosGralloc1");
-		return -ENOMEM;
-	}
+    if (strcmp(name, GRALLOC_HARDWARE_MODULE_ID) == 0) {        
+        CrosGralloc1* pGralloc1 = new CrosGralloc1();
+        if(pGralloc1) {
+            if(pGralloc1->Init()) {
+                pGralloc1->common.module = const_cast<hw_module_t *>(mod);
+                *device = &pGralloc1->common;                        
+                ret = 0;
+            }
+            else {
+                ALOGE("Failed to initialize CrosGralloc1. \n");
+                ret = -EINVAL;                
+            }
+        }
+        else {
+    		ALOGE("Failed to allocate CrosGralloc1");
+    		ret = -ENOMEM;          
+        }
 
-	if (!ctx->Init()) {
-		ALOGE("Failed to initialize CrosGralloc1. \n");
-		return -EINVAL;
-	}
+    }
+    else if (strcmp(name, GRALLOC_HARDWARE_FB0) == 0) {
+        ret = gralloc1_fb_open(mod, (struct framebuffer_device_t **)device);
+    }
+    else {
+        ALOGE("Invalid module name- %s", name);        
+        ret = -EINVAL;
+    }
 
-	ctx->common.module = const_cast<hw_module_t *>(mod);
-	*device = &ctx->common;
-	ctx.release();
-	return 0;
+    return ret;
 }
 
-// static
-int CrosGralloc1::HookDevClose(hw_device_t * /*dev*/)
-{
-	ScopedSpinLock lock(global_lock_);
-	if (ref_count > 0) {
-		ref_count--;
-	}
-
-	if (ref_count > 0) {
-		return 0;
-	}
-
-	if (pCrosGralloc1) {
-		delete pCrosGralloc1;
-		pCrosGralloc1 = NULL;
-	}
-
-	return 0;
-}
-
-} // namespace android
+};
 
 static struct hw_module_methods_t cros_gralloc_module_methods = {
 	.open = android::CrosGralloc1::HookDevOpen,
@@ -715,3 +946,5 @@ hw_module_t HAL_MODULE_INFO_SYM = {
 	.author = "Chrome OS",
 	.methods = &cros_gralloc_module_methods,
 };
+
+

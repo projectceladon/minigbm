@@ -53,7 +53,7 @@ LOCAL_C_INCLUDES += frameworks/native/libs/nativebase/include \
 ifneq ($(filter $(intel_drivers), $(BOARD_GPU_DRIVERS)),)
 LOCAL_CPPFLAGS += -DDRV_I915
 LOCAL_CFLAGS += -DDRV_I915
-LOCAL_SHARED_LIBRARIES += libdrm_intel
+LOCAL_SHARED_LIBRARIES += libdrm_intel libGLESv2
 endif
 
 ifeq ($(shell test $(PLATFORM_SDK_VERSION) -ge 27; echo $$?), 0)
@@ -64,7 +64,7 @@ LOCAL_CFLAGS += -DUSE_VNDK
 endif
 
 LOCAL_CFLAGS += -Wno-error
-LOCAL_MODULE := gralloc.$(TARGET_BOARD_PLATFORM)
+LOCAL_MODULE := gralloc.intel
 LOCAL_MODULE_TAGS := optional
 # The preferred path for vendor HALs is /vendor/lib/hw
 LOCAL_PROPRIETARY_MODULE := true

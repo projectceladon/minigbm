@@ -19,7 +19,7 @@ class cros_gralloc_driver
 	cros_gralloc_driver();
 	~cros_gralloc_driver();
 
-	int32_t init();
+	int32_t init();  
 	bool is_supported(const struct cros_gralloc_buffer_descriptor *descriptor);
 	int32_t allocate(const struct cros_gralloc_buffer_descriptor *descriptor,
 			 buffer_handle_t *out_handle);
@@ -33,6 +33,11 @@ class cros_gralloc_driver
 
 	int32_t get_backing_store(buffer_handle_t handle, uint64_t *out_store);
 
+    int init_kms();
+    int get_kms_info(kms_info_t* info);
+    int kms_present(buffer_handle_t handle);
+    void fini_kms();
+    
       private:
 	cros_gralloc_driver(cros_gralloc_driver const &);
 	cros_gralloc_driver operator=(cros_gralloc_driver const &);

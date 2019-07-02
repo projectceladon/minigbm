@@ -22,8 +22,13 @@
 #include "../cros_gralloc_driver.h"
 
 #include <hardware/gralloc1.h>
+#include <hardware/fb.h>
+
 #include <utils/Log.h>
 #include <unistd.h>
+
+#define DEBUG_GRALLOC_API   0
+
 
 struct cros_gralloc_module;
 
@@ -51,7 +56,7 @@ class CrosGralloc1 : public gralloc1_device_t
 
 	static int HookDevOpen(const struct hw_module_t *mod, const char *name,
 			       struct hw_device_t **device);
-	static int HookDevClose(hw_device_t *dev);
+	static int HookGrallocClose(hw_device_t *dev);
 
       private:
 	static inline CrosGralloc1 *getAdapter(gralloc1_device_t *device)
@@ -320,9 +325,22 @@ class CrosGralloc1 : public gralloc1_device_t
 		return getAdapter(device)->setModifier(descriptor, modifier);
 	}
 
+
+    // clang-format on
 	// Adapter internals
-	std::unique_ptr<cros_gralloc_driver> driver;
+	cros_gralloc_driver* driver;
 };
+
+
+struct gralloc1_fb_dev {
+    framebuffer_device_t base;
+    cros_gralloc_driver* driver;
+};
+typedef struct gralloc1_fb_dev gralloc1_fb_dev_t;
+
+cros_gralloc_driver* get_global_driver();
+void release_global_driver();
+
 
 } // namespace android
 

@@ -7,14 +7,23 @@
 #include "../cros_gralloc_driver.h"
 
 #include <hardware/gralloc.h>
+#include <hardware/fb.h>
 #include <memory.h>
+#include <stdlib.h>
+
+#include <log/log.h>
+
+#include <GLES2/gl2.h>
 
 #include "../i915_private_android.h"
 #include "../i915_private_android_types.h"
 
+#define DEBUG_GRALLOC_API   1
+
 struct gralloc0_module {
 	gralloc_module_t base;
 	std::unique_ptr<alloc_device_t> alloc;
+    framebuffer_device_t* fb;
 	std::unique_ptr<cros_gralloc_driver> driver;
 	bool initialized;
 	SpinLock initialization_mutex;
@@ -34,6 +43,119 @@ enum {
 	GRALLOC_DRM_GET_BACKING_STORE,
 };
 // clang-format on
+
+
+
+
+/*
+  * framebuffer_device_t  implementation
+  */
+static int fb_setSwapInterval(struct framebuffer_device_t* dev, int interval)
+{
+#if DEBUG_GRALLOC_API
+	ALOGI("%s: %d", __func__, __LINE__);
+#endif
+
+    auto mod = (struct gralloc0_module *)dev->common.module;  
+    if ((interval < dev->minSwapInterval) || (interval > dev->maxSwapInterval)) {
+	        return -EINVAL;
+    }
+    return 0;
+}
+
+static int fb_setUpdateRect(struct framebuffer_device_t* dev, int left, int top, int width, int height)
+{
+#if DEBUG_GRALLOC_API
+	ALOGI("%s: %d", __func__, __LINE__);
+#endif 
+
+    auto mod = (struct gralloc0_module *)dev->common.module;  
+    return 0;
+}
+
+static int fb_post(struct framebuffer_device_t* dev, buffer_handle_t buffer)
+{
+#if DEBUG_GRALLOC_API	
+        ALOGI("fb_post(%p) starts", (void*)buffer);
+#endif 
+
+    auto mod = (struct gralloc0_module *)dev->common.module;  
+    int ret = 0;
+
+	if(!buffer)
+        return -EINVAL;		
+
+    // parser handle
+
+    // add fb if needed
+
+    // post
+
+#if DEBUG_GRALLOC_API
+    ALOGI("fb_post returns %d", ret);
+#endif 
+
+    return ret;
+}
+
+static int fb_compositionComplete(struct framebuffer_device_t* dev)
+{
+#if DEBUG_GRALLOC_API
+	ALOGI("%s: %d", __func__, __LINE__);
+#endif 
+
+    auto mod = (struct gralloc0_module *)dev->common.module; 
+    int ret = 0;
+  
+    glFlush();
+    // glFinish();
+    
+    return ret;
+}
+
+
+void fb_dump(struct framebuffer_device_t* dev, char *buff, int buff_len)
+{
+#if DEBUG_GRALLOC_API
+    ALOGI("%s: %d", __func__, __LINE__);
+#endif 
+
+}
+
+
+int fb_enableScreen(struct framebuffer_device_t* dev, int enable)
+{
+#if DEBUG_GRALLOC_API
+	ALOGI("%s: %d", __func__, __LINE__);
+#endif
+
+    auto mod = (struct gralloc0_module *)dev->common.module; 
+    int ret = 0;
+
+    return ret;
+}
+
+
+static int fb_close(struct hw_device_t* dev)
+{
+#if DEBUG_GRALLOC_API
+	ALOGI("%s: %d", __func__, __LINE__);
+#endif
+
+
+    auto mod = (struct gralloc0_module *)dev->module; 
+    int ret = 0;
+
+
+    if(mod->fb) {
+        free(mod->fb);
+        mod->fb = nullptr;
+    }
+    
+    return ret;
+}
+
+
 
 static uint64_t gralloc0_convert_usage(int usage)
 {
@@ -145,7 +267,7 @@ static int gralloc0_close(struct hw_device_t *dev)
 	return 0;
 }
 
-static int gralloc0_init(struct gralloc0_module *mod, bool initialize_alloc)
+static int gralloc0_init(struct gralloc0_module *mod, bool initialize_alloc, bool initialize_fb)
 {
 	SCOPED_SPIN_LOCK(mod->initialization_mutex);
 
@@ -168,6 +290,51 @@ static int gralloc0_init(struct gralloc0_module *mod, bool initialize_alloc)
 		mod->alloc->common.close = gralloc0_close;
 	}
 
+    if(initialize_fb) {
+        mod->fb = (framebuffer_device_t*)malloc(sizeof(framebuffer_device_t));
+        memset(mod->fb, 0, sizeof(framebuffer_device_t));
+        
+        mod->fb->setSwapInterval = fb_setSwapInterval;
+        mod->fb->setUpdateRect = fb_setUpdateRect;
+        mod->fb->post = fb_post;
+        mod->fb->compositionComplete = fb_compositionComplete;
+        mod->fb->dump = fb_dump;
+        mod->fb->enableScreen = fb_enableScreen;
+        mod->fb->common.close = fb_close;
+
+#if 0
+        yalloc_kms_info_t info;
+        memset(&info, 0, sizeof(yalloc_kms_info_t));
+        yalloc_drm_get_kms_info((struct yalloc_drm_t *)(_module->priv), &info);
+        const_cast<uint32_t&>(mod->fb->flags)     	= info.flags;
+        const_cast<uint32_t&>(mod->fb->width)      = info.width;
+        const_cast<uint32_t&>(mod->fb->height)     = info.height;
+        const_cast<int&>(mod->fb->stride)          = info.stride;
+
+        const_cast<int&>(mod->fb->.format)         	= info.format;
+        const_cast<float&>(mod->fb->.xdpi)          = info.xdpi;
+        const_cast<float&>(mod->fb->ydpi)          = info.ydpi;
+        const_cast<float&>(mod->fb->fps)           = info.fps;
+        const_cast<int&>(mod->fb->minSwapInterval)	= info.minSwapInterval;
+        const_cast<int&>(mod->fb->maxSwapInterval) = info.maxSwapInterval;
+        const_cast<int&>(mod->fb->numFramebuffers) = info.numFramebuffers;
+
+#endif     
+        ALOGI("fb.width  %d\n"
+              "fb.height %d\n"
+              "fb.fps    %f\n"
+              "fb.format 0x%x\n"
+              "fb.xdpi   %f\n"
+              "fb.ydpi   %f\n",
+              mod->fb->width,
+              mod->fb->height,
+              mod->fb->fps,
+              mod->fb->format,
+              mod->fb->xdpi, 
+              mod->fb->ydpi);
+            
+    }
+
 	mod->initialized = true;
 	return 0;
 }
@@ -175,25 +342,29 @@ static int gralloc0_init(struct gralloc0_module *mod, bool initialize_alloc)
 static int gralloc0_open(const struct hw_module_t *mod, const char *name, struct hw_device_t **dev)
 {
 	auto module = (struct gralloc0_module *)mod;
+    int ret = 0;
 
-	if (module->initialized) {
-		*dev = &module->alloc->common;
-		return 0;
-	}
+    if (strcmp(name, GRALLOC_HARDWARE_GPU0) == 0) {
+        ret = gralloc0_init(module, true, false);
+        if(!ret) {
+            if(dev) {
+                *dev = &module->alloc->common;    
+            }
+        }
+     }
+     else if (strcmp(name, GRALLOC_HARDWARE_FB0) == 0) {
+         ret = gralloc0_init(module, true, true);
+         if(!ret) {
+             if(dev) {
+                 *dev = &module->fb->common;    
+             }
+         }
+     }
+     else {
+         ret = -EINVAL;
+     }
 
-        /* On Android M, Surfaceflinger tries to open the gralloc device
-         * using name GRALLOC_HARDWARE_FB0.
-         */
-        if ((strcmp(name, GRALLOC_HARDWARE_GPU0)!=0) && (strcmp(name, GRALLOC_HARDWARE_FB0)!=0)) {
-		cros_gralloc_error("Incorrect device name - %s.", name);
-		return -EINVAL;
-	}
-
-	if (gralloc0_init(module, true))
-		return -ENODEV;
-
-	*dev = &module->alloc->common;
-	return 0;
+     return ret;
 }
 
 static int gralloc0_register_buffer(struct gralloc_module_t const *module, buffer_handle_t handle)
@@ -201,7 +372,7 @@ static int gralloc0_register_buffer(struct gralloc_module_t const *module, buffe
 	auto mod = (struct gralloc0_module *)module;
 
 	if (!mod->initialized)
-		if (gralloc0_init(mod, false))
+		if (gralloc0_init(mod, false, false))
 			return -ENODEV;
 
 	return mod->driver->retain(handle);
@@ -384,6 +555,7 @@ static int gralloc0_lock_async_ycbcr(struct gralloc_module_t const *module, buff
 	return 0;
 }
 
+
 // clang-format off
 static struct hw_module_methods_t gralloc0_module_methods = { .open = gralloc0_open };
 // clang-format on
@@ -414,6 +586,7 @@ struct gralloc0_module HAL_MODULE_INFO_SYM = {
 	    },
 
 	.alloc = nullptr,
+	.fb = nullptr,
 	.driver = nullptr,
 	.initialized = false,
 };

@@ -15,6 +15,8 @@
 #include <unistd.h>
 #include <xf86drm.h>
 
+#include <log/log.h>
+
 cros_gralloc_driver::cros_gralloc_driver() : drv_(nullptr)
 {
 }
@@ -41,10 +43,15 @@ int32_t cros_gralloc_driver::init()
 
 	int fd;
 	drmVersionPtr version;
-	char const *str = "%s/renderD%d";
-	const char *undesired[2] = { "vgem", nullptr };
-	uint32_t num_nodes = 63;
-	uint32_t min_node = 128;
+	//char const *str = "%s/renderD%d";
+	//const char *undesired[2] = { "vgem", nullptr };
+	//uint32_t num_nodes = 63;
+	//uint32_t min_node = 128;
+
+	char const *str = "%s/card%d";	
+    const char *undesired[2] = { "vgem", nullptr };
+	uint32_t num_nodes = 1;
+	uint32_t min_node = 0;
 	uint32_t max_node = (min_node + num_nodes);
 
 	for (uint32_t i = 0; i < ARRAY_SIZE(undesired); i++) {
@@ -52,6 +59,8 @@ int32_t cros_gralloc_driver::init()
 			char *node;
 			if (asprintf(&node, str, DRM_DIR_NAME, j) < 0)
 				continue;
+
+            ALOGI("open(%s)", node);
 
 			fd = open(node, O_RDWR, 0);
 			free(node);
@@ -64,6 +73,8 @@ int32_t cros_gralloc_driver::init()
 				close(fd);
 				continue;
 			}
+
+            cros_gralloc_log("CROS_GRALLOC_INFO", __FILE__, __LINE__, "drm version->name =%s", version->name);
 
 			if (undesired[i] && !strcmp(version->name, undesired[i])) {
 				drmFreeVersion(version);
@@ -342,4 +353,59 @@ cros_gralloc_buffer *cros_gralloc_driver::get_buffer(cros_gralloc_handle_t hnd)
 		return handles_[hnd].first;
 
 	return nullptr;
+}
+
+int cros_gralloc_driver::init_kms()
+{
+    int ret = 0;
+
+    ALOGI("%s:%d", __func__, __LINE__);
+    
+    ret = drv_init_kms(drv_);
+    if(ret) {
+        cros_gralloc_error("Init kms failed");        
+    }
+    return ret;
+}
+
+int cros_gralloc_driver::get_kms_info(kms_info_t* info) 
+{
+    int ret = 0;
+
+    ALOGI("%s:%d", __func__, __LINE__);
+    
+    ret = drv_get_kms_info(drv_, info);
+    if(ret) {
+       cros_gralloc_error("Get kms info failed");  
+    }
+
+    return ret;
+}
+
+int cros_gralloc_driver::kms_present(buffer_handle_t handle)
+{
+    int ret = 0;
+
+	SCOPED_SPIN_LOCK(mutex_);
+	cros_gralloc_handle_t hnd = cros_gralloc_convert_handle(handle);
+	if (!hnd) {
+		cros_gralloc_error("Invalid handle.");
+		return -EINVAL;
+	}
+
+	cros_gralloc_buffer* buffer = get_buffer(hnd);
+	if (!buffer) {
+		cros_gralloc_error("Invalid Reference.");
+		return -EINVAL;
+	}
+
+    drv_present_bo(drv_, buffer->get_bo());
+
+    return ret;
+}
+
+void cros_gralloc_driver::fini_kms()
+{
+    ALOGI("%s:%d", __func__, __LINE__);
+    drv_fini_kms(drv_);
 }

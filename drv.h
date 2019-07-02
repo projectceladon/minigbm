@@ -87,6 +87,21 @@ struct map_info {
 	void *priv;
 };
 
+typedef struct _kms_info_t {
+      unsigned int    flags;
+      unsigned int    width;
+      unsigned int    height;
+      int             stride;
+      int             format;
+      float           xdpi;
+      float           ydpi;
+      float           fps;
+      int             minSwapInterval;
+      int             maxSwapInterval;
+      int             numFramebuffers;    
+}kms_info_t;
+
+
 struct driver *drv_create(int fd);
 
 void drv_destroy(struct driver *drv);
@@ -148,6 +163,12 @@ uint32_t drv_resolve_format(struct driver *drv, uint32_t format, uint64_t use_fl
 size_t drv_num_planes_from_format(uint32_t format);
 
 uint32_t drv_num_buffers_per_bo(struct bo *bo);
+
+int drv_init_kms(struct driver* drv);
+int drv_get_kms_info(struct driver* drv, kms_info_t *info);
+int drv_present_bo(struct driver* drv, struct bo *bo);
+void drv_fini_kms(struct driver* drv);
+
 
 #ifdef __cplusplus
 }

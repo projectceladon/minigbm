@@ -12,6 +12,8 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #include <stdatomic.h>
+#include <xf86drm.h>
+#include <xf86drmMode.h>
 
 #include "drv.h"
 
@@ -40,7 +42,8 @@ struct bo {
 	uint32_t strides[DRV_MAX_PLANES];
 	uint64_t format_modifiers[DRV_MAX_PLANES];
 	uint64_t use_flags;
-	size_t total_size;
+	size_t total_size;    
+    uint32_t fb_id;
 	void *priv;
 };
 
@@ -68,6 +71,35 @@ struct combinations {
 	uint32_t allocations;
 };
 
+typedef struct _kms_output {
+    uint32_t            crtc_id;
+    uint32_t            connector_id;
+    uint32_t            pipe;
+    drmModeModeInfo     mode;
+    drmModePropertyPtr  props;
+    float               xdpi;
+    float               ydpi;
+    int                 fb_format;
+    int                 bpp;
+    int                 active;    
+    int                 swap_interval;
+}kms_output_t;
+
+typedef struct _kms_t {
+    int                 fd;
+    drmModeResPtr       resources;
+    drmModePlaneResPtr  plane_resources;
+    drmModePlanePtr*    planes;    
+    kms_output_t        primary;
+    uint32_t            crtc_allocator;    
+    uint32_t            lxc_id;  
+    int                 edp_available;
+    int                 first_post;
+    struct bo *         front_bo;
+    struct bo *         back_bo;
+} kms_t;
+
+
 struct driver {
 	int fd;
 	struct backend *backend;
@@ -76,6 +108,8 @@ struct driver {
 	void *map_table;
 	struct combinations combos;
 	atomic_flag driver_lock;
+
+    kms_t kms;
 };
 
 struct backend {

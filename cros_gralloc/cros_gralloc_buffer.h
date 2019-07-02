@@ -26,6 +26,8 @@ class cros_gralloc_buffer
 	int32_t lock(uint32_t map_flags, uint8_t *addr[DRV_MAX_PLANES]);
 	int32_t unlock();
 
+  	struct bo *get_bo() const;
+
       private:
 	cros_gralloc_buffer(cros_gralloc_buffer const &);
 	cros_gralloc_buffer operator=(cros_gralloc_buffer const &);
