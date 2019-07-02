@@ -14,9 +14,6 @@
  * limitations under the License.
  */
 
-#undef LOG_TAG
-#define LOG_TAG "CrosGralloc1 "
-//#define LOG_NDEBUG 0
 
 #include <errno.h>
 #include "cros_gralloc1_module.h"
@@ -389,6 +386,10 @@ bool CrosGralloc1::Init()
 
 void CrosGralloc1::doGetCapabilities(uint32_t *outCount, int32_t *outCapabilities)
 {
+#if DEBUG_GRALLOC_API
+    ALOGI("%s: %d ", __func__, __LINE__);
+#endif
+
 	if (outCapabilities == nullptr) {
 		*outCount = 0;
 	}
@@ -396,6 +397,10 @@ void CrosGralloc1::doGetCapabilities(uint32_t *outCount, int32_t *outCapabilitie
 
 gralloc1_function_pointer_t CrosGralloc1::doGetFunction(int32_t intDescriptor)
 {
+#if DEBUG_GRALLOC_API
+    ALOGI("%s: %d : intDescriptor = %llu ", __func__, __LINE__, intDescriptor);
+#endif
+
 	constexpr auto lastDescriptor = static_cast<int32_t>(GRALLOC1_LAST_FUNCTION);
 	if (intDescriptor < 0 || ((intDescriptor > lastDescriptor) && ((intDescriptor < 100) || (intDescriptor > GRALLOC1_LAST_CUSTOM)))) {
 		ALOGE("Invalid function descriptor %d", intDescriptor);
@@ -475,6 +480,11 @@ void CrosGralloc1::dump(uint32_t *outSize, char *outBuffer)
 
 int32_t CrosGralloc1::createDescriptor(gralloc1_buffer_descriptor_t *outDescriptor)
 {
+
+#if DEBUG_GRALLOC_API
+    ALOGI("%s: %d : outDescriptor= %p", __func__, __LINE__, outDescriptor);
+#endif
+
 	if (!outDescriptor)
 		return CROS_GRALLOC_ERROR_BAD_DESCRIPTOR;
 
@@ -485,6 +495,10 @@ int32_t CrosGralloc1::createDescriptor(gralloc1_buffer_descriptor_t *outDescript
 
 int32_t CrosGralloc1::destroyDescriptor(gralloc1_buffer_descriptor_t descriptor)
 {
+#if DEBUG_GRALLOC_API
+    ALOGI("%s: %d : (descriptorId = %llu)", __func__, __LINE__, descriptor);
+#endif
+
 	auto hnd = (struct cros_gralloc_buffer_descriptor *)descriptor;
 	delete hnd;
 	return CROS_GRALLOC_ERROR_NONE;
@@ -492,6 +506,10 @@ int32_t CrosGralloc1::destroyDescriptor(gralloc1_buffer_descriptor_t descriptor)
 
 int32_t CrosGralloc1::setConsumerUsage(gralloc1_buffer_descriptor_t descriptorId, uint64_t intUsage)
 {
+#if DEBUG_GRALLOC_API
+    ALOGI("%s: %d : (descriptorId = %llu, intUsage = 0x%x)", __func__, __LINE__, descriptorId, intUsage);
+#endif
+
 	auto hnd = (struct cros_gralloc_buffer_descriptor *)descriptorId;
 	hnd->consumer_usage = intUsage;
 	return CROS_GRALLOC_ERROR_NONE;
@@ -499,6 +517,10 @@ int32_t CrosGralloc1::setConsumerUsage(gralloc1_buffer_descriptor_t descriptorId
 
 int32_t CrosGralloc1::setProducerUsage(gralloc1_buffer_descriptor_t descriptorId, uint64_t intUsage)
 {
+#if DEBUG_GRALLOC_API
+    ALOGI("%s: %d : (descriptorId = %llu, intUsage = 0x%x)", __func__, __LINE__, descriptorId, intUsage);
+#endif
+
 	auto hnd = (struct cros_gralloc_buffer_descriptor *)descriptorId;
 	hnd->producer_usage = intUsage;
 	return CROS_GRALLOC_ERROR_NONE;
@@ -507,6 +529,11 @@ int32_t CrosGralloc1::setProducerUsage(gralloc1_buffer_descriptor_t descriptorId
 int32_t CrosGralloc1::setDimensions(gralloc1_buffer_descriptor_t descriptorId, uint32_t width,
 				    uint32_t height)
 {
+
+#if DEBUG_GRALLOC_API
+    ALOGI("%s: %d : (descriptorId = %llu, format = %d)", __func__, __LINE__, descriptorId, width);
+#endif
+
 	auto hnd = (struct cros_gralloc_buffer_descriptor *)descriptorId;
 	hnd->width = width;
 	hnd->height = height;
@@ -515,6 +542,11 @@ int32_t CrosGralloc1::setDimensions(gralloc1_buffer_descriptor_t descriptorId, u
 
 int32_t CrosGralloc1::setFormat(gralloc1_buffer_descriptor_t descriptorId, int32_t format)
 {
+
+#if DEBUG_GRALLOC_API
+    ALOGI("%s: %d : (descriptorId = %llu, format = %x)", __func__, __LINE__, descriptorId, format);
+#endif
+
 	auto hnd = (struct cros_gralloc_buffer_descriptor *)descriptorId;
 	hnd->droid_format = format;
 	hnd->drm_format = cros_gralloc_convert_format(format);
@@ -543,6 +575,11 @@ int32_t CrosGralloc1::setProtectionInfo(buffer_handle_t buffer, uint32_t protect
 
 int32_t CrosGralloc1::setModifier(gralloc1_buffer_descriptor_t descriptorId, uint64_t modifier)
 {
+
+#if DEBUG_GRALLOC_API
+    ALOGI("%s: %d : (descriptorId = %llu, modifier = %llu)", __func__, __LINE__, descriptorId, modifier);
+#endif
+
 	auto hnd = (struct cros_gralloc_buffer_descriptor *)descriptorId;
 	hnd->modifier = modifier;
 	return CROS_GRALLOC_ERROR_NONE;
@@ -551,6 +588,11 @@ int32_t CrosGralloc1::setModifier(gralloc1_buffer_descriptor_t descriptorId, uin
 int32_t CrosGralloc1::allocate(struct cros_gralloc_buffer_descriptor *descriptor,
 			       buffer_handle_t *outBufferHandle)
 {
+
+#if DEBUG_GRALLOC_API
+    ALOGI("%s: %d : (descriptor = %p)", __func__, __LINE__, descriptor);
+#endif
+
 	// If this function is being called, it's because we handed out its function
 	// pointer, which only occurs when mDevice has been loaded successfully and
 	// we are permitted to allocate
@@ -570,8 +612,19 @@ int32_t CrosGralloc1::allocate(struct cros_gralloc_buffer_descriptor *descriptor
 				   static_cast<unsigned long long>(descriptor->use_flags));
 		return CROS_GRALLOC_ERROR_UNSUPPORTED;
 	}
-	if (driver->allocate(descriptor, outBufferHandle))
+	if (driver->allocate(descriptor, outBufferHandle)) {
+        if(outBufferHandle) {
+            ALOGI("%s: %d : allocate failed (descriptor = %p, *outBufferHandle = %p)", __func__, __LINE__, descriptor, *outBufferHandle);
+        }
+
 		return CROS_GRALLOC_ERROR_NO_RESOURCES;
+    }
+
+#if DEBUG_GRALLOC_API
+    if(outBufferHandle) {
+        ALOGI("%s: %d : (descriptor = %p, *outBufferHandle = %p)", __func__, __LINE__, descriptor, *outBufferHandle);
+    }
+#endif
 
 	return CROS_GRALLOC_ERROR_NONE;
 }
@@ -580,6 +633,10 @@ int32_t CrosGralloc1::allocateBuffers(gralloc1_device_t *device, uint32_t numDes
 				      const gralloc1_buffer_descriptor_t *descriptors,
 				      buffer_handle_t *outBuffers)
 {
+#if DEBUG_GRALLOC_API
+    ALOGI("%s: %d : (descriptors = %p)", __func__, __LINE__, descriptors);
+#endif
+
 	auto adapter = getAdapter(device);
 	for (uint32_t i = 0; i < numDescriptors; i++) {
 		auto descriptor = (struct cros_gralloc_buffer_descriptor *)descriptors[i];
@@ -601,6 +658,11 @@ int32_t CrosGralloc1::allocateBuffers(gralloc1_device_t *device, uint32_t numDes
 
 int32_t CrosGralloc1::retain(buffer_handle_t bufferHandle)
 {
+
+#if DEBUG_GRALLOC_API
+    ALOGI("%s: %d : (buffer = %p)", __func__, __LINE__, bufferHandle);
+#endif
+
 	if (driver->retain(bufferHandle))
 		return CROS_GRALLOC_ERROR_BAD_HANDLE;
 
@@ -609,6 +671,11 @@ int32_t CrosGralloc1::retain(buffer_handle_t bufferHandle)
 
 int32_t CrosGralloc1::release(buffer_handle_t bufferHandle)
 {
+
+#if DEBUG_GRALLOC_API
+    ALOGI("%s: %d : (buffer = %p)", __func__, __LINE__, bufferHandle);
+#endif
+
 	if (driver->release(bufferHandle))
 		return CROS_GRALLOC_ERROR_BAD_HANDLE;
 
@@ -620,6 +687,10 @@ int32_t CrosGralloc1::lock(buffer_handle_t bufferHandle, gralloc1_producer_usage
 			   const gralloc1_rect_t &accessRegion, void **outData,
 			   int32_t acquireFence)
 {
+#if DEBUG_GRALLOC_API
+    ALOGI("%s: %d : (buffer = %p)", __func__, __LINE__, bufferHandle);
+#endif
+
 	uint64_t map_flags;
 	uint8_t *addr[DRV_MAX_PLANES];
 
@@ -675,6 +746,11 @@ int32_t CrosGralloc1::lockFlex(buffer_handle_t bufferHandle,
 			       const gralloc1_rect_t &accessRegion,
 			       struct android_flex_layout *outData, int32_t acquireFence)
 {
+
+#if DEBUG_GRALLOC_API
+    ALOGI("%s: %d : (buffer = %p)", __func__, __LINE__, bufferHandle);
+#endif
+
 	int32_t ret = -EINVAL;
 	struct android_ycbcr ycbcrData;
 
@@ -705,6 +781,11 @@ int32_t CrosGralloc1::lockYCbCr(buffer_handle_t bufferHandle,
 				const gralloc1_rect_t &accessRegion, struct android_ycbcr *ycbcr,
 				int32_t acquireFence)
 {
+
+#if DEBUG_GRALLOC_API
+    ALOGI("%s: %d : (buffer = %p)", __func__, __LINE__, bufferHandle);
+#endif
+
 	uint64_t map_flags;
 	uint8_t *addr[DRV_MAX_PLANES] = { nullptr, nullptr, nullptr, nullptr };
 
@@ -759,6 +840,11 @@ int32_t CrosGralloc1::lockYCbCr(buffer_handle_t bufferHandle,
 
 int32_t CrosGralloc1::unlock(buffer_handle_t bufferHandle, int32_t *outReleaseFence)
 {
+
+#if DEBUG_GRALLOC_API
+    ALOGI("%s: %d : (buffer = %p)", __func__, __LINE__, bufferHandle);
+#endif
+
 	if (driver->unlock(bufferHandle, outReleaseFence))
 		return CROS_GRALLOC_ERROR_BAD_HANDLE;
 
@@ -767,6 +853,11 @@ int32_t CrosGralloc1::unlock(buffer_handle_t bufferHandle, int32_t *outReleaseFe
 
 int32_t CrosGralloc1::getNumFlexPlanes(buffer_handle_t buffer, uint32_t *outNumPlanes)
 {
+
+#if DEBUG_GRALLOC_API
+    ALOGI("%s: %d : (buffer = %p)", __func__, __LINE__, buffer);
+#endif
+
 	auto hnd = cros_gralloc_convert_handle(buffer);
 	if (!hnd) {
 		cros_gralloc_error("Invalid handle.");
@@ -779,6 +870,10 @@ int32_t CrosGralloc1::getNumFlexPlanes(buffer_handle_t buffer, uint32_t *outNumP
 
 int32_t CrosGralloc1::getBackingStore(buffer_handle_t buffer, gralloc1_backing_store_t *outStore)
 {
+#if DEBUG_GRALLOC_API
+    ALOGI("%s: %d : (buffer = %p)", __func__, __LINE__, buffer);
+#endif
+
 	auto hnd = cros_gralloc_convert_handle(buffer);
 	if (!hnd) {
 		cros_gralloc_error("Invalid handle.");
@@ -794,6 +889,10 @@ int32_t CrosGralloc1::getBackingStore(buffer_handle_t buffer, gralloc1_backing_s
 int32_t CrosGralloc1::getConsumerUsage(buffer_handle_t buffer,
 				       uint64_t * /*gralloc1_consumer_usage_t*/ outUsage)
 {
+#if DEBUG_GRALLOC_API
+    ALOGI("%s: %d : (buffer = %p)", __func__, __LINE__, buffer);
+#endif
+
 	auto hnd = cros_gralloc_convert_handle(buffer);
 	if (!hnd) {
 		return CROS_GRALLOC_ERROR_BAD_HANDLE;
@@ -805,6 +904,11 @@ int32_t CrosGralloc1::getConsumerUsage(buffer_handle_t buffer,
 
 int32_t CrosGralloc1::getDimensions(buffer_handle_t buffer, uint32_t *outWidth, uint32_t *outHeight)
 {
+
+#if DEBUG_GRALLOC_API
+    ALOGI("%s: %d : (buffer = %p)", __func__, __LINE__, buffer);
+#endif
+
 	auto hnd = cros_gralloc_convert_handle(buffer);
 	if (!hnd) {
 		return CROS_GRALLOC_ERROR_BAD_HANDLE;
@@ -817,6 +921,10 @@ int32_t CrosGralloc1::getDimensions(buffer_handle_t buffer, uint32_t *outWidth, 
 
 int32_t CrosGralloc1::getFormat(buffer_handle_t buffer, int32_t *outFormat)
 {
+#if DEBUG_GRALLOC_API
+    ALOGI("%s: %d : (buffer = %p)", __func__, __LINE__, buffer);
+#endif
+
 	auto hnd = cros_gralloc_convert_handle(buffer);
 	if (!hnd) {
 		return CROS_GRALLOC_ERROR_BAD_HANDLE;
@@ -829,6 +937,11 @@ int32_t CrosGralloc1::getFormat(buffer_handle_t buffer, int32_t *outFormat)
 int32_t CrosGralloc1::getProducerUsage(buffer_handle_t buffer,
 				       uint64_t * /*gralloc1_producer_usage_t*/ outUsage)
 {
+
+#if DEBUG_GRALLOC_API
+    ALOGI("%s: %d : (buffer = %p)", __func__, __LINE__, buffer);
+#endif
+
 	auto hnd = cros_gralloc_convert_handle(buffer);
 	if (!hnd) {
 		return CROS_GRALLOC_ERROR_BAD_HANDLE;
@@ -840,6 +953,11 @@ int32_t CrosGralloc1::getProducerUsage(buffer_handle_t buffer,
 
 int32_t CrosGralloc1::getStride(buffer_handle_t buffer, uint32_t *outStride)
 {
+#if DEBUG_GRALLOC_API
+        ALOGI("%s: %d : (buffer = %p)", __func__, __LINE__, buffer);
+#endif
+
+
 	auto hnd = cros_gralloc_convert_handle(buffer);
 	if (!hnd) {
 		return CROS_GRALLOC_ERROR_BAD_HANDLE;
@@ -884,6 +1002,11 @@ int32_t CrosGralloc1::getByteStride(buffer_handle_t buffer, uint32_t *outStride,
 int CrosGralloc1::HookGrallocClose(hw_device_t * dev)
 {
     CrosGralloc1* pGralloc1 = CrosGralloc1::getAdapter((gralloc1_device_t*)dev);
+
+#if DEBUG_GRALLOC_API
+    ALOGI("%s: %d : (dev = %p)", __func__, __LINE__, dev);
+#endif
+
 
     if(pGralloc1) {
         delete pGralloc1;

@@ -142,8 +142,6 @@ struct driver *drv_create(int fd)
 	if (!drv->buffer_table)
 		goto free_driver;
 
-    ALOGI("%s : %d", __func__, __LINE__);
-
 	drv->map_table = drmHashCreate();
 	if (!drv->map_table)
 		goto free_buffer_table;
@@ -526,10 +524,22 @@ union bo_handle drv_bo_get_plane_handle(struct bo *bo, size_t plane)
 int drv_bo_get_plane_fd(struct bo *bo, size_t plane)
 {
 
-	int ret, fd;
+	int ret = 0;
+    int fd = -1;
+    uint32_t flags = 0;
+
+
+    // Note  :  kernel 4.4 can't support DRM_RDWR flag
+    // flags = DRM_CLOEXEC | DRM_RDWR;
+    flags = DRM_CLOEXEC;
+
 	assert(plane < bo->num_planes);
 
-	ret = drmPrimeHandleToFD(bo->drv->fd, bo->handles[plane].u32, DRM_CLOEXEC | DRM_RDWR, &fd);
+	ret = drmPrimeHandleToFD(bo->drv->fd, bo->handles[plane].u32, flags, &fd);
+    if(ret) {
+        ALOGE("%s : %d : drmPrimeHandleToFD failed(fd = %d, handle = %d, flags = %x, prime_fd = %d) ret = %d",
+            __func__, __LINE__, bo->drv->fd, bo->handles[plane].u32, flags, fd, ret);
+    }
 
 	return (ret) ? ret : fd;
 }
@@ -1070,7 +1080,6 @@ static int kms_wait_vblank(kms_t *kms)
 int drv_init_kms(struct driver* drv)
 {
     drmModeConnectorPtr lvds, hdmi, edp;
-    uint32_t lxc_id = 1;
     uint32_t type_id = 1;
     int connected_count = 0;
     int i, ret;
@@ -1361,9 +1370,11 @@ int drv_present_bo(struct driver* drv, struct bo *bo)
             uint32_t flags = 0;
             ret = drmModePageFlip(kms->fd, kms->primary.crtc_id, bo->fb_id, flags, (void *)kms);        
             if (ret) {
-                ALOGE("%s : %d : page flip failed (crtc_id = %d, fb_id =%d, flags = %d), error = %s)",
-                      __func__, __LINE__, kms->primary.crtc_id, bo->fb_id, flags, strerror(errno));
-                kms->first_post = 1;
+                if(ret != -EBUSY) {
+                    ALOGE("%s : %d : page flip failed (crtc_id = %d, fb_id =%d, flags = %d), ret = %d, error = %s)",
+                          __func__, __LINE__, kms->primary.crtc_id, bo->fb_id, flags, ret, strerror(errno));
+                    kms->first_post = 1;
+                }
             }
             else {
                 kms->back_bo = bo;

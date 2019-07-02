@@ -13,6 +13,8 @@ LOCAL_SRC_FILES += \
 ifeq ($(strip $(BOARD_USES_GRALLOC1)), true)
 LOCAL_SRC_FILES += cros_gralloc/gralloc1/cros_gralloc1_module.cc
 LOCAL_CPPFLAGS += -DUSE_GRALLOC1
+LOCAL_CFLAGS += -DUSE_GRALLOC1  -DLOG_TAG=\"gralloc1\"
 else
 LOCAL_SRC_FILES += cros_gralloc/gralloc0/gralloc0.cc
+LOCAL_CFLAGS += -DLOG_TAG=\"gralloc\"
 endif

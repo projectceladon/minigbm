@@ -15,7 +15,7 @@
 #include <unistd.h>
 #include <xf86drm.h>
 
-#include <log/log.h>
+#include <cutils/log.h>
 
 cros_gralloc_driver::cros_gralloc_driver() : drv_(nullptr)
 {
@@ -74,7 +74,7 @@ int32_t cros_gralloc_driver::init()
 				continue;
 			}
 
-            cros_gralloc_log("CROS_GRALLOC_INFO", __FILE__, __LINE__, "drm version->name =%s", version->name);
+            ALOGI("drm version->name =%s", version->name);
 
 			if (undesired[i] && !strcmp(version->name, undesired[i])) {
 				drmFreeVersion(version);
@@ -371,8 +371,6 @@ int cros_gralloc_driver::init_kms()
 int cros_gralloc_driver::get_kms_info(kms_info_t* info) 
 {
     int ret = 0;
-
-    ALOGI("%s:%d", __func__, __LINE__);
     
     ret = drv_get_kms_info(drv_, info);
     if(ret) {
