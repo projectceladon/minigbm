@@ -531,7 +531,7 @@ int32_t CrosGralloc1::setDimensions(gralloc1_buffer_descriptor_t descriptorId, u
 {
 
 #if DEBUG_GRALLOC_API
-    ALOGI("%s: %d : (descriptorId = %llu, format = %d)", __func__, __LINE__, descriptorId, width);
+    ALOGI("%s: %d : (descriptorId = %llu, width = %d, height = %d)", __func__, __LINE__, descriptorId, width, height);
 #endif
 
 	auto hnd = (struct cros_gralloc_buffer_descriptor *)descriptorId;
@@ -1064,7 +1064,11 @@ static struct hw_module_methods_t cros_gralloc_module_methods = {
 hw_module_t HAL_MODULE_INFO_SYM = {
 	.tag = HARDWARE_MODULE_TAG,
 	.module_api_version = HARDWARE_MODULE_API_VERSION(1, 0),
+#if TARGET_USE_GRALLOC_VHAL
+	.id = GRALLOC_IMP_HARDWARE_MODULE_ID,
+#else
 	.id = GRALLOC_HARDWARE_MODULE_ID,
+#endif 	
 	.name = "Gralloc module",
 	.author = "Chrome OS",
 	.methods = &cros_gralloc_module_methods,

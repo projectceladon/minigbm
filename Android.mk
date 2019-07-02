@@ -64,7 +64,14 @@ LOCAL_CFLAGS += -DUSE_VNDK
 endif
 
 LOCAL_CFLAGS += -Wno-error
+ifeq ($(TARGET_USE_GRALLOC_VHAL), true)
+LOCAL_CFLAGS += -DTARGET_USE_GRALLOC_VHAL=1
+LOCAL_CPPFLAGS += -DTARGET_USE_GRALLOC_VHAL=1
+LOCAL_MODULE := gralloc_imp.intel
+#LOCAL_MODULE := gralloc.intel
+else
 LOCAL_MODULE := gralloc.intel
+endif
 LOCAL_MODULE_TAGS := optional
 # The preferred path for vendor HALs is /vendor/lib/hw
 LOCAL_PROPRIETARY_MODULE := true

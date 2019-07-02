@@ -18,7 +18,7 @@
 #include "../i915_private_android.h"
 #include "../i915_private_android_types.h"
 
-#define DEBUG_GRALLOC_API   1
+#define DEBUG_GRALLOC_API   0
 
 struct gralloc0_module {
 	gralloc_module_t base;
