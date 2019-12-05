@@ -7,12 +7,8 @@
 #include "cros_gralloc_driver.h"
 #include "../util.h"
 
-#include "i915_private_android.h"
-
 #include <cstdlib>
-#include <errno.h>
 #include <fcntl.h>
-#include <unistd.h>
 #include <xf86drm.h>
 
 cros_gralloc_driver::cros_gralloc_driver() : drv_(nullptr)
@@ -60,24 +56,18 @@ int32_t cros_gralloc_driver::init()
 				continue;
 
 			version = drmGetVersion(fd);
-			if (!version) {
-				close(fd);
+			if (!version)
 				continue;
-			}
 
 			if (undesired[i] && !strcmp(version->name, undesired[i])) {
 				drmFreeVersion(version);
-				close(fd);
 				continue;
 			}
 
 			drmFreeVersion(version);
 			drv_ = drv_create(fd);
-			if (drv_) {
+			if (drv_)
 				return 0;
-			}
-
-			close(fd);
 		}
 	}
 
@@ -100,20 +90,26 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 	uint64_t mod;
 	size_t num_planes;
 	uint32_t resolved_format;
+	uint32_t bytes_per_pixel;
+	uint64_t use_flags;
 
 	struct bo *bo;
 	struct cros_gralloc_handle *hnd;
 
 	resolved_format = drv_resolve_format(drv_, descriptor->drm_format, descriptor->use_flags);
-	if (descriptor->modifier == 0) {
-		bo = drv_bo_create(drv_, descriptor->width, descriptor->height, resolved_format,
-				   descriptor->use_flags);
-	} else {
-		bo = drv_bo_create_with_modifiers(drv_, descriptor->width, descriptor->height,
-						  resolved_format, &descriptor->modifier, 1);
-	}
+	use_flags = descriptor->use_flags;
+	/*
+	 * TODO(b/79682290): ARC++ assumes NV12 is always linear and doesn't
+	 * send modifiers across Wayland protocol, so we or in the
+	 * BO_USE_LINEAR flag here. We need to fix ARC++ to allocate and work
+	 * with tiled buffers.
+	 */
+	if (resolved_format == DRM_FORMAT_NV12)
+		use_flags |= BO_USE_LINEAR;
+
+	bo = drv_bo_create(drv_, descriptor->width, descriptor->height, resolved_format, use_flags);
 	if (!bo) {
-		cros_gralloc_error("Failed to create bo.");
+		drv_log("Failed to create bo.\n");
 		return -ENOMEM;
 	}
 
@@ -124,7 +120,7 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 	 */
 	if (drv_num_buffers_per_bo(bo) != 1) {
 		drv_bo_destroy(bo);
-		cros_gralloc_error("Can only support one buffer per bo.");
+		drv_log("Can only support one buffer per bo.\n");
 		return -EINVAL;
 	}
 
@@ -139,7 +135,6 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 		hnd->fds[plane] = drv_bo_get_plane_fd(bo, plane);
 		hnd->strides[plane] = drv_bo_get_plane_stride(bo, plane);
 		hnd->offsets[plane] = drv_bo_get_plane_offset(bo, plane);
-		hnd->sizes[plane] = drv_bo_get_plane_size(bo, plane);
 
 		mod = drv_bo_get_plane_format_modifier(bo, plane);
 		hnd->format_modifiers[2 * plane] = static_cast<uint32_t>(mod >> 32);
@@ -149,24 +144,18 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 	hnd->width = drv_bo_get_width(bo);
 	hnd->height = drv_bo_get_height(bo);
 	hnd->format = drv_bo_get_format(bo);
-	hnd->tiling_mode = drv_bo_get_stride_or_tiling(bo);
 	hnd->use_flags[0] = static_cast<uint32_t>(descriptor->use_flags >> 32);
 	hnd->use_flags[1] = static_cast<uint32_t>(descriptor->use_flags);
-	hnd->pixel_stride = drv_bo_get_stride_in_pixels(bo);
+	bytes_per_pixel = drv_bytes_per_pixel_from_format(hnd->format, 0);
+	hnd->pixel_stride = DIV_ROUND_UP(hnd->strides[0], bytes_per_pixel);
 	hnd->magic = cros_gralloc_magic;
-	int32_t format = i915_private_invert_format(hnd->format);
-	if (format == 0) {
-		format = descriptor->droid_format;
-	}
-	hnd->droid_format = format;
+	hnd->droid_format = descriptor->droid_format;
 	hnd->usage = descriptor->producer_usage;
-	hnd->producer_usage = descriptor->producer_usage;
-	hnd->consumer_usage = descriptor->consumer_usage;
 
 	id = drv_bo_get_plane_handle(bo, 0).u32;
 	auto buffer = new cros_gralloc_buffer(id, bo, hnd);
 
-	SCOPED_SPIN_LOCK(mutex_);
+	std::lock_guard<std::mutex> lock(mutex_);
 	buffers_.emplace(id, buffer);
 	handles_.emplace(hnd, std::make_pair(buffer, 1));
 	*out_handle = &hnd->base;
@@ -176,11 +165,11 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 int32_t cros_gralloc_driver::retain(buffer_handle_t handle)
 {
 	uint32_t id;
-	SCOPED_SPIN_LOCK(mutex_);
+	std::lock_guard<std::mutex> lock(mutex_);
 
 	auto hnd = cros_gralloc_convert_handle(handle);
 	if (!hnd) {
-		cros_gralloc_error("Invalid handle.");
+		drv_log("Invalid handle.\n");
 		return -EINVAL;
 	}
 
@@ -192,7 +181,7 @@ int32_t cros_gralloc_driver::retain(buffer_handle_t handle)
 	}
 
 	if (drmPrimeFDToHandle(drv_get_fd(drv_), hnd->fds[0], &id)) {
-		cros_gralloc_error("drmPrimeFDToHandle failed.");
+		drv_log("drmPrimeFDToHandle failed.\n");
 		return -errno;
 	}
 
@@ -233,29 +222,21 @@ int32_t cros_gralloc_driver::retain(buffer_handle_t handle)
 
 int32_t cros_gralloc_driver::release(buffer_handle_t handle)
 {
-	SCOPED_SPIN_LOCK(mutex_);
+	std::lock_guard<std::mutex> lock(mutex_);
 
 	auto hnd = cros_gralloc_convert_handle(handle);
 	if (!hnd) {
-		cros_gralloc_error("Invalid handle.");
+		drv_log("Invalid handle.\n");
 		return -EINVAL;
 	}
 
 	auto buffer = get_buffer(hnd);
 	if (!buffer) {
-		uint32_t id = -1;
-		if (drmPrimeFDToHandle(drv_get_fd(drv_), hnd->fds[0], &id)) {
-			cros_gralloc_error("drmPrimeFDToHandle failed.");
-			return -errno;
-		}
-		if (buffers_.count(id)) {
-			buffer = buffers_[id];
-			buffer->increase_refcount();
-		} else {
-			cros_gralloc_error("Could not found reference");
-			return -EINVAL;
-		}
-	} else if (!--handles_[hnd].second)
+		drv_log("Invalid Reference.\n");
+		return -EINVAL;
+	}
+
+	if (!--handles_[hnd].second)
 		handles_.erase(hnd);
 
 	if (buffer->decrease_refcount() == 0) {
@@ -266,42 +247,43 @@ int32_t cros_gralloc_driver::release(buffer_handle_t handle)
 	return 0;
 }
 
-int32_t cros_gralloc_driver::lock(buffer_handle_t handle, int32_t acquire_fence, uint32_t map_flags,
+int32_t cros_gralloc_driver::lock(buffer_handle_t handle, int32_t acquire_fence,
+				  const struct rectangle *rect, uint32_t map_flags,
 				  uint8_t *addr[DRV_MAX_PLANES])
 {
 	int32_t ret = cros_gralloc_sync_wait(acquire_fence);
 	if (ret)
 		return ret;
 
-	SCOPED_SPIN_LOCK(mutex_);
+	std::lock_guard<std::mutex> lock(mutex_);
 	auto hnd = cros_gralloc_convert_handle(handle);
 	if (!hnd) {
-		cros_gralloc_error("Invalid handle.");
+		drv_log("Invalid handle.\n");
 		return -EINVAL;
 	}
 
 	auto buffer = get_buffer(hnd);
 	if (!buffer) {
-		cros_gralloc_error("Invalid Reference.");
+		drv_log("Invalid Reference.\n");
 		return -EINVAL;
 	}
 
-	return buffer->lock(map_flags, addr);
+	return buffer->lock(rect, map_flags, addr);
 }
 
 int32_t cros_gralloc_driver::unlock(buffer_handle_t handle, int32_t *release_fence)
 {
-	SCOPED_SPIN_LOCK(mutex_);
+	std::lock_guard<std::mutex> lock(mutex_);
 
 	auto hnd = cros_gralloc_convert_handle(handle);
 	if (!hnd) {
-		cros_gralloc_error("Invalid handle.");
+		drv_log("Invalid handle.\n");
 		return -EINVAL;
 	}
 
 	auto buffer = get_buffer(hnd);
 	if (!buffer) {
-		cros_gralloc_error("Invalid Reference.");
+		drv_log("Invalid Reference.\n");
 		return -EINVAL;
 	}
 
@@ -317,17 +299,17 @@ int32_t cros_gralloc_driver::unlock(buffer_handle_t handle, int32_t *release_fen
 
 int32_t cros_gralloc_driver::get_backing_store(buffer_handle_t handle, uint64_t *out_store)
 {
-	SCOPED_SPIN_LOCK(mutex_);
+	std::lock_guard<std::mutex> lock(mutex_);
 
 	auto hnd = cros_gralloc_convert_handle(handle);
 	if (!hnd) {
-		cros_gralloc_error("Invalid handle.");
+		drv_log("Invalid handle.\n");
 		return -EINVAL;
 	}
 
 	auto buffer = get_buffer(hnd);
 	if (!buffer) {
-		cros_gralloc_error("Invalid Reference.");
+		drv_log("Invalid Reference.\n");
 		return -EINVAL;
 	}
 

@@ -7,7 +7,6 @@
 #include "cros_gralloc_buffer.h"
 
 #include <assert.h>
-#include <errno.h>
 #include <sys/mman.h>
 
 cros_gralloc_buffer::cros_gralloc_buffer(uint32_t id, struct bo *acquire_bo,
@@ -45,7 +44,8 @@ int32_t cros_gralloc_buffer::decrease_refcount()
 	return --refcount_;
 }
 
-int32_t cros_gralloc_buffer::lock(uint32_t map_flags, uint8_t *addr[DRV_MAX_PLANES])
+int32_t cros_gralloc_buffer::lock(const struct rectangle *rect, uint32_t map_flags,
+				  uint8_t *addr[DRV_MAX_PLANES])
 {
 	void *vaddr = nullptr;
 
@@ -56,21 +56,20 @@ int32_t cros_gralloc_buffer::lock(uint32_t map_flags, uint8_t *addr[DRV_MAX_PLAN
 	 * just use the first kernel buffer.
 	 */
 	if (drv_num_buffers_per_bo(bo_) != 1) {
-		cros_gralloc_error("Can only support one buffer per bo.");
+		drv_log("Can only support one buffer per bo.\n");
 		return -EINVAL;
 	}
 
 	if (map_flags) {
 		if (lock_data_[0]) {
 			drv_bo_invalidate(bo_, lock_data_[0]);
-			vaddr = lock_data_[0]->addr;
+			vaddr = lock_data_[0]->vma->addr;
 		} else {
-			vaddr = drv_bo_map(bo_, 0, 0, drv_bo_get_width(bo_), drv_bo_get_height(bo_),
-					   map_flags, &lock_data_[0], 0);
+			vaddr = drv_bo_map(bo_, rect, map_flags, &lock_data_[0], 0);
 		}
 
 		if (vaddr == MAP_FAILED) {
-			cros_gralloc_error("Mapping failed.");
+			drv_log("Mapping failed.\n");
 			return -EFAULT;
 		}
 	}
@@ -85,13 +84,13 @@ int32_t cros_gralloc_buffer::lock(uint32_t map_flags, uint8_t *addr[DRV_MAX_PLAN
 int32_t cros_gralloc_buffer::unlock()
 {
 	if (lockcount_ <= 0) {
-		cros_gralloc_error("Buffer was not locked.");
+		drv_log("Buffer was not locked.\n");
 		return -EINVAL;
 	}
 
 	if (!--lockcount_) {
 		if (lock_data_[0]) {
-			drv_bo_unmap(bo_, lock_data_[0]);
+			drv_bo_flush_or_unmap(bo_, lock_data_[0]);
 			lock_data_[0] = nullptr;
 		}
 	}

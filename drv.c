@@ -6,6 +6,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <pthread.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,47 +16,55 @@
 #include <unistd.h>
 #include <xf86drm.h>
 
+#ifdef __ANDROID__
+#include <cutils/log.h>
+#include <libgen.h>
+#endif
+
 #include "drv_priv.h"
 #include "helpers.h"
 #include "util.h"
-#include "i915_private.h"
 
 #ifdef DRV_AMDGPU
-extern struct backend backend_amdgpu;
+extern const struct backend backend_amdgpu;
 #endif
-extern struct backend backend_cirrus;
-extern struct backend backend_evdi;
+extern const struct backend backend_evdi;
 #ifdef DRV_EXYNOS
-extern struct backend backend_exynos;
+extern const struct backend backend_exynos;
 #endif
-extern struct backend backend_gma500;
 #ifdef DRV_I915
-extern struct backend backend_i915;
+extern const struct backend backend_i915;
 #endif
 #ifdef DRV_MARVELL
-extern struct backend backend_marvell;
+extern const struct backend backend_marvell;
 #endif
 #ifdef DRV_MEDIATEK
-extern struct backend backend_mediatek;
+extern const struct backend backend_mediatek;
 #endif
-extern struct backend backend_nouveau;
+#ifdef DRV_MESON
+extern const struct backend backend_meson;
+#endif
+#ifdef DRV_MSM
+extern const struct backend backend_msm;
+#endif
+extern const struct backend backend_nouveau;
 #ifdef DRV_RADEON
-extern struct backend backend_radeon;
+extern const struct backend backend_radeon;
 #endif
 #ifdef DRV_ROCKCHIP
-extern struct backend backend_rockchip;
+extern const struct backend backend_rockchip;
 #endif
 #ifdef DRV_TEGRA
-extern struct backend backend_tegra;
+extern const struct backend backend_tegra;
 #endif
-extern struct backend backend_udl;
+extern const struct backend backend_udl;
 #ifdef DRV_VC4
-extern struct backend backend_vc4;
+extern const struct backend backend_vc4;
 #endif
-extern struct backend backend_vgem;
-extern struct backend backend_virtio_gpu;
+extern const struct backend backend_vgem;
+extern const struct backend backend_virtio_gpu;
 
-static struct backend *drv_get_backend(int fd)
+static const struct backend *drv_get_backend(int fd)
 {
 	drmVersionPtr drm_version;
 	unsigned int i;
@@ -65,15 +74,14 @@ static struct backend *drv_get_backend(int fd)
 	if (!drm_version)
 		return NULL;
 
-	struct backend *backend_list[] = {
+	const struct backend *backend_list[] = {
 #ifdef DRV_AMDGPU
 		&backend_amdgpu,
 #endif
-		&backend_cirrus,   &backend_evdi,
+		&backend_evdi,
 #ifdef DRV_EXYNOS
 		&backend_exynos,
 #endif
-		&backend_gma500,
 #ifdef DRV_I915
 		&backend_i915,
 #endif
@@ -82,6 +90,12 @@ static struct backend *drv_get_backend(int fd)
 #endif
 #ifdef DRV_MEDIATEK
 		&backend_mediatek,
+#endif
+#ifdef DRV_MESON
+		&backend_meson,
+#endif
+#ifdef DRV_MSM
+		&backend_msm,
 #endif
 		&backend_nouveau,
 #ifdef DRV_RADEON
@@ -126,38 +140,37 @@ struct driver *drv_create(int fd)
 	if (!drv->backend)
 		goto free_driver;
 
-	drv->buffer_table = drmHashCreate();
-	if (!drv->buffer_table)
+	if (pthread_mutex_init(&drv->driver_lock, NULL))
 		goto free_driver;
 
-	drv->map_table = drmHashCreate();
-	if (!drv->map_table)
+	drv->buffer_table = drmHashCreate();
+	if (!drv->buffer_table)
+		goto free_lock;
+
+	drv->mappings = drv_array_init(sizeof(struct mapping));
+	if (!drv->mappings)
 		goto free_buffer_table;
 
-	/* Start with a power of 2 number of allocations. */
-	drv->combos.allocations = 2;
-	drv->combos.size = 0;
-
-	drv->combos.data = calloc(drv->combos.allocations, sizeof(struct combination));
-	if (!drv->combos.data)
-		goto free_map_table;
+	drv->combos = drv_array_init(sizeof(struct combination));
+	if (!drv->combos)
+		goto free_mappings;
 
 	if (drv->backend->init) {
 		ret = drv->backend->init(drv);
 		if (ret) {
-			free(drv->combos.data);
-			goto free_map_table;
+			drv_array_destroy(drv->combos);
+			goto free_mappings;
 		}
 	}
 
-	ATOMIC_VAR_INIT(drv->driver_lock);
-
 	return drv;
 
-free_map_table:
-	drmHashDestroy(drv->map_table);
+free_mappings:
+	drv_array_destroy(drv->mappings);
 free_buffer_table:
 	drmHashDestroy(drv->buffer_table);
+free_lock:
+	pthread_mutex_destroy(&drv->driver_lock);
 free_driver:
 	free(drv);
 	return NULL;
@@ -165,19 +178,17 @@ free_driver:
 
 void drv_destroy(struct driver *drv)
 {
-	ATOMIC_LOCK(&drv->driver_lock);
-
-       close(drv->fd);
+	pthread_mutex_lock(&drv->driver_lock);
 
 	if (drv->backend->close)
 		drv->backend->close(drv);
 
 	drmHashDestroy(drv->buffer_table);
-	drmHashDestroy(drv->map_table);
+	drv_array_destroy(drv->mappings);
+	drv_array_destroy(drv->combos);
 
-	free(drv->combos.data);
-
-	ATOMIC_UNLOCK(&drv->driver_lock);
+	pthread_mutex_unlock(&drv->driver_lock);
+	pthread_mutex_destroy(&drv->driver_lock);
 
 	free(drv);
 }
@@ -201,8 +212,8 @@ struct combination *drv_get_combination(struct driver *drv, uint32_t format, uin
 
 	best = NULL;
 	uint32_t i;
-	for (i = 0; i < drv->combos.size; i++) {
-		curr = &drv->combos.data[i];
+	for (i = 0; i < drv_array_size(drv->combos); i++) {
+		curr = drv_array_at_idx(drv->combos, i);
 		if ((format == curr->format) && use_flags == (curr->use_flags & use_flags))
 			if (!best || best->metadata.priority < curr->metadata.priority)
 				best = curr;
@@ -255,7 +266,7 @@ struct bo *drv_bo_create(struct driver *drv, uint32_t width, uint32_t height, ui
 		return NULL;
 	}
 
-	ATOMIC_LOCK(&drv->driver_lock);
+	pthread_mutex_lock(&drv->driver_lock);
 
 	for (plane = 0; plane < bo->num_planes; plane++) {
 		if (plane > 0)
@@ -264,7 +275,7 @@ struct bo *drv_bo_create(struct driver *drv, uint32_t width, uint32_t height, ui
 		drv_increment_reference_count(drv, bo, plane);
 	}
 
-	ATOMIC_UNLOCK(&drv->driver_lock);
+	pthread_mutex_unlock(&drv->driver_lock);
 
 	return bo;
 }
@@ -293,7 +304,7 @@ struct bo *drv_bo_create_with_modifiers(struct driver *drv, uint32_t width, uint
 		return NULL;
 	}
 
-	ATOMIC_LOCK(&drv->driver_lock);
+	pthread_mutex_lock(&drv->driver_lock);
 
 	for (plane = 0; plane < bo->num_planes; plane++) {
 		if (plane > 0)
@@ -302,7 +313,7 @@ struct bo *drv_bo_create_with_modifiers(struct driver *drv, uint32_t width, uint
 		drv_increment_reference_count(drv, bo, plane);
 	}
 
-	ATOMIC_UNLOCK(&drv->driver_lock);
+	pthread_mutex_unlock(&drv->driver_lock);
 
 	return bo;
 }
@@ -313,7 +324,7 @@ void drv_bo_destroy(struct bo *bo)
 	uintptr_t total = 0;
 	struct driver *drv = bo->drv;
 
-	ATOMIC_LOCK(&drv->driver_lock);
+	pthread_mutex_lock(&drv->driver_lock);
 
 	for (plane = 0; plane < bo->num_planes; plane++)
 		drv_decrement_reference_count(drv, bo, plane);
@@ -321,10 +332,10 @@ void drv_bo_destroy(struct bo *bo)
 	for (plane = 0; plane < bo->num_planes; plane++)
 		total += drv_get_reference_count(drv, bo, plane);
 
-	ATOMIC_UNLOCK(&drv->driver_lock);
+	pthread_mutex_unlock(&drv->driver_lock);
 
 	if (total == 0) {
-		assert(drv_map_info_destroy(bo) == 0);
+		assert(drv_mapping_destroy(bo) == 0);
 		bo->drv->backend->bo_destroy(bo);
 	}
 
@@ -356,7 +367,7 @@ struct bo *drv_bo_import(struct driver *drv, struct drv_import_fd_data *data)
 
 		seek_end = lseek(data->fds[plane], 0, SEEK_END);
 		if (seek_end == (off_t)(-1)) {
-			fprintf(stderr, "drv: lseek() failed with %s\n", strerror(errno));
+			drv_log("lseek() failed with %s\n", strerror(errno));
 			goto destroy_bo;
 		}
 
@@ -367,7 +378,7 @@ struct bo *drv_bo_import(struct driver *drv, struct drv_import_fd_data *data)
 			bo->sizes[plane] = data->offsets[plane + 1] - data->offsets[plane];
 
 		if ((int64_t)bo->offsets[plane] + bo->sizes[plane] > seek_end) {
-			fprintf(stderr, "drv: buffer size is too large.\n");
+			drv_log("buffer size is too large.\n");
 			goto destroy_bo;
 		}
 
@@ -381,99 +392,134 @@ destroy_bo:
 	return NULL;
 }
 
-void *drv_bo_map(struct bo *bo, uint32_t x, uint32_t y, uint32_t width, uint32_t height,
-		 uint32_t map_flags, struct map_info **map_data, size_t plane)
+void *drv_bo_map(struct bo *bo, const struct rectangle *rect, uint32_t map_flags,
+		 struct mapping **map_data, size_t plane)
 {
-	void *ptr;
+	uint32_t i;
 	uint8_t *addr;
-	size_t offset;
-	struct map_info *data;
+	struct mapping mapping;
 
-	assert(width > 0);
-	assert(height > 0);
-	assert(x + width <= drv_bo_get_width(bo));
-	assert(y + height <= drv_bo_get_height(bo));
+	assert(rect->width >= 0);
+	assert(rect->height >= 0);
+	assert(rect->x + rect->width <= drv_bo_get_width(bo));
+	assert(rect->y + rect->height <= drv_bo_get_height(bo));
 	assert(BO_MAP_READ_WRITE & map_flags);
 	/* No CPU access for protected buffers. */
 	assert(!(bo->use_flags & BO_USE_PROTECTED));
 
-	ATOMIC_LOCK(&bo->drv->driver_lock);
+	memset(&mapping, 0, sizeof(mapping));
+	mapping.rect = *rect;
+	mapping.refcount = 1;
 
-	if (!drmHashLookup(bo->drv->map_table, bo->handles[plane].u32, &ptr)) {
-		data = (struct map_info *)ptr;
-		/* TODO(gsingh): support mapping same buffer with different flags. */
-		assert(data->map_flags == map_flags);
-		data->refcount++;
+	pthread_mutex_lock(&bo->drv->driver_lock);
+
+	for (i = 0; i < drv_array_size(bo->drv->mappings); i++) {
+		struct mapping *prior = (struct mapping *)drv_array_at_idx(bo->drv->mappings, i);
+		if (prior->vma->handle != bo->handles[plane].u32 ||
+		    prior->vma->map_flags != map_flags)
+			continue;
+
+		if (rect->x != prior->rect.x || rect->y != prior->rect.y ||
+		    rect->width != prior->rect.width || rect->height != prior->rect.height)
+			continue;
+
+		prior->refcount++;
+		*map_data = prior;
+		goto exact_match;
+	}
+
+	for (i = 0; i < drv_array_size(bo->drv->mappings); i++) {
+		struct mapping *prior = (struct mapping *)drv_array_at_idx(bo->drv->mappings, i);
+		if (prior->vma->handle != bo->handles[plane].u32 ||
+		    prior->vma->map_flags != map_flags)
+			continue;
+
+		prior->vma->refcount++;
+		mapping.vma = prior->vma;
 		goto success;
 	}
 
-	data = calloc(1, sizeof(*data));
-	addr = bo->drv->backend->bo_map(bo, data, plane, map_flags);
+	mapping.vma = calloc(1, sizeof(*mapping.vma));
+	memcpy(mapping.vma->map_strides, bo->strides, sizeof(mapping.vma->map_strides));
+	addr = bo->drv->backend->bo_map(bo, mapping.vma, plane, map_flags);
 	if (addr == MAP_FAILED) {
 		*map_data = NULL;
-		free(data);
-		ATOMIC_UNLOCK(&bo->drv->driver_lock);
+		free(mapping.vma);
+		pthread_mutex_unlock(&bo->drv->driver_lock);
 		return MAP_FAILED;
 	}
 
-	data->refcount = 1;
-	data->addr = addr;
-	data->handle = bo->handles[plane].u32;
-	data->map_flags = map_flags;
-	drmHashInsert(bo->drv->map_table, bo->handles[plane].u32, (void *)data);
+	mapping.vma->refcount = 1;
+	mapping.vma->addr = addr;
+	mapping.vma->handle = bo->handles[plane].u32;
+	mapping.vma->map_flags = map_flags;
 
 success:
-	drv_bo_invalidate(bo, data);
-	*map_data = data;
-	offset = drv_bo_get_plane_stride(bo, plane) * y;
-	offset += drv_stride_from_format(bo->format, x, plane);
-	addr = (uint8_t *)data->addr;
-	addr += drv_bo_get_plane_offset(bo, plane) + offset;
-	ATOMIC_UNLOCK(&bo->drv->driver_lock);
-
+	*map_data = drv_array_append(bo->drv->mappings, &mapping);
+exact_match:
+	drv_bo_invalidate(bo, *map_data);
+	addr = (uint8_t *)((*map_data)->vma->addr);
+	addr += drv_bo_get_plane_offset(bo, plane);
+	pthread_mutex_unlock(&bo->drv->driver_lock);
 	return (void *)addr;
 }
 
-int drv_bo_unmap(struct bo *bo, struct map_info *data)
+int drv_bo_unmap(struct bo *bo, struct mapping *mapping)
 {
-	int ret = drv_bo_flush(bo, data);
-	if (ret)
-		return ret;
+	uint32_t i;
+	int ret = 0;
 
-	ATOMIC_LOCK(&bo->drv->driver_lock);
+	pthread_mutex_lock(&bo->drv->driver_lock);
 
-	if (!--data->refcount) {
-		ret = bo->drv->backend->bo_unmap(bo, data);
-		drmHashDelete(bo->drv->map_table, data->handle);
-		free(data);
+	if (--mapping->refcount)
+		goto out;
+
+	if (!--mapping->vma->refcount) {
+		ret = bo->drv->backend->bo_unmap(bo, mapping->vma);
+		free(mapping->vma);
 	}
 
-	ATOMIC_UNLOCK(&bo->drv->driver_lock);;
+	for (i = 0; i < drv_array_size(bo->drv->mappings); i++) {
+		if (mapping == (struct mapping *)drv_array_at_idx(bo->drv->mappings, i)) {
+			drv_array_remove(bo->drv->mappings, i);
+			break;
+		}
+	}
 
+out:
+	pthread_mutex_unlock(&bo->drv->driver_lock);
 	return ret;
 }
 
-int drv_bo_invalidate(struct bo *bo, struct map_info *data)
+int drv_bo_invalidate(struct bo *bo, struct mapping *mapping)
 {
 	int ret = 0;
-	assert(data);
-	assert(data->refcount >= 0);
+
+	assert(mapping);
+	assert(mapping->vma);
+	assert(mapping->refcount > 0);
+	assert(mapping->vma->refcount > 0);
 
 	if (bo->drv->backend->bo_invalidate)
-		ret = bo->drv->backend->bo_invalidate(bo, data);
+		ret = bo->drv->backend->bo_invalidate(bo, mapping);
 
 	return ret;
 }
 
-int drv_bo_flush(struct bo *bo, struct map_info *data)
+int drv_bo_flush_or_unmap(struct bo *bo, struct mapping *mapping)
 {
 	int ret = 0;
-	assert(data);
-	assert(data->refcount >= 0);
+
+	assert(mapping);
+	assert(mapping->vma);
+	assert(mapping->refcount > 0);
+	assert(mapping->vma->refcount > 0);
 	assert(!(bo->use_flags & BO_USE_PROTECTED));
 
 	if (bo->drv->backend->bo_flush)
-		ret = bo->drv->backend->bo_flush(bo, data);
+		ret = bo->drv->backend->bo_flush(bo, mapping);
+	else
+		ret = drv_bo_unmap(bo, mapping);
 
 	return ret;
 }
@@ -515,6 +561,10 @@ int drv_bo_get_plane_fd(struct bo *bo, size_t plane)
 
 	ret = drmPrimeHandleToFD(bo->drv->fd, bo->handles[plane].u32, DRM_CLOEXEC | DRM_RDWR, &fd);
 
+	// Older DRM implementations blocked DRM_RDWR, but gave a read/write mapping anyways
+	if (ret)
+		ret = drmPrimeHandleToFD(bo->drv->fd, bo->handles[plane].u32, DRM_CLOEXEC, &fd);
+
 	return (ret) ? ret : fd;
 }
 
@@ -555,68 +605,6 @@ uint32_t drv_resolve_format(struct driver *drv, uint32_t format, uint64_t use_fl
 	return format;
 }
 
-size_t drv_num_planes_from_format(uint32_t format)
-{
-	switch (format) {
-	case DRM_FORMAT_ABGR1555:
-	case DRM_FORMAT_ABGR2101010:
-	case DRM_FORMAT_ABGR4444:
-	case DRM_FORMAT_ABGR8888:
-	case DRM_FORMAT_ARGB1555:
-	case DRM_FORMAT_ARGB2101010:
-	case DRM_FORMAT_ARGB4444:
-	case DRM_FORMAT_ARGB8888:
-	case DRM_FORMAT_AYUV:
-	case DRM_FORMAT_BGR233:
-	case DRM_FORMAT_BGR565:
-	case DRM_FORMAT_BGR888:
-	case DRM_FORMAT_BGRA1010102:
-	case DRM_FORMAT_BGRA4444:
-	case DRM_FORMAT_BGRA5551:
-	case DRM_FORMAT_BGRA8888:
-	case DRM_FORMAT_BGRX1010102:
-	case DRM_FORMAT_BGRX4444:
-	case DRM_FORMAT_BGRX5551:
-	case DRM_FORMAT_BGRX8888:
-	case DRM_FORMAT_C8:
-	case DRM_FORMAT_GR88:
-	case DRM_FORMAT_R8:
-	case DRM_FORMAT_RG88:
-	case DRM_FORMAT_RGB332:
-	case DRM_FORMAT_RGB565:
-	case DRM_FORMAT_RGB888:
-	case DRM_FORMAT_RGBA1010102:
-	case DRM_FORMAT_RGBA4444:
-	case DRM_FORMAT_RGBA5551:
-	case DRM_FORMAT_RGBA8888:
-	case DRM_FORMAT_RGBX1010102:
-	case DRM_FORMAT_RGBX4444:
-	case DRM_FORMAT_RGBX5551:
-	case DRM_FORMAT_RGBX8888:
-	case DRM_FORMAT_UYVY:
-	case DRM_FORMAT_VYUY:
-	case DRM_FORMAT_XBGR1555:
-	case DRM_FORMAT_XBGR2101010:
-	case DRM_FORMAT_XBGR4444:
-	case DRM_FORMAT_XBGR8888:
-	case DRM_FORMAT_XRGB1555:
-	case DRM_FORMAT_XRGB2101010:
-	case DRM_FORMAT_XRGB4444:
-	case DRM_FORMAT_XRGB8888:
-	case DRM_FORMAT_YUYV:
-	case DRM_FORMAT_YVYU:
-		return 1;
-	case DRM_FORMAT_NV12:
-	case DRM_FORMAT_NV21:
-		return 2;
-	case DRM_FORMAT_YVU420:
-	case DRM_FORMAT_YVU420_ANDROID:
-		return 3;
-	}
-
-	return i915_private_num_planes_from_format(format);
-}
-
 uint32_t drv_num_buffers_per_bo(struct bo *bo)
 {
 	uint32_t count = 0;
@@ -631,4 +619,20 @@ uint32_t drv_num_buffers_per_bo(struct bo *bo)
 	}
 
 	return count;
+}
+
+void drv_log_prefix(const char *prefix, const char *file, int line, const char *format, ...)
+{
+	char buf[50];
+	snprintf(buf, sizeof(buf), "[%s:%s(%d)]", prefix, basename(file), line);
+
+	va_list args;
+	va_start(args, format);
+#ifdef __ANDROID__
+	__android_log_vprint(ANDROID_LOG_ERROR, buf, format, args);
+#else
+	fprintf(stderr, "%s ", buf);
+	vfprintf(stderr, format, args);
+#endif
+	va_end(args);
 }

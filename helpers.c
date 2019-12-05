@@ -16,40 +16,77 @@
 
 #include "drv_priv.h"
 #include "helpers.h"
-#include "i915_private.h"
 #include "util.h"
 
-static uint32_t subsample_stride(uint32_t stride, uint32_t format, size_t plane)
+struct planar_layout {
+	size_t num_planes;
+	int horizontal_subsampling[DRV_MAX_PLANES];
+	int vertical_subsampling[DRV_MAX_PLANES];
+	int bytes_per_pixel[DRV_MAX_PLANES];
+};
+
+// clang-format off
+
+static const struct planar_layout packed_1bpp_layout = {
+	.num_planes = 1,
+	.horizontal_subsampling = { 1 },
+	.vertical_subsampling = { 1 },
+	.bytes_per_pixel = { 1 }
+};
+
+static const struct planar_layout packed_2bpp_layout = {
+	.num_planes = 1,
+	.horizontal_subsampling = { 1 },
+	.vertical_subsampling = { 1 },
+	.bytes_per_pixel = { 2 }
+};
+
+static const struct planar_layout packed_3bpp_layout = {
+	.num_planes = 1,
+	.horizontal_subsampling = { 1 },
+	.vertical_subsampling = { 1 },
+	.bytes_per_pixel = { 3 }
+};
+
+static const struct planar_layout packed_4bpp_layout = {
+	.num_planes = 1,
+	.horizontal_subsampling = { 1 },
+	.vertical_subsampling = { 1 },
+	.bytes_per_pixel = { 4 }
+};
+
+static const struct planar_layout biplanar_yuv_420_layout = {
+	.num_planes = 2,
+	.horizontal_subsampling = { 1, 2 },
+	.vertical_subsampling = { 1, 2 },
+	.bytes_per_pixel = { 1, 2 }
+};
+
+static const struct planar_layout triplanar_yuv_420_layout = {
+	.num_planes = 3,
+	.horizontal_subsampling = { 1, 2, 2 },
+	.vertical_subsampling = { 1, 2, 2 },
+	.bytes_per_pixel = { 1, 1, 1 }
+};
+
+// clang-format on
+
+static const struct planar_layout *layout_from_format(uint32_t format)
 {
-
-	if (plane != 0) {
-		switch (format) {
-		case DRM_FORMAT_YVU420:
-		case DRM_FORMAT_YVU420_ANDROID:
-			stride = DIV_ROUND_UP(stride, 2);
-			break;
-		}
-	}
-
-	return stride;
-}
-
-static uint32_t bpp_from_format(uint32_t format, size_t plane)
-{
-	assert(plane < drv_num_planes_from_format(format));
-
 	switch (format) {
 	case DRM_FORMAT_BGR233:
 	case DRM_FORMAT_C8:
 	case DRM_FORMAT_R8:
 	case DRM_FORMAT_RGB332:
+		return &packed_1bpp_layout;
+
 	case DRM_FORMAT_YVU420:
 	case DRM_FORMAT_YVU420_ANDROID:
-		return 8;
+		return &triplanar_yuv_420_layout;
 
 	case DRM_FORMAT_NV12:
 	case DRM_FORMAT_NV21:
-		return (plane == 0) ? 8 : 4;
+		return &biplanar_yuv_420_layout;
 
 	case DRM_FORMAT_ABGR1555:
 	case DRM_FORMAT_ABGR4444:
@@ -75,11 +112,11 @@ static uint32_t bpp_from_format(uint32_t format, size_t plane)
 	case DRM_FORMAT_XRGB4444:
 	case DRM_FORMAT_YUYV:
 	case DRM_FORMAT_YVYU:
-		return 16;
+		return &packed_2bpp_layout;
 
 	case DRM_FORMAT_BGR888:
 	case DRM_FORMAT_RGB888:
-		return 24;
+		return &packed_3bpp_layout;
 
 	case DRM_FORMAT_ABGR2101010:
 	case DRM_FORMAT_ABGR8888:
@@ -98,16 +135,44 @@ static uint32_t bpp_from_format(uint32_t format, size_t plane)
 	case DRM_FORMAT_XBGR8888:
 	case DRM_FORMAT_XRGB2101010:
 	case DRM_FORMAT_XRGB8888:
-		return 32;
-	}
+		return &packed_4bpp_layout;
 
-	return i915_private_bpp_from_format(format, plane);
+	default:
+		drv_log("UNKNOWN FORMAT %d\n", format);
+		return NULL;
+	}
 }
 
-uint32_t drv_bo_get_stride_in_pixels(struct bo *bo)
+size_t drv_num_planes_from_format(uint32_t format)
 {
-	uint32_t bytes_per_pixel = DIV_ROUND_UP(bpp_from_format(bo->format, 0), 8);
-	return DIV_ROUND_UP(bo->strides[0], bytes_per_pixel);
+	const struct planar_layout *layout = layout_from_format(format);
+
+	/*
+	 * drv_bo_new calls this function early to query number of planes and
+	 * considers 0 planes to mean unknown format, so we have to support
+	 * that.  All other layout_from_format() queries can assume that the
+	 * format is supported and that the return value is non-NULL.
+	 */
+
+	return layout ? layout->num_planes : 0;
+}
+
+uint32_t drv_height_from_format(uint32_t format, uint32_t height, size_t plane)
+{
+	const struct planar_layout *layout = layout_from_format(format);
+
+	assert(plane < layout->num_planes);
+
+	return DIV_ROUND_UP(height, layout->vertical_subsampling[plane]);
+}
+
+uint32_t drv_bytes_per_pixel_from_format(uint32_t format, size_t plane)
+{
+	const struct planar_layout *layout = layout_from_format(format);
+
+	assert(plane < layout->num_planes);
+
+	return layout->bytes_per_pixel[plane];
 }
 
 /*
@@ -115,7 +180,11 @@ uint32_t drv_bo_get_stride_in_pixels(struct bo *bo)
  */
 uint32_t drv_stride_from_format(uint32_t format, uint32_t width, size_t plane)
 {
-	uint32_t stride = DIV_ROUND_UP(width * bpp_from_format(format, plane), 8);
+	const struct planar_layout *layout = layout_from_format(format);
+	assert(plane < layout->num_planes);
+
+	uint32_t plane_width = DIV_ROUND_UP(width, layout->horizontal_subsampling[plane]);
+	uint32_t stride = plane_width * layout->bytes_per_pixel[plane];
 
 	/*
 	 * The stride of Android YV12 buffers is required to be aligned to 16 bytes
@@ -129,20 +198,21 @@ uint32_t drv_stride_from_format(uint32_t format, uint32_t width, size_t plane)
 
 uint32_t drv_size_from_format(uint32_t format, uint32_t stride, uint32_t height, size_t plane)
 {
-	assert(plane < drv_num_planes_from_format(format));
-	uint32_t vertical_subsampling;
+	return stride * drv_height_from_format(format, height, plane);
+}
 
-	switch (format) {
-	case DRM_FORMAT_NV12:
-	case DRM_FORMAT_YVU420:
-	case DRM_FORMAT_YVU420_ANDROID:
-		vertical_subsampling = (plane == 0) ? 1 : 2;
-		break;
-	default:
-		i915_private_vertical_subsampling_from_format(&vertical_subsampling, format, plane);
+static uint32_t subsample_stride(uint32_t stride, uint32_t format, size_t plane)
+{
+	if (plane != 0) {
+		switch (format) {
+		case DRM_FORMAT_YVU420:
+		case DRM_FORMAT_YVU420_ANDROID:
+			stride = DIV_ROUND_UP(stride, 2);
+			break;
+		}
 	}
 
-	return stride * DIV_ROUND_UP(height, vertical_subsampling);
+	return stride;
 }
 
 /*
@@ -206,12 +276,12 @@ int drv_dumb_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint32_t 
 	memset(&create_dumb, 0, sizeof(create_dumb));
 	create_dumb.height = aligned_height;
 	create_dumb.width = aligned_width;
-	create_dumb.bpp = bpp_from_format(format, 0);
+	create_dumb.bpp = layout_from_format(format)->bytes_per_pixel[0] * 8;
 	create_dumb.flags = 0;
 
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_MODE_CREATE_DUMB, &create_dumb);
 	if (ret) {
-		fprintf(stderr, "drv: DRM_IOCTL_MODE_CREATE_DUMB failed\n");
+		drv_log("DRM_IOCTL_MODE_CREATE_DUMB failed (%d, %d)\n", bo->drv->fd, errno);
 		return ret;
 	}
 
@@ -234,8 +304,7 @@ int drv_dumb_bo_destroy(struct bo *bo)
 
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_MODE_DESTROY_DUMB, &destroy_dumb);
 	if (ret) {
-		fprintf(stderr, "drv: DRM_IOCTL_MODE_DESTROY_DUMB failed (handle=%x)\n",
-			bo->handles[0].u32);
+		drv_log("DRM_IOCTL_MODE_DESTROY_DUMB failed (handle=%x)\n", bo->handles[0].u32);
 		return ret;
 	}
 
@@ -261,7 +330,7 @@ int drv_gem_bo_destroy(struct bo *bo)
 
 		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_GEM_CLOSE, &gem_close);
 		if (ret) {
-			fprintf(stderr, "drv: DRM_IOCTL_GEM_CLOSE failed (handle=%x) error %d\n",
+			drv_log("DRM_IOCTL_GEM_CLOSE failed (handle=%x) error %d\n",
 				bo->handles[plane].u32, ret);
 			error = ret;
 		}
@@ -283,8 +352,7 @@ int drv_prime_bo_import(struct bo *bo, struct drv_import_fd_data *data)
 		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_PRIME_FD_TO_HANDLE, &prime_handle);
 
 		if (ret) {
-			fprintf(stderr, "drv: DRM_IOCTL_PRIME_FD_TO_HANDLE failed (fd=%u)\n",
-				prime_handle.fd);
+			drv_log("DRM_IOCTL_PRIME_FD_TO_HANDLE failed (fd=%u)\n", prime_handle.fd);
 
 			/*
 			 * Need to call GEM close on planes that were opened,
@@ -300,16 +368,16 @@ int drv_prime_bo_import(struct bo *bo, struct drv_import_fd_data *data)
 		bo->handles[plane].u32 = prime_handle.handle;
 	}
 
-	ATOMIC_LOCK(&bo->drv->driver_lock);
 	for (plane = 0; plane < bo->num_planes; plane++) {
+		pthread_mutex_lock(&bo->drv->driver_lock);
 		drv_increment_reference_count(bo->drv, bo, plane);
+		pthread_mutex_unlock(&bo->drv->driver_lock);
 	}
-	ATOMIC_UNLOCK(&bo->drv->driver_lock);
 
 	return 0;
 }
 
-void *drv_dumb_bo_map(struct bo *bo, struct map_info *data, size_t plane, uint32_t map_flags)
+void *drv_dumb_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t map_flags)
 {
 	int ret;
 	size_t i;
@@ -320,46 +388,56 @@ void *drv_dumb_bo_map(struct bo *bo, struct map_info *data, size_t plane, uint32
 
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_MODE_MAP_DUMB, &map_dumb);
 	if (ret) {
-		fprintf(stderr, "drv: DRM_IOCTL_MODE_MAP_DUMB failed \n");
+		drv_log("DRM_IOCTL_MODE_MAP_DUMB failed\n");
 		return MAP_FAILED;
 	}
 
 	for (i = 0; i < bo->num_planes; i++)
 		if (bo->handles[i].u32 == bo->handles[plane].u32)
-			data->length += bo->sizes[i];
+			vma->length += bo->sizes[i];
 
-	return mmap(0, data->length, drv_get_prot(map_flags), MAP_SHARED, bo->drv->fd,
+	return mmap(0, vma->length, drv_get_prot(map_flags), MAP_SHARED, bo->drv->fd,
 		    map_dumb.offset);
 }
 
-int drv_bo_munmap(struct bo *bo, struct map_info *data)
+int drv_bo_munmap(struct bo *bo, struct vma *vma)
 {
-	return munmap(data->addr, data->length);
+	return munmap(vma->addr, vma->length);
 }
 
-int drv_map_info_destroy(struct bo *bo)
+int drv_mapping_destroy(struct bo *bo)
 {
 	int ret;
-	void *ptr;
 	size_t plane;
-	struct map_info *data;
+	struct mapping *mapping;
+	uint32_t idx;
 
 	/*
 	 * This function is called right before the buffer is destroyed. It will free any mappings
 	 * associated with the buffer.
 	 */
 
+	idx = 0;
 	for (plane = 0; plane < bo->num_planes; plane++) {
-		if (!drmHashLookup(bo->drv->map_table, bo->handles[plane].u32, &ptr)) {
-			data = (struct map_info *)ptr;
-			ret = bo->drv->backend->bo_unmap(bo, data);
-			if (ret) {
-				fprintf(stderr, "drv: munmap failed");
-				return ret;
+		while (idx < drv_array_size(bo->drv->mappings)) {
+			mapping = (struct mapping *)drv_array_at_idx(bo->drv->mappings, idx);
+			if (mapping->vma->handle != bo->handles[plane].u32) {
+				idx++;
+				continue;
 			}
 
-			drmHashDelete(bo->drv->map_table, data->handle);
-			free(data);
+			if (!--mapping->vma->refcount) {
+				ret = bo->drv->backend->bo_unmap(bo, mapping->vma);
+				if (ret) {
+					drv_log("munmap failed\n");
+					return ret;
+				}
+
+				free(mapping->vma);
+			}
+
+			/* This shrinks and shifts the array, so don't increment idx. */
+			drv_array_remove(bo->drv->mappings, idx);
 		}
 	}
 
@@ -411,41 +489,18 @@ uint32_t drv_log_base2(uint32_t value)
 	return ret;
 }
 
-int drv_add_combination(struct driver *drv, uint32_t format, struct format_metadata *metadata,
-			uint64_t use_flags)
+void drv_add_combinations(struct driver *drv, const uint32_t *formats, uint32_t num_formats,
+			  struct format_metadata *metadata, uint64_t use_flags)
 {
-	struct combinations *combos = &drv->combos;
-	if (combos->size >= combos->allocations) {
-		struct combination *new_data;
-		combos->allocations *= 2;
-		new_data = realloc(combos->data, combos->allocations * sizeof(*combos->data));
-		if (!new_data)
-			return -ENOMEM;
-
-		combos->data = new_data;
-	}
-
-	combos->data[combos->size].format = format;
-	combos->data[combos->size].metadata.priority = metadata->priority;
-	combos->data[combos->size].metadata.tiling = metadata->tiling;
-	combos->data[combos->size].metadata.modifier = metadata->modifier;
-	combos->data[combos->size].use_flags = use_flags;
-	combos->size++;
-	return 0;
-}
-
-int drv_add_combinations(struct driver *drv, const uint32_t *formats, uint32_t num_formats,
-			 struct format_metadata *metadata, uint64_t use_flags)
-{
-	int ret;
 	uint32_t i;
-	for (i = 0; i < num_formats; i++) {
-		ret = drv_add_combination(drv, formats[i], metadata, use_flags);
-		if (ret)
-			return ret;
-	}
 
-	return 0;
+	for (i = 0; i < num_formats; i++) {
+		struct combination combo = { .format = formats[i],
+					     .metadata = *metadata,
+					     .use_flags = use_flags };
+
+		drv_array_append(drv->combos, &combo);
+	}
 }
 
 void drv_modify_combination(struct driver *drv, uint32_t format, struct format_metadata *metadata,
@@ -454,30 +509,27 @@ void drv_modify_combination(struct driver *drv, uint32_t format, struct format_m
 	uint32_t i;
 	struct combination *combo;
 	/* Attempts to add the specified flags to an existing combination. */
-	for (i = 0; i < drv->combos.size; i++) {
-		combo = &drv->combos.data[i];
+	for (i = 0; i < drv_array_size(drv->combos); i++) {
+		combo = (struct combination *)drv_array_at_idx(drv->combos, i);
 		if (combo->format == format && combo->metadata.tiling == metadata->tiling &&
 		    combo->metadata.modifier == metadata->modifier)
 			combo->use_flags |= use_flags;
 	}
 }
 
-struct kms_item *drv_query_kms(struct driver *drv, uint32_t *num_items)
+struct drv_array *drv_query_kms(struct driver *drv)
 {
-	struct kms_item *items;
+	struct drv_array *kms_items;
 	uint64_t plane_type, use_flag;
-	uint32_t i, j, k, allocations, item_size;
+	uint32_t i, j, k;
 
 	drmModePlanePtr plane;
 	drmModePropertyPtr prop;
 	drmModePlaneResPtr resources;
 	drmModeObjectPropertiesPtr props;
 
-	/* Start with a power of 2 number of allocations. */
-	allocations = 2;
-	item_size = 0;
-	items = calloc(allocations, sizeof(*items));
-	if (!items)
+	kms_items = drv_array_init(sizeof(struct kms_item));
+	if (!kms_items)
 		goto out;
 
 	/*
@@ -528,32 +580,22 @@ struct kms_item *drv_query_kms(struct driver *drv, uint32_t *num_items)
 
 		for (j = 0; j < plane->count_formats; j++) {
 			bool found = false;
-			for (k = 0; k < item_size; k++) {
-				if (items[k].format == plane->formats[j] &&
-				    items[k].modifier == DRM_FORMAT_MOD_INVALID) {
-					items[k].use_flags |= use_flag;
+			for (k = 0; k < drv_array_size(kms_items); k++) {
+				struct kms_item *item = drv_array_at_idx(kms_items, k);
+				if (item->format == plane->formats[j] &&
+				    item->modifier == DRM_FORMAT_MOD_LINEAR) {
+					item->use_flags |= use_flag;
 					found = true;
 					break;
 				}
 			}
 
-			if (!found && item_size >= allocations) {
-				struct kms_item *new_data = NULL;
-				allocations *= 2;
-				new_data = realloc(items, allocations * sizeof(*items));
-				if (!new_data) {
-					item_size = 0;
-					goto out;
-				}
-
-				items = new_data;
-			}
-
 			if (!found) {
-				items[item_size].format = plane->formats[j];
-				items[item_size].modifier = DRM_FORMAT_MOD_INVALID;
-				items[item_size].use_flags = use_flag;
-				item_size++;
+				struct kms_item item = { .format = plane->formats[j],
+							 .modifier = DRM_FORMAT_MOD_LINEAR,
+							 .use_flags = use_flag };
+
+				drv_array_append(kms_items, &item);
 			}
 		}
 
@@ -563,20 +605,20 @@ struct kms_item *drv_query_kms(struct driver *drv, uint32_t *num_items)
 
 	drmModeFreePlaneResources(resources);
 out:
-	if (items && item_size == 0) {
-		free(items);
-		items = NULL;
+	if (kms_items && !drv_array_size(kms_items)) {
+		drv_array_destroy(kms_items);
+		return NULL;
 	}
 
-	*num_items = item_size;
-	return items;
+	return kms_items;
 }
 
 int drv_modify_linear_combinations(struct driver *drv)
 {
-	uint32_t i, j, num_items;
-	struct kms_item *items;
+	uint32_t i, j;
+	struct kms_item *item;
 	struct combination *combo;
+	struct drv_array *kms_items;
 
 	/*
 	 * All current drivers can scanout linear XRGB8888/ARGB8888 as a primary
@@ -590,19 +632,20 @@ int drv_modify_linear_combinations(struct driver *drv)
 	drv_modify_combination(drv, DRM_FORMAT_ARGB8888, &LINEAR_METADATA,
 			       BO_USE_CURSOR | BO_USE_SCANOUT);
 
-	items = drv_query_kms(drv, &num_items);
-	if (!items || !num_items)
+	kms_items = drv_query_kms(drv);
+	if (!kms_items)
 		return 0;
 
-	for (i = 0; i < num_items; i++) {
-		for (j = 0; j < drv->combos.size; j++) {
-			combo = &drv->combos.data[j];
-			if (items[i].format == combo->format)
+	for (i = 0; i < drv_array_size(kms_items); i++) {
+		item = (struct kms_item *)drv_array_at_idx(kms_items, i);
+		for (j = 0; j < drv_array_size(drv->combos); j++) {
+			combo = drv_array_at_idx(drv->combos, j);
+			if (item->format == combo->format)
 				combo->use_flags |= BO_USE_SCANOUT;
 		}
 	}
 
-	free(items);
+	drv_array_destroy(kms_items);
 	return 0;
 }
 

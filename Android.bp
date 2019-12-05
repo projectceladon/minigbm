@@ -1,0 +1,78 @@
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+cc_defaults {
+    name: "gralloc.minigbm_intel_defaults_pri",
+    cflags: ["-DDRV_I915"],
+}
+
+cc_defaults {
+    name: "gralloc.minigbm_defaults_pri",
+
+    srcs: [
+        "drv.c",
+        "evdi.c",
+        "helpers_array.c",
+        "helpers.c",
+        "i915.c",
+        "nouveau.c",
+        "udl.c",
+        "vgem.c",
+        "virtio_gpu.c",
+
+        "cros_gralloc/cros_gralloc_buffer.cc",
+        "cros_gralloc/cros_gralloc_driver.cc",
+        "cros_gralloc/cros_gralloc_helpers.cc",
+        "cros_gralloc/gralloc0/gralloc0.cc",
+    ],
+
+    cflags: [
+        "-D_GNU_SOURCE=1",
+        "-D_FILE_OFFSET_BITS=64",
+        "-Wall",
+        "-Wsign-compare",
+        "-Wpointer-arith",
+        "-Wcast-qual",
+        "-Wcast-align",
+        "-Wno-unused-parameter",
+    ],
+    cppflags: ["-std=c++14"],
+
+    // The preferred path for vendor HALs is /vendor/lib/hw
+    vendor: true,
+    relative_install_path: "hw",
+
+    header_libs: [
+        "libhardware_headers",
+        "libnativebase_headers",
+        "libsystem_headers",
+    ],
+
+    shared_libs: [
+        "libcutils",
+        "libdrm",
+
+        "libnativewindow",
+        "libsync",
+        "liblog",
+    ],
+
+    static_libs: ["libarect"],
+}
+
+cc_library_shared {
+    name: "gralloc.intel",
+    defaults: [
+        "gralloc.minigbm_defaults_pri",
+        "gralloc.minigbm_intel_defaults_pri",
+    ],
+    enabled: false,
+    arch: {
+        x86: {
+            enabled: true,
+        },
+        x86_64: {
+            enabled: true,
+        },
+    },
+}
