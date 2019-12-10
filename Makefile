@@ -14,7 +14,7 @@ CFLAGS += -std=c99 -Wall -Wsign-compare -Wpointer-arith -Wcast-qual \
 
 ifdef DRV_AMDGPU
 	CFLAGS += $(shell $(PKG_CONFIG) --cflags libdrm_amdgpu)
-	LDLIBS += -lamdgpuaddr
+	LDLIBS += -ldrm_amdgpu -ldl
 endif
 ifdef DRV_EXYNOS
 	CFLAGS += $(shell $(PKG_CONFIG) --cflags libdrm_exynos)
@@ -22,11 +22,17 @@ endif
 ifdef DRV_I915
 	CFLAGS += $(shell $(PKG_CONFIG) --cflags libdrm_intel)
 endif
+ifdef DRV_MESON
+	CFLAGS += $(shell $(PKG_CONFIG) --cflags libdrm_meson)
+endif
 ifdef DRV_RADEON
 	CFLAGS += $(shell $(PKG_CONFIG) --cflags libdrm_radeon)
 endif
 ifdef DRV_ROCKCHIP
 	CFLAGS += $(shell $(PKG_CONFIG) --cflags libdrm_rockchip)
+endif
+ifdef DRV_VC4
+	CFLAGS += $(shell $(PKG_CONFIG) --cflags libdrm_vc4)
 endif
 
 CPPFLAGS += $(PC_CFLAGS)
@@ -50,5 +56,5 @@ install: all
 	install -D -m 755 $(OUT)/$(MINIGBM_FILENAME) $(DESTDIR)/$(LIBDIR)
 	ln -sf $(MINIGBM_FILENAME) $(DESTDIR)/$(LIBDIR)/libgbm.so
 	ln -sf $(MINIGBM_FILENAME) $(DESTDIR)/$(LIBDIR)/libgbm.so.$(GBM_VERSION_MAJOR)
-	install -D -m 0644 $(SRC)/gbm.pc $(DESTDIR)/$(LIBDIR)/pkgconfig/gbm.pc
-	install -D -m 0644 $(SRC)/gbm.h $(DESTDIR)/include/gbm.h
+	install -D -m 0644 $(SRC)/gbm.pc $(DESTDIR)$(LIBDIR)/pkgconfig/gbm.pc
+	install -D -m 0644 $(SRC)/gbm.h $(DESTDIR)/usr/include/gbm.h

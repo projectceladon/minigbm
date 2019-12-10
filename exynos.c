@@ -25,16 +25,11 @@ static const uint32_t texture_source_formats[] = { DRM_FORMAT_NV12 };
 
 static int exynos_init(struct driver *drv)
 {
-	int ret;
-	ret = drv_add_combinations(drv, render_target_formats, ARRAY_SIZE(render_target_formats),
-				   &LINEAR_METADATA, BO_USE_RENDER_MASK);
-	if (ret)
-		return ret;
+	drv_add_combinations(drv, render_target_formats, ARRAY_SIZE(render_target_formats),
+			     &LINEAR_METADATA, BO_USE_RENDER_MASK);
 
-	ret = drv_add_combinations(drv, texture_source_formats, ARRAY_SIZE(texture_source_formats),
-				   &LINEAR_METADATA, BO_USE_TEXTURE_MASK);
-	if (ret)
-		return ret;
+	drv_add_combinations(drv, texture_source_formats, ARRAY_SIZE(texture_source_formats),
+			     &LINEAR_METADATA, BO_USE_TEXTURE_MASK);
 
 	return drv_modify_linear_combinations(drv);
 }
@@ -61,7 +56,7 @@ static int exynos_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint
 		bo->total_size = bo->sizes[0] = height * bo->strides[0];
 		bo->offsets[0] = 0;
 	} else {
-		fprintf(stderr, "drv: unsupported format %X\n", format);
+		drv_log("unsupported format %X\n", format);
 		assert(0);
 		return -EINVAL;
 	}
@@ -77,8 +72,7 @@ static int exynos_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint
 
 		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_EXYNOS_GEM_CREATE, &gem_create);
 		if (ret) {
-			fprintf(stderr, "drv: DRM_IOCTL_EXYNOS_GEM_CREATE failed (size=%zu)\n",
-				size);
+			drv_log("DRM_IOCTL_EXYNOS_GEM_CREATE failed (size=%zu)\n", size);
 			goto cleanup_planes;
 		}
 
@@ -94,7 +88,7 @@ cleanup_planes:
 		gem_close.handle = bo->handles[plane - 1].u32;
 		int gem_close_ret = drmIoctl(bo->drv->fd, DRM_IOCTL_GEM_CLOSE, &gem_close);
 		if (gem_close_ret) {
-			fprintf(stderr, "drv: DRM_IOCTL_GEM_CLOSE failed: %d\n", gem_close_ret);
+			drv_log("DRM_IOCTL_GEM_CLOSE failed: %d\n", gem_close_ret);
 		}
 	}
 
@@ -105,7 +99,7 @@ cleanup_planes:
  * Use dumb mapping with exynos even though a GEM buffer is created.
  * libdrm does the same thing in exynos_drm.c
  */
-struct backend backend_exynos = {
+const struct backend backend_exynos = {
 	.name = "exynos",
 	.init = exynos_init,
 	.bo_create = exynos_bo_create,

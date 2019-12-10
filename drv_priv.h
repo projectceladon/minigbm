@@ -7,25 +7,12 @@
 #ifndef DRV_PRIV_H
 #define DRV_PRIV_H
 
-
+#include <pthread.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <sys/types.h>
-#include <stdatomic.h>
 
 #include "drv.h"
-
-#ifndef DISABLE_LOCK
-#define ATOMIC_LOCK(X) \
-while (atomic_flag_test_and_set(X)) { \
-  }
-
-#define ATOMIC_UNLOCK(X) \
-  atomic_flag_clear(X);
-#else
-#define ATOMIC_LOCK(X) ((void)0)
-#define ATOMIC_UNLOCK(X) ((void)0)
-#endif
 
 struct bo {
 	struct driver *drv;
@@ -62,20 +49,14 @@ struct combination {
 	uint64_t use_flags;
 };
 
-struct combinations {
-	struct combination *data;
-	uint32_t size;
-	uint32_t allocations;
-};
-
 struct driver {
 	int fd;
-	struct backend *backend;
+	const struct backend *backend;
 	void *priv;
 	void *buffer_table;
-	void *map_table;
-	struct combinations combos;
-	atomic_flag driver_lock;
+	struct drv_array *mappings;
+	struct drv_array *combos;
+	pthread_mutex_t driver_lock;
 };
 
 struct backend {
@@ -88,10 +69,10 @@ struct backend {
 					uint32_t format, const uint64_t *modifiers, uint32_t count);
 	int (*bo_destroy)(struct bo *bo);
 	int (*bo_import)(struct bo *bo, struct drv_import_fd_data *data);
-	void *(*bo_map)(struct bo *bo, struct map_info *data, size_t plane, uint32_t map_flags);
-	int (*bo_unmap)(struct bo *bo, struct map_info *data);
-	int (*bo_invalidate)(struct bo *bo, struct map_info *data);
-	int (*bo_flush)(struct bo *bo, struct map_info *data);
+	void *(*bo_map)(struct bo *bo, struct vma *vma, size_t plane, uint32_t map_flags);
+	int (*bo_unmap)(struct bo *bo, struct vma *vma);
+	int (*bo_invalidate)(struct bo *bo, struct mapping *mapping);
+	int (*bo_flush)(struct bo *bo, struct mapping *mapping);
 	uint32_t (*resolve_format)(uint32_t format, uint64_t use_flags);
 };
 
@@ -104,10 +85,18 @@ struct backend {
 	                    BO_USE_SW_READ_OFTEN | BO_USE_SW_WRITE_OFTEN | \
                             BO_USE_SW_READ_RARELY | BO_USE_SW_WRITE_RARELY | BO_USE_TEXTURE
 
-#define BO_USE_SW_MASK BO_USE_SW_READ_OFTEN | BO_USE_SW_WRITE_OFTEN | \
-                       BO_USE_SW_READ_RARELY | BO_USE_SW_WRITE_RARELY
+#define BO_USE_SW BO_USE_SW_READ_OFTEN | BO_USE_SW_WRITE_OFTEN | \
+	    BO_USE_SW_READ_RARELY | BO_USE_SW_WRITE_RARELY
 
-#define LINEAR_METADATA (struct format_metadata) { 0, 1, DRM_FORMAT_MOD_NONE }
+#define BO_USE_SW_OFTEN BO_USE_SW_READ_OFTEN | BO_USE_SW_WRITE_OFTEN
+
+#define BO_USE_SW_RARELY BO_USE_SW_READ_RARELY | BO_USE_SW_WRITE_RARELY
+
+#ifndef DRM_FORMAT_MOD_LINEAR
+#define DRM_FORMAT_MOD_LINEAR DRM_FORMAT_MOD_NONE
+#endif
+
+#define LINEAR_METADATA (struct format_metadata) { 1, 0, DRM_FORMAT_MOD_LINEAR }
 // clang-format on
 
 #endif

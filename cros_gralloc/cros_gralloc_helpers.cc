@@ -6,22 +6,7 @@
 
 #include "cros_gralloc_helpers.h"
 
-#include "i915_private_android.h"
-
-#include <cstdlib>
-#include <log/log.h>
 #include <sync/sync.h>
-#include <errno.h>
-#include <unistd.h>
-
-const char* drmFormat2Str(int drm_format)
-{
-    static char buf[5];
-    char *pDrmFormat = (char*) &drm_format;
-    snprintf(buf, sizeof(buf), "%c%c%c%c", *pDrmFormat, *(pDrmFormat + 1),
-             *(pDrmFormat + 2), *(pDrmFormat + 3));
-    return buf;
-}
 
 uint32_t cros_gralloc_convert_format(int format)
 {
@@ -38,7 +23,7 @@ uint32_t cros_gralloc_convert_format(int format)
 	case HAL_PIXEL_FORMAT_RGB_565:
 		return DRM_FORMAT_RGB565;
 	case HAL_PIXEL_FORMAT_RGB_888:
-		return DRM_FORMAT_RGB888;
+		return DRM_FORMAT_BGR888;
 	case HAL_PIXEL_FORMAT_RGBA_8888:
 		return DRM_FORMAT_ABGR8888;
 	case HAL_PIXEL_FORMAT_RGBX_8888:
@@ -56,7 +41,7 @@ uint32_t cros_gralloc_convert_format(int format)
 		return DRM_FORMAT_R8;
 	}
 
-	return i915_private_convert_format(format);
+	return DRM_FORMAT_NONE;
 }
 
 cros_gralloc_handle_t cros_gralloc_convert_handle(buffer_handle_t handle)
@@ -79,42 +64,19 @@ int32_t cros_gralloc_sync_wait(int32_t acquire_fence)
 	 */
 	int err = sync_wait(acquire_fence, 1000);
 	if (err < 0) {
-		cros_gralloc_error("Timed out on sync wait, err = %s", strerror(errno));
+		drv_log("Timed out on sync wait, err = %s\n", strerror(errno));
 		err = sync_wait(acquire_fence, -1);
 		if (err < 0) {
-			cros_gralloc_error("sync wait error = %s", strerror(errno));
+			drv_log("sync wait error = %s\n", strerror(errno));
 			return -errno;
 		}
 	}
 
 	err = close(acquire_fence);
 	if (err) {
-		cros_gralloc_error("Unable to close fence fd, err = %s", strerror(errno));
+		drv_log("Unable to close fence fd, err = %s\n", strerror(errno));
 		return -errno;
 	}
 
 	return 0;
-}
-
-void cros_gralloc_log(const char *prefix, const char *file, int line, const char *format, ...)
-{
-	char buf[50];
-	snprintf(buf, sizeof(buf), "[%s:%s(%d)]", prefix, basename(file), line);
-
-	va_list args;
-	va_start(args, format);
-	__android_log_vprint(ANDROID_LOG_ERROR, buf, format, args);
-	va_end(args);
-}
-
-bool is_flex_format(uint32_t format)
-{
-	switch (format) {
-	case DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED:
-	case DRM_FORMAT_FLEX_YCbCr_420_888:
-		return true;
-	default:
-		return false;
-	}
-	return false;
 }
