@@ -27,7 +27,6 @@ MINIGBM_SRC := \
 	tegra.c \
 	udl.c \
 	vc4.c \
-	vgem.c \
 	virtio_gpu.c
 
 MINIGBM_CPPFLAGS := -std=c++14
