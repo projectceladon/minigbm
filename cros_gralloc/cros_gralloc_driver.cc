@@ -185,6 +185,11 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 	buffers_.emplace(id, buffer);
 	handles_.emplace(hnd, std::make_pair(buffer, 1));
 	*out_handle = &hnd->base;
+
+	ALOGI("%s : %d : hnd = %p", __FUNCTION__, __LINE__, *out_handle);
+	ALOGI("\t width = %d, height = %d, stride = %d", hnd->width, hnd->height, hnd->pixel_stride);
+	ALOGI("\t usage = %x, format = %x, droid_format = %x, tiling = %d", hnd->usage, hnd->format, hnd->droid_format, hnd->tiling_mode);
+
 	return 0;
 }
 
@@ -220,6 +225,7 @@ int32_t cros_gralloc_driver::retain(buffer_handle_t handle)
 		data.format = hnd->format;
 		data.width = hnd->width;
 		data.height = hnd->height;
+		data.tiling = hnd->tiling_mode;
 		data.use_flags = static_cast<uint64_t>(hnd->use_flags[0]) << 32;
 		data.use_flags |= hnd->use_flags[1];
 
@@ -240,6 +246,12 @@ int32_t cros_gralloc_driver::retain(buffer_handle_t handle)
 
 		buffer = new cros_gralloc_buffer(id, bo, nullptr);
 		buffers_.emplace(id, buffer);
+
+		ALOGI("%s : %d : hnd = %p", __FUNCTION__, __LINE__, hnd);
+		ALOGI("\t width = %d, height = %d, stride = %d", hnd->width, hnd->height, hnd->pixel_stride);
+		ALOGI("\t usage = %x, format = %x, droid_format = %x, tiling = %d", hnd->usage, hnd->format, hnd->droid_format, hnd->tiling_mode);
+		ALOGI("\t bo = %p, id = %d, buffer = %p", bo, id, buffer);
+
 	}
 
 	handles_.emplace(hnd, std::make_pair(buffer, 1));

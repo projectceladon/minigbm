@@ -442,7 +442,7 @@ static int i915_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t h
 
 	for (plane = 0; plane < bo->num_planes; plane++)
 		bo->handles[plane].u32 = gem_create.handle;
-
+#if 0
 	memset(&gem_set_tiling, 0, sizeof(gem_set_tiling));
 	gem_set_tiling.handle = bo->handles[0].u32;
 	gem_set_tiling.tiling_mode = bo->tiling;
@@ -458,7 +458,7 @@ static int i915_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t h
 		ALOGE( "drv: DRM_IOCTL_I915_GEM_SET_TILING failed with %d", errno);
 		return -errno;
 	}
-
+#endif
 	return 0;
 }
 
@@ -504,7 +504,7 @@ static int i915_bo_import(struct bo *bo, struct drv_import_fd_data *data)
 	ret = drv_prime_bo_import(bo, data);
 	if (ret)
 		return ret;
-
+#if 0
 	/* TODO(gsingh): export modifiers and get rid of backdoor tiling. */
 	memset(&gem_get_tiling, 0, sizeof(gem_get_tiling));
 	gem_get_tiling.handle = bo->handles[0].u32;
@@ -517,6 +517,9 @@ static int i915_bo_import(struct bo *bo, struct drv_import_fd_data *data)
 	}
 
 	bo->tiling = gem_get_tiling.tiling_mode;
+#else
+       bo->tiling = data->tiling;
+#endif
 	return 0;
 }
 

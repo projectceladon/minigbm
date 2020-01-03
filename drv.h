@@ -75,6 +75,7 @@ struct drv_import_fd_data {
 	uint32_t width;
 	uint32_t height;
 	uint32_t format;
+	uint32_t tiling;
 	uint64_t use_flags;
 };
 
