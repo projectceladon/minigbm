@@ -23,6 +23,10 @@
 
 #define I915_CACHELINE_SIZE 64
 #define I915_CACHELINE_MASK (I915_CACHELINE_SIZE - 1)
+/* Mmap offset ioctl */
+#define I915_PARAM_MMAP_OFFSET_VERSION  55
+#define DRM_I915_GEM_MMAP_OFFSET       DRM_I915_GEM_MMAP_GTT
+#define DRM_IOCTL_I915_GEM_MMAP_OFFSET         DRM_IOWR(DRM_COMMAND_BASE + DRM_I915_GEM_MMAP_OFFSET, struct drm_i915_gem_mmap_offset)
 
 static const uint32_t render_target_formats[] = { DRM_FORMAT_ABGR8888,    DRM_FORMAT_ARGB1555,
 						  DRM_FORMAT_ARGB8888,    DRM_FORMAT_RGB565,
@@ -36,6 +40,30 @@ static const uint32_t tileable_texture_source_formats[] = { DRM_FORMAT_GR88, DRM
 
 static const uint32_t texture_source_formats[] = { DRM_FORMAT_YVU420, DRM_FORMAT_YVU420_ANDROID,
 						   DRM_FORMAT_NV12 };
+struct drm_i915_gem_mmap_offset {
+        /** Handle for the object being mapped. */
+        __u32 handle;
+        __u32 pad;
+        /**
+         * Fake offset to use for subsequent mmap call
+         *
+         * This is a fixed-size type for 32/64 compatibility.
+         */
+        __u64 offset;
+
+        /**
+         * Flags for extended behaviour.
+         *
+         * It is mandatory that either one of the _WC/_WB flags
+         * should be passed here.
+         */
+        __u64 flags;
+#define I915_MMAP_OFFSET_WC (1 << 0)
+#define I915_MMAP_OFFSET_WB (1 << 1)
+#define I915_MMAP_OFFSET_UC (1 << 2)
+#define I915_MMAP_OFFSET_FLAGS \
+        (I915_MMAP_OFFSET_WC | I915_MMAP_OFFSET_WB | I915_MMAP_OFFSET_UC)
+};
 
 struct i915_device
 {
@@ -43,6 +71,7 @@ struct i915_device
 	int32_t has_llc;
 	uint64_t cursor_width;
 	uint64_t cursor_height;
+	int32_t has_mmap_offset;
 };
 
 static uint32_t i915_get_gen(int device_id)
@@ -271,6 +300,31 @@ static void i915_clflush(void *start, size_t size)
 	}
 }
 
+
+static inline int
+gen_ioctl(int fd, unsigned long request, void *arg)
+{
+    int ret;
+
+    do {
+        ret = ioctl(fd, request, arg);
+    } while (ret == -1 && (errno == EINTR || errno == EAGAIN));
+    return ret;
+}
+
+
+static int
+gem_param(int fd, int name)
+{
+   int v = -1; /* No param uses (yet) the sign bit, reserve it for errors */
+
+   struct drm_i915_getparam gp = { .param = name, .value = &v };
+   if (gen_ioctl(fd, DRM_IOCTL_I915_GETPARAM, &gp))
+      return -1;
+
+   return v;
+}
+
 static int i915_init(struct driver *drv)
 {
 	int ret;
@@ -303,6 +357,9 @@ static int i915_init(struct driver *drv)
 		free(i915);
 		return -EINVAL;
 	}
+
+	i915->has_mmap_offset = gem_param(drv->fd, I915_PARAM_MMAP_OFFSET_VERSION) > 0;
+	//ALOGI("%s : %d : has_mmap_offset = %d", __func__, __LINE__, i915->has_mmap_offset);
 
 	drv->priv = i915;
 
@@ -547,23 +604,52 @@ static void *i915_bo_map(struct bo *bo, struct map_info *data, size_t plane, uin
 
 		addr = (void *)(uintptr_t)gem_map.addr_ptr;
 	} else {
-		struct drm_i915_gem_mmap_gtt gem_map;
-		memset(&gem_map, 0, sizeof(gem_map));
 
-		gem_map.handle = bo->handles[0].u32;
+		struct i915_device *i915 = (struct i915_device *)(bo->drv->priv);
 
-		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_MMAP_GTT, &gem_map);
-		if (ret) {
-			ALOGE( "drv: DRM_IOCTL_I915_GEM_MMAP_GTT failed\n");
-			return MAP_FAILED;
+		if(i915->has_mmap_offset) {
+
+			bool wc = false;
+			
+			struct drm_i915_gem_mmap_offset mmap_arg = {
+			   .handle =  bo->handles[0].u32,
+			   .flags = wc ? I915_MMAP_OFFSET_WC : I915_MMAP_OFFSET_WB,
+			};
+			
+			/* Get the fake offset back */
+			int ret = gen_ioctl(bo->drv->fd, DRM_IOCTL_I915_GEM_MMAP_OFFSET, &mmap_arg);
+			if (ret != 0) {
+			   ALOGE( "drv: DRM_IOCTL_I915_GEM_MMAP_OFFSET failed\n");
+			   return MAP_FAILED;
+			}
+
+			ALOGI("%s : %d : handle = %x, size = %d, mmpa_arg.offset = %x",  
+				__func__, __LINE__, mmap_arg.handle, bo->total_size, mmap_arg.offset);
+				
+			/* And map it */
+			addr = mmap(0, bo->total_size, PROT_READ | PROT_WRITE, MAP_SHARED,
+							 bo->drv->fd, mmap_arg.offset);
+			
 		}
+		else {	
+			struct drm_i915_gem_mmap_gtt gem_map;
+			memset(&gem_map, 0, sizeof(gem_map));
 
-		addr = mmap(0, bo->total_size, drv_get_prot(map_flags), MAP_SHARED, bo->drv->fd,
-			    gem_map.offset);
+			gem_map.handle = bo->handles[0].u32;
+
+			ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_MMAP_GTT, &gem_map);
+			if (ret) {
+				ALOGE( "drv: DRM_IOCTL_I915_GEM_MMAP_GTT failed\n");
+				return MAP_FAILED;
+			}
+
+			addr = mmap(0, bo->total_size, drv_get_prot(map_flags), MAP_SHARED, bo->drv->fd,
+				    gem_map.offset);
+		}
 	}
 
 	if (addr == MAP_FAILED) {
-		ALOGE( "drv: i915 GEM mmap failed\n");
+		ALOGE( "%s : %d : i915 GEM mmap failed : %d(%s)", __func__, __LINE__, errno, strerror(errno));
 		return addr;
 	}
 
