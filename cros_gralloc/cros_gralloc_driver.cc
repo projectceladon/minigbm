@@ -16,6 +16,7 @@
 #include <xf86drm.h>
 
 #include <cutils/log.h>
+#include <cutils/properties.h>
 
 cros_gralloc_driver::cros_gralloc_driver() : drv_(nullptr)
 {
@@ -43,7 +44,7 @@ int32_t cros_gralloc_driver::init()
 
 	int fd;
 	drmVersionPtr version;
-
+        
 #if 1
 	char const *str = "%s/renderD%d";
 	const char *undesired[2] = { "vgem", nullptr };
@@ -59,41 +60,46 @@ int32_t cros_gralloc_driver::init()
 	uint32_t max_node = (min_node + num_nodes);
 
 	for (uint32_t i = 0; i < ARRAY_SIZE(undesired); i++) {
-		for (uint32_t j = min_node; j < max_node; j++) {
-			char *node;
-			if (asprintf(&node, str, DRM_DIR_NAME, j) < 0)
-				continue;
+                char prop_buf[PROPERTY_VALUE_MAX] = {0};
+		char *node;
 
-            ALOGI("open(%s)", node);
+        #define TARGET_DEVICE_IDX_PROP  "ro.boot.icr.server_addr"
 
-			fd = open(node, O_RDWR, 0);
-			free(node);
+                property_get(TARGET_DEVICE_IDX_PROP, prop_buf, "0");
+                ALOGI("Render name set by property is (%s)",prop_buf);
 
-			if (fd < 0)
-				continue;
+		if (asprintf(&node, str, DRM_DIR_NAME, atoi(prop_buf)+128) < 0)
+		        continue;
 
-			version = drmGetVersion(fd);
-			if (!version) {
-				close(fd);
-				continue;
-			}
+                ALOGI("open(%s)", node);
 
-            ALOGI("drm version->name =%s", version->name);
+		fd = open(node, O_RDWR, 0);
+		free(node);
 
-			if (undesired[i] && !strcmp(version->name, undesired[i])) {
-				drmFreeVersion(version);
-				close(fd);
-				continue;
-			}
+		if (fd < 0)
+			continue;
 
-			drmFreeVersion(version);
-			drv_ = drv_create(fd);
-			if (drv_) {
-				return 0;
-			}
-
+		version = drmGetVersion(fd);
+		if (!version) {
 			close(fd);
+			continue;
 		}
+
+                ALOGI("drm version->name =%s", version->name);
+
+		if (undesired[i] && !strcmp(version->name, undesired[i])) {
+			drmFreeVersion(version);
+			close(fd);
+			continue;
+		}
+
+		drmFreeVersion(version);
+		drv_ = drv_create(fd);
+		if (drv_) {
+			return 0;
+		}
+
+		close(fd);
 	}
 
 	return -ENODEV;
