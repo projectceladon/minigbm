@@ -358,7 +358,7 @@ static int i915_init(struct driver *drv)
 		return -EINVAL;
 	}
 
-	i915->has_mmap_offset = gem_param(drv->fd, I915_PARAM_MMAP_OFFSET_VERSION) > 0;
+	i915->has_mmap_offset = gem_param(drv->fd, I915_PARAM_MMAP_GTT_VERSION) >= 4;
 	//ALOGI("%s : %d : has_mmap_offset = %d", __func__, __LINE__, i915->has_mmap_offset);
 
 	drv->priv = i915;
