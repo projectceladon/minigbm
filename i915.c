@@ -76,12 +76,19 @@ struct i915_device
 
 static uint32_t i915_get_gen(int device_id)
 {
+        ALOGI("%s : %d : device_id = %x", __func__, __LINE__, device_id);
 	const uint16_t gen3_ids[] = { 0x2582, 0x2592, 0x2772, 0x27A2, 0x27AE,
 				      0x29C2, 0x29B2, 0x29D2, 0xA001, 0xA011 };
+        const uint16_t gen12_ids[] = { 0x9A40, 0x9A49, 0x9A59, 0x9A60, 0x9A68,
+                                       0x9A70, 0x9A78, 0xFF20, 0x4905, 0x4906,
+                                       0x4907, 0x4f80, 0x0201, 0xFF25 };
 	unsigned i;
 	for (i = 0; i < ARRAY_SIZE(gen3_ids); i++)
 		if (gen3_ids[i] == device_id)
 			return 3;
+	for (i = 0; i < ARRAY_SIZE(gen12_ids); i++)
+		if (gen12_ids[i] == device_id)
+			return 12;
 
 	return 4;
 }
@@ -499,23 +506,24 @@ static int i915_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t h
 
 	for (plane = 0; plane < bo->num_planes; plane++)
 		bo->handles[plane].u32 = gem_create.handle;
-#if 0
-	memset(&gem_set_tiling, 0, sizeof(gem_set_tiling));
-	gem_set_tiling.handle = bo->handles[0].u32;
-	gem_set_tiling.tiling_mode = bo->tiling;
-	gem_set_tiling.stride = bo->strides[0];
+	if (i915_dev->gen < 12) {
+		memset(&gem_set_tiling, 0, sizeof(gem_set_tiling));
+		gem_set_tiling.handle = bo->handles[0].u32;
+		gem_set_tiling.tiling_mode = bo->tiling;
+		gem_set_tiling.stride = bo->strides[0];
 
-	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_SET_TILING, &gem_set_tiling);
-	if (ret) {
-		struct drm_gem_close gem_close;
-		memset(&gem_close, 0, sizeof(gem_close));
-		gem_close.handle = bo->handles[0].u32;
-		drmIoctl(bo->drv->fd, DRM_IOCTL_GEM_CLOSE, &gem_close);
+		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_SET_TILING, &gem_set_tiling);
+		if (ret) {
+			struct drm_gem_close gem_close;
+			memset(&gem_close, 0, sizeof(gem_close));
+			gem_close.handle = bo->handles[0].u32;
+			drmIoctl(bo->drv->fd, DRM_IOCTL_GEM_CLOSE, &gem_close);
 
-		ALOGE( "drv: DRM_IOCTL_I915_GEM_SET_TILING failed with %d", errno);
-		return -errno;
-	}
-#endif
+			ALOGE( "drv: DRM_IOCTL_I915_GEM_SET_TILING failed with %d", errno);
+			return -errno;
+		}
+        }
+
 	return 0;
 }
 
@@ -561,22 +569,26 @@ static int i915_bo_import(struct bo *bo, struct drv_import_fd_data *data)
 	ret = drv_prime_bo_import(bo, data);
 	if (ret)
 		return ret;
-#if 0
-	/* TODO(gsingh): export modifiers and get rid of backdoor tiling. */
-	memset(&gem_get_tiling, 0, sizeof(gem_get_tiling));
-	gem_get_tiling.handle = bo->handles[0].u32;
 
-	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_GET_TILING, &gem_get_tiling);
-	if (ret) {
-		drv_gem_bo_destroy(bo);
-		ALOGE( "drv: DRM_IOCTL_I915_GEM_GET_TILING failed.");
-		return ret;
+	struct i915_device *i915_dev = (struct i915_device *)(bo->drv->priv);
+	if (i915_dev->gen < 12) {
+	/* TODO(gsingh): export modifiers and get rid of backdoor tiling. */
+		memset(&gem_get_tiling, 0, sizeof(gem_get_tiling));
+		gem_get_tiling.handle = bo->handles[0].u32;
+
+		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_GET_TILING, &gem_get_tiling);
+		if (ret) {
+			drv_gem_bo_destroy(bo);
+			ALOGE( "drv: DRM_IOCTL_I915_GEM_GET_TILING failed.");
+			return ret;
+		}
+
+		bo->tiling = gem_get_tiling.tiling_mode;
+        }
+	else {
+		bo->tiling = data->tiling;
 	}
 
-	bo->tiling = gem_get_tiling.tiling_mode;
-#else
-       bo->tiling = data->tiling;
-#endif
 	return 0;
 }
 
