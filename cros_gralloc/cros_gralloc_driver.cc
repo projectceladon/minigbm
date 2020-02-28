@@ -63,7 +63,7 @@ int32_t cros_gralloc_driver::init()
                 char prop_buf[PROPERTY_VALUE_MAX] = {0};
 		char *node;
 
-        #define TARGET_DEVICE_IDX_PROP  "ro.boot.icr.server_addr"
+        #define TARGET_DEVICE_IDX_PROP  "ro.acg.rnode"
 
                 property_get(TARGET_DEVICE_IDX_PROP, prop_buf, "0");
                 ALOGI("Render name set by property is (%s)",prop_buf);
