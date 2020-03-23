@@ -20,10 +20,22 @@
 static const uint32_t render_target_formats[] = { DRM_FORMAT_ARGB8888, DRM_FORMAT_RGB565,
 						  DRM_FORMAT_XRGB8888 };
 
+static const uint32_t texture_only_formats[] = { DRM_FORMAT_NV12, DRM_FORMAT_YVU420 };
+
 static int vc4_init(struct driver *drv)
 {
 	drv_add_combinations(drv, render_target_formats, ARRAY_SIZE(render_target_formats),
 			     &LINEAR_METADATA, BO_USE_RENDER_MASK);
+
+	drv_add_combinations(drv, texture_only_formats, ARRAY_SIZE(texture_only_formats),
+			     &LINEAR_METADATA, BO_USE_TEXTURE_MASK);
+	/*
+	 * Chrome uses DMA-buf mmap to write to YV12 buffers, which are then accessed by the
+	 * Video Encoder Accelerator (VEA). It could also support NV12 potentially in the future.
+	 */
+	drv_modify_combination(drv, DRM_FORMAT_YVU420, &LINEAR_METADATA, BO_USE_HW_VIDEO_ENCODER);
+	drv_modify_combination(drv, DRM_FORMAT_NV12, &LINEAR_METADATA,
+			       BO_USE_HW_VIDEO_DECODER | BO_USE_SCANOUT | BO_USE_HW_VIDEO_ENCODER);
 
 	return drv_modify_linear_combinations(drv);
 }
