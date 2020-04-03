@@ -13,10 +13,11 @@
 #include <xf86drm.h>
 
 #include "drv_priv.h"
+#include "external/virgl_hw.h"
+#include "external/virgl_protocol.h"
+#include "external/virtgpu_drm.h"
 #include "helpers.h"
 #include "util.h"
-#include "virgl_hw.h"
-#include "virtgpu_drm.h"
 
 #ifndef PAGE_SIZE
 #define PAGE_SIZE 0x1000
