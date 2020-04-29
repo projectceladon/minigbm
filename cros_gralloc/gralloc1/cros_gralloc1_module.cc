@@ -1016,10 +1016,10 @@ int32_t CrosGralloc1::getModifier(buffer_handle_t buffer, uint32_t *outModifier,
         return CROS_GRALLOC_ERROR_BAD_HANDLE;
     }
 
-/*    if (size != drv_num_planes_from_format(hnd->format)) {
+    if (size != drv_num_planes_from_format(hnd->format)) {
         ALOGE("Invalid array size- %d", size);
         return -EINVAL;
-    } */
+    }
 
     memcpy(outModifier, hnd->format_modifiers, sizeof(*outModifier) * size * 2);
     return CROS_GRALLOC_ERROR_NONE;
