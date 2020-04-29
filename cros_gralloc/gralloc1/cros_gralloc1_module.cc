@@ -469,6 +469,8 @@ gralloc1_function_pointer_t CrosGralloc1::doGetFunction(int32_t intDescriptor)
                 return asFP<GRALLOC1_PFN_SET_INTERLACE>(setInterlaceHook);
         case GRALLOC1_FUNCTION_SET_PROTECTIONINFO:
                 return asFP<GRALLOC1_PFN_SET_PROTECTIONINFO>(setProtectionInfoHook);
+        case GRALLOC1_FUNCTION_GET_MODIFIER:
+                return asFP<GRALLOC1_PFN_GET_MODIFIER>(getModifierHook);
 	case GRALLOC1_FUNCTION_INVALID:
 		ALOGE("Invalid function descriptor");
 		return nullptr;
@@ -1002,6 +1004,27 @@ int32_t CrosGralloc1::getByteStride(buffer_handle_t buffer, uint32_t *outStride,
     memcpy(outStride, hnd->strides, sizeof(*outStride) * size);
     return CROS_GRALLOC_ERROR_NONE;
 }
+
+int32_t CrosGralloc1::getModifier(buffer_handle_t buffer, uint32_t *outModifier, uint32_t size)
+{
+    auto hnd = cros_gralloc_convert_handle(buffer);
+
+    if (!outModifier)
+        return -EINVAL;
+
+    if (!hnd) {
+        return CROS_GRALLOC_ERROR_BAD_HANDLE;
+    }
+
+/*    if (size != drv_num_planes_from_format(hnd->format)) {
+        ALOGE("Invalid array size- %d", size);
+        return -EINVAL;
+    } */
+
+    memcpy(outModifier, hnd->format_modifiers, sizeof(*outModifier) * size * 2);
+    return CROS_GRALLOC_ERROR_NONE;
+}
+
 
 // static
 int CrosGralloc1::HookGrallocClose(hw_device_t * dev)

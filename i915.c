@@ -384,7 +384,7 @@ static int i915_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t h
 	struct drm_i915_gem_create gem_create;
 	struct drm_i915_gem_set_tiling gem_set_tiling;
 	struct i915_device *i915_dev = (struct i915_device *)bo->drv->priv;
-
+	bo->format_modifiers[0] = modifier;
 	switch (modifier) {
 	case DRM_FORMAT_MOD_LINEAR:
 		bo->tiling = I915_TILING_NONE;
