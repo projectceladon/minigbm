@@ -403,6 +403,20 @@ static int virtio_gpu_bo_invalidate(struct bo *bo, struct mapping *mapping)
 	xfer.box.h = mapping->rect.height;
 	xfer.box.d = 1;
 
+	if (mapping->rect.x || mapping->rect.y) {
+		drv_log("Non-zero transfer offset\n");
+
+		/*
+		 * virglrenderer uses the box parameters and assumes that offset == 0 for planar
+		 * images
+		 */
+		if (bo->meta.num_planes == 1) {
+			xfer.offset =
+			    (bo->meta.strides[0] * mapping->rect.y) +
+			    drv_bytes_per_pixel_from_format(bo->meta.format, 0) * mapping->rect.x;
+		}
+	}
+
 	if ((bo->meta.use_flags & BO_USE_RENDERING) == 0) {
 		// Unfortunately, the kernel doesn't actually pass the guest layer_stride and
 		// guest stride to the host (compare virtio_gpu.h and virtgpu_drm.h). For gbm
@@ -453,6 +467,19 @@ static int virtio_gpu_bo_flush(struct bo *bo, struct mapping *mapping)
 	xfer.box.w = mapping->rect.width;
 	xfer.box.h = mapping->rect.height;
 	xfer.box.d = 1;
+
+	if (mapping->rect.x || mapping->rect.y) {
+		drv_log("Non-zero transfer offset\n");
+		/*
+		 * virglrenderer uses the box parameters and assumes that offset == 0 for planar
+		 * images
+		 */
+		if (bo->meta.num_planes == 1) {
+			xfer.offset =
+			    (bo->meta.strides[0] * mapping->rect.y) +
+			    drv_bytes_per_pixel_from_format(bo->meta.format, 0) * mapping->rect.x;
+		}
+	}
 
 	// Unfortunately, the kernel doesn't actually pass the guest layer_stride and
 	// guest stride to the host (compare virtio_gpu.h and virtgpu_drm.h). We can use
