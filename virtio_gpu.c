@@ -175,15 +175,33 @@ static uint32_t use_flags_to_bind(uint64_t use_flags)
 	handle_flag(&use_flags, BO_USE_CURSOR, &bind, VIRGL_BIND_CURSOR);
 	handle_flag(&use_flags, BO_USE_LINEAR, &bind, VIRGL_BIND_LINEAR);
 
-	handle_flag(&use_flags, BO_USE_SW_READ_OFTEN, &bind, VIRGL_BIND_LINEAR);
-	handle_flag(&use_flags, BO_USE_SW_READ_RARELY, &bind, VIRGL_BIND_LINEAR);
-	handle_flag(&use_flags, BO_USE_SW_WRITE_OFTEN, &bind, VIRGL_BIND_LINEAR);
-	handle_flag(&use_flags, BO_USE_SW_WRITE_RARELY, &bind, VIRGL_BIND_LINEAR);
+	if (use_flags & BO_USE_PROTECTED) {
+		handle_flag(&use_flags, BO_USE_PROTECTED, &bind, VIRGL_BIND_MINIGBM_PROTECTED);
+	} else {
+		// Make sure we don't set both flags, since that could be mistaken for
+		// protected. Give OFTEN priority over RARELY.
+		if (use_flags & BO_USE_SW_READ_OFTEN) {
+			handle_flag(&use_flags, BO_USE_SW_READ_OFTEN, &bind,
+				    VIRGL_BIND_MINIGBM_SW_READ_OFTEN);
+		} else {
+			handle_flag(&use_flags, BO_USE_SW_READ_RARELY, &bind,
+				    VIRGL_BIND_MINIGBM_SW_READ_RARELY);
+		}
+		if (use_flags & BO_USE_SW_WRITE_OFTEN) {
+			handle_flag(&use_flags, BO_USE_SW_WRITE_OFTEN, &bind,
+				    VIRGL_BIND_MINIGBM_SW_WRITE_OFTEN);
+		} else {
+			handle_flag(&use_flags, BO_USE_SW_WRITE_RARELY, &bind,
+				    VIRGL_BIND_MINIGBM_SW_WRITE_RARELY);
+		}
+	}
 
-	// All host drivers only support linear camera buffer formats. If
-	// that changes, this will need to be modified.
-	handle_flag(&use_flags, BO_USE_CAMERA_READ, &bind, VIRGL_BIND_LINEAR);
-	handle_flag(&use_flags, BO_USE_CAMERA_WRITE, &bind, VIRGL_BIND_LINEAR);
+	handle_flag(&use_flags, BO_USE_CAMERA_WRITE, &bind, VIRGL_BIND_MINIGBM_CAMERA_WRITE);
+	handle_flag(&use_flags, BO_USE_CAMERA_READ, &bind, VIRGL_BIND_MINIGBM_CAMERA_READ);
+	handle_flag(&use_flags, BO_USE_HW_VIDEO_DECODER, &bind,
+		    VIRGL_BIND_MINIGBM_HW_VIDEO_DECODER);
+	handle_flag(&use_flags, BO_USE_HW_VIDEO_ENCODER, &bind,
+		    VIRGL_BIND_MINIGBM_HW_VIDEO_ENCODER);
 
 	if (use_flags) {
 		drv_log("Unhandled bo use flag: %llx\n", (unsigned long long)use_flags);
