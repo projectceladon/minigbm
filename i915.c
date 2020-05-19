@@ -278,6 +278,8 @@ static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t heig
 		DRM_FORMAT_MOD_LINEAR,
 	};
 	uint64_t modifier;
+	struct i915_device *i915 = bo->drv->priv;
+	bool huge_bo = (i915->gen <= 11) && (width > 4096);
 
 	if (modifiers) {
 		modifier =
@@ -287,6 +289,21 @@ static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t heig
 		if (!combo)
 			return -EINVAL;
 		modifier = combo->metadata.modifier;
+	}
+
+	/*
+	 * i915 only supports linear/x-tiled above 4096 wide
+	 */
+	if (huge_bo && modifier != I915_FORMAT_MOD_X_TILED && modifier != DRM_FORMAT_MOD_LINEAR) {
+		uint32_t i;
+		for (i = 0; modifiers && i < count; i++) {
+			if (modifiers[i] == I915_FORMAT_MOD_X_TILED)
+				break;
+		}
+		if (i == count)
+			modifier = DRM_FORMAT_MOD_LINEAR;
+		else
+			modifier = I915_FORMAT_MOD_X_TILED;
 	}
 
 	switch (modifier) {
