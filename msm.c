@@ -292,6 +292,12 @@ static void *msm_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t m
 static uint32_t msm_resolve_format(struct driver *drv, uint32_t format, uint64_t use_flags)
 {
 	switch (format) {
+	case DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED:
+		/* Camera subsystem requires NV12. */
+		if (use_flags & (BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE))
+			return DRM_FORMAT_NV12;
+		/*HACK: See b/28671744 */
+		return DRM_FORMAT_XBGR8888;
 	case DRM_FORMAT_FLEX_YCbCr_420_888:
 		return DRM_FORMAT_NV12;
 	default:
