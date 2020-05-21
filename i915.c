@@ -27,6 +27,70 @@
 #define I915_PARAM_MMAP_OFFSET_VERSION  55
 #define DRM_I915_GEM_MMAP_OFFSET       DRM_I915_GEM_MMAP_GTT
 #define DRM_IOCTL_I915_GEM_MMAP_OFFSET         DRM_IOWR(DRM_COMMAND_BASE + DRM_I915_GEM_MMAP_OFFSET, struct drm_i915_gem_mmap_offset)
+#define DRM_I915_QUERY_MEMREGION_INFO   4
+#define DRM_I915_GEM_OBJECT_SETPARAM     DRM_I915_GEM_CONTEXT_SETPARAM
+#define DRM_IOCTL_I915_GEM_OBJECT_SETPARAM       DRM_IOWR(DRM_COMMAND_BASE + DRM_I915_GEM_OBJECT_SETPARAM, struct drm_i915_gem_object_param)
+#define I915_PARAM_MEMORY_REGION 0x1
+#define I915_OBJECT_PARAM  (1ull<<32)
+
+struct drm_i915_memory_region_info {
+
+        /** Base type of a region
+         */
+#define I915_SYSTEM_MEMORY         0
+#define I915_DEVICE_MEMORY         1
+
+        /** The region id is encoded in a layout which makes it possible to
+         *  retrieve the following information:
+         *
+         *  Base type: log2(ID >> 16)
+         *  Instance:  log2(ID & 0xffff)
+         */
+        __u32 id;
+
+        /** Reserved field. MBZ */
+        __u32 rsvd0;
+
+        /** Unused for now. MBZ */
+        __u64 flags;
+
+        __u64 size;
+
+        /** Reserved fields must be cleared to zero. */
+        __u64 rsvd1[4];
+};
+
+struct drm_i915_gem_object_param {
+        /** Handle for the object */
+        __u32 handle;
+
+        __u32 size;
+
+        /** Set the memory region for the object listed in preference order
+         *  as an array of region ids within data. To force an object
+         *  to a particular memory region, set the region as the sole entry.
+         *
+         *  Valid region ids are derived from the id field of
+         *  struct drm_i915_memory_region_info.
+         *  See struct drm_i915_query_memory_region_info.
+         */
+#define I915_OBJECT_PARAM  (1ull<<32)
+#define I915_PARAM_MEMORY_REGION 0x1
+        __u64 param;
+
+        __u64 data;
+};
+
+struct drm_i915_query_memory_region_info {
+
+        /** Number of struct drm_i915_memory_region_info structs */
+        __u32 num_regions;
+
+        /** MBZ */
+        __u32 rsvd[3];
+
+        struct drm_i915_memory_region_info regions[];
+};
 
 static const uint32_t render_target_formats[] = { DRM_FORMAT_ABGR8888,    DRM_FORMAT_ARGB1555,
 						  DRM_FORMAT_ARGB8888,    DRM_FORMAT_RGB565,
@@ -65,6 +129,11 @@ struct drm_i915_gem_mmap_offset {
         (I915_MMAP_OFFSET_WC | I915_MMAP_OFFSET_WB | I915_MMAP_OFFSET_UC)
 };
 
+struct memregion {
+       uint32_t id;
+       uint64_t size;
+};
+
 struct i915_device
 {
 	uint32_t gen;
@@ -72,6 +141,7 @@ struct i915_device
 	uint64_t cursor_width;
 	uint64_t cursor_height;
 	int32_t has_mmap_offset;
+	struct memregion vram, sys;
 };
 
 static uint32_t i915_get_gen(int device_id)
@@ -332,6 +402,77 @@ gem_param(int fd, int name)
    return v;
 }
 
+#define HAVE___BUILTIN_CLZ 1
+
+static inline unsigned
+util_last_bit(unsigned u)
+{
+#if defined(HAVE___BUILTIN_CLZ)
+   return u == 0 ? 0 : 32 - __builtin_clz(u);
+#elif defined(_MSC_VER) && (_M_IX86 || _M_ARM || _M_AMD64 || _M_IA64)
+   unsigned long index;
+   if (_BitScanReverse(&index, u))
+      return index + 1;
+   else
+      return 0;
+#else
+   unsigned r = 0;
+   while (u) {
+      r++;
+      u >>= 1;
+   }
+   return r;
+#endif
+}
+
+static void i915_bo_update_meminfo(struct i915_device* i915_dev, const struct drm_i915_query_memory_region_info *meminfo)
+{
+    for (int i = 0; i < meminfo->num_regions; i++) {
+        uint32_t type = util_last_bit(meminfo->regions[i].id >> 16) - 1;
+        switch (type) {
+        case I915_SYSTEM_MEMORY:
+            i915_dev->sys.id = meminfo->regions[i].id;
+            i915_dev->sys.size = meminfo->regions[i].size;
+            break;
+        case I915_DEVICE_MEMORY:
+            i915_dev->vram.id = meminfo->regions[i].id;
+            i915_dev->vram.size = meminfo->regions[i].size;
+            break;
+        default:
+            break;
+        }
+    }
+}
+
+static bool i915_bo_query_meminfo(struct driver *drv, struct i915_device* i915_dev)
+{
+    struct drm_i915_query_item item = {
+      .query_id = DRM_I915_QUERY_MEMREGION_INFO,
+    };
+
+    struct drm_i915_query query = {
+      .num_items = 1,
+      .items_ptr = (uintptr_t) &item,
+    };
+
+    if (drmIoctl(drv->fd, DRM_IOCTL_I915_QUERY, &query))
+        return false;
+
+    struct drm_i915_query_memory_region_info *meminfo = calloc(1, item.length);
+    item.data_ptr = (uintptr_t) meminfo;
+
+    if (drmIoctl(drv->fd, DRM_IOCTL_I915_QUERY, &query) ||
+        item.length <= 0)
+        return false;
+
+    i915_bo_update_meminfo(i915_dev, meminfo);
+
+    free(meminfo);
+
+    return true;
+}
+
+
 static int i915_init(struct driver *drv)
 {
 	int ret;
@@ -367,6 +508,9 @@ static int i915_init(struct driver *drv)
 
 	i915->has_mmap_offset = gem_param(drv->fd, I915_PARAM_MMAP_GTT_VERSION) >= 4;
 	//ALOGI("%s : %d : has_mmap_offset = %d", __func__, __LINE__, i915->has_mmap_offset);
+
+        i915_bo_query_meminfo(drv, i915);
+        ALOGI("Gralloc: i915_bo_query_meminfo done");
 
 	drv->priv = i915;
 
@@ -503,6 +647,66 @@ static int i915_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t h
 			gem_create.size);
 		return ret;
 	}
+
+        static bool force_mem_type = false;
+        static bool force_mem_local = false;
+        static bool force_mem_read = false;
+
+        if (!force_mem_read) {
+	#define FORCE_MEM_PROP "sys.icr.force_mem"
+            char mem_prop_buf[PROPERTY_VALUE_MAX];
+            if (property_get(FORCE_MEM_PROP, mem_prop_buf, NULL) > 0) {
+                const char *force_mem_property = mem_prop_buf;
+                if (!strcmp(force_mem_property, "local")) {
+                    force_mem_local = true; /* always use local memory */
+                    force_mem_type = true;
+                } else if (!strcmp(force_mem_property, "system")) {
+                    force_mem_local = false; /* always use system memory */
+                    force_mem_type = true;
+                }
+            }
+            force_mem_read = true;
+
+            if (force_mem_type) {
+                ALOGI("Gralloc: Forcing all memory allocation to come from: %s",
+                  force_mem_local ? "local" : "system");
+            }
+        }
+
+        if (force_mem_type) {
+        bool sysmem = !force_mem_local;
+
+	/* If we have vram size, we have multiple memory regions and should choose
+	* one of them.
+	*/
+	if (i915_dev->vram.size > 0) {
+            uint32_t regions[2];
+	    uint32_t nregions = 0;
+	    if (sysmem) {
+		regions[nregions++] = i915_dev->sys.id;
+	    } else {
+	    /* For vram allocations, still use system memory as a fallback. */
+		regions[nregions++] = i915_dev->vram.id;
+		//regions[nregions++] = bo->drv->sys.id;
+	    }
+
+	    struct drm_i915_gem_object_param obj  = {
+		.handle = gem_create.handle,
+		.param = I915_PARAM_MEMORY_REGION | I915_OBJECT_PARAM,
+		.size = nregions,
+		.data = (uintptr_t)regions,
+	    };
+	    ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_OBJECT_SETPARAM, &obj);
+	    if (ret) {
+		struct drm_gem_close close_bo = {
+		    .handle = gem_create.handle,
+		};
+		drmIoctl(bo->drv->fd, DRM_IOCTL_GEM_CLOSE, &close_bo);
+		    ALOGE( "drv: DRM_IOCTL_I915_GEM_OBJECT_SETPARAM failed\n");
+		return ret;
+                }
+            }
+        }
 
 	for (plane = 0; plane < bo->num_planes; plane++)
 		bo->handles[plane].u32 = gem_create.handle;
