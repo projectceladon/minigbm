@@ -653,7 +653,7 @@ static int i915_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t h
         static bool force_mem_read = false;
 
         if (!force_mem_read) {
-	#define FORCE_MEM_PROP "sys.icr.force_mem"
+	#define FORCE_MEM_PROP "sys.icr.gralloc.force_mem"
             char mem_prop_buf[PROPERTY_VALUE_MAX];
             if (property_get(FORCE_MEM_PROP, mem_prop_buf, NULL) > 0) {
                 const char *force_mem_property = mem_prop_buf;
