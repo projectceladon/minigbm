@@ -11,21 +11,17 @@ MINIGBM_SRC := \
 	amdgpu.c \
 	dri.c \
 	drv.c \
-	evdi.c \
+	dumb_driver.c \
 	exynos.c \
 	helpers_array.c \
 	helpers.c \
 	i915.c \
-	marvell.c \
 	mediatek.c \
 	meson.c \
 	msm.c \
-	nouveau.c \
 	radeon.c \
 	rockchip.c \
-	synaptics.c \
 	tegra.c \
-	udl.c \
 	vc4.c \
 	virtio_gpu.c
 
