@@ -96,10 +96,11 @@ static int i915_add_combinations(struct driver *drv)
 
 	/*
 	 * R8 format is used for Android's HAL_PIXEL_FORMAT_BLOB and is used for JPEG snapshots
-	 * from camera.
+	 * from camera and input/output from hardware decoder/encoder.
 	 */
 	drv_modify_combination(drv, DRM_FORMAT_R8, &metadata,
-			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE);
+			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER |
+				   BO_USE_HW_VIDEO_ENCODER);
 
 	render = unset_flags(render, linear_mask);
 	scanout_and_render = unset_flags(scanout_and_render, linear_mask);

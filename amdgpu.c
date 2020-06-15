@@ -102,10 +102,11 @@ static int amdgpu_init(struct driver *drv)
 
 	/*
 	 * R8 format is used for Android's HAL_PIXEL_FORMAT_BLOB and is used for JPEG snapshots
-	 * from camera.
+	 * from camera and input/output from hardware decoder/encoder.
 	 */
 	drv_modify_combination(drv, DRM_FORMAT_R8, &metadata,
-			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE);
+			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER |
+				   BO_USE_HW_VIDEO_ENCODER);
 
 	/*
 	 * The following formats will be allocated by the DRI backend and may be potentially tiled.

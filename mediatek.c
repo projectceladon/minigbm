@@ -74,6 +74,13 @@ static int mediatek_init(struct driver *drv)
 	drv_modify_combination(drv, DRM_FORMAT_YVU420_ANDROID, &metadata, BO_USE_HW_VIDEO_DECODER);
 	drv_modify_combination(drv, DRM_FORMAT_NV12, &metadata, BO_USE_HW_VIDEO_DECODER);
 
+	/*
+	 * R8 format is used for Android's HAL_PIXEL_FORMAT_BLOB for input/output from
+	 * hardware decoder/encoder.
+	 */
+	drv_modify_combination(drv, DRM_FORMAT_R8, &metadata,
+			       BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER);
+
 #ifdef MTK_MT8183
 	/* Only for MT8183 Camera subsystem */
 	drv_modify_combination(drv, DRM_FORMAT_NV12, &metadata,
