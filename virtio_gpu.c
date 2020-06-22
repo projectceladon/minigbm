@@ -423,8 +423,6 @@ static int virtio_gpu_bo_invalidate(struct bo *bo, struct mapping *mapping)
 	xfer.box.d = 1;
 
 	if (mapping->rect.x || mapping->rect.y) {
-		drv_log("Non-zero transfer offset\n");
-
 		/*
 		 * virglrenderer uses the box parameters and assumes that offset == 0 for planar
 		 * images
@@ -488,7 +486,6 @@ static int virtio_gpu_bo_flush(struct bo *bo, struct mapping *mapping)
 	xfer.box.d = 1;
 
 	if (mapping->rect.x || mapping->rect.y) {
-		drv_log("Non-zero transfer offset\n");
 		/*
 		 * virglrenderer uses the box parameters and assumes that offset == 0 for planar
 		 * images
