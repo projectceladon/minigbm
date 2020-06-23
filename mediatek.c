@@ -57,9 +57,6 @@ static int mediatek_init(struct driver *drv)
 	drv_add_combination(drv, DRM_FORMAT_R8, &LINEAR_METADATA,
 			    BO_USE_SW_MASK | BO_USE_LINEAR | BO_USE_PROTECTED);
 
-	/* NV12 format for encoding. */
-	drv_modify_combination(drv, DRM_FORMAT_NV12, &LINEAR_METADATA, BO_USE_HW_VIDEO_ENCODER);
-
 	/* Android CTS tests require this. */
 	drv_add_combination(drv, DRM_FORMAT_BGR888, &LINEAR_METADATA, BO_USE_SW_MASK);
 
@@ -79,6 +76,10 @@ static int mediatek_init(struct driver *drv)
 			       BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER);
 
 #ifdef MTK_MT8183
+	/* NV12 format for encoding and display. */
+	drv_modify_combination(drv, DRM_FORMAT_NV12, &metadata,
+			       BO_USE_SCANOUT | BO_USE_HW_VIDEO_ENCODER);
+
 	/* Only for MT8183 Camera subsystem */
 	drv_modify_combination(drv, DRM_FORMAT_NV12, &metadata,
 			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE);
