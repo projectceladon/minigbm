@@ -27,70 +27,119 @@
 #define I915_PARAM_MMAP_OFFSET_VERSION  55
 #define DRM_I915_GEM_MMAP_OFFSET       DRM_I915_GEM_MMAP_GTT
 #define DRM_IOCTL_I915_GEM_MMAP_OFFSET         DRM_IOWR(DRM_COMMAND_BASE + DRM_I915_GEM_MMAP_OFFSET, struct drm_i915_gem_mmap_offset)
-#define DRM_I915_QUERY_MEMREGION_INFO   4
-#define DRM_I915_GEM_OBJECT_SETPARAM     DRM_I915_GEM_CONTEXT_SETPARAM
-#define DRM_IOCTL_I915_GEM_OBJECT_SETPARAM       DRM_IOWR(DRM_COMMAND_BASE + DRM_I915_GEM_OBJECT_SETPARAM, struct drm_i915_gem_object_param)
-#define I915_PARAM_MEMORY_REGION 0x1
-#define I915_OBJECT_PARAM  (1ull<<32)
+#define DRM_I915_QUERY_MEMORY_REGIONS   4
+
+enum drm_i915_gem_memory_class {
+	I915_MEMORY_CLASS_SYSTEM = 0,
+	I915_MEMORY_CLASS_DEVICE,
+	I915_MEMORY_CLASS_STOLEN_SYSTEM,
+	I915_MEMORY_CLASS_STOLEN_DEVICE,
+};
+
+#define DRM_IOCTL_I915_QUERY			DRM_IOWR(DRM_COMMAND_BASE + DRM_I915_QUERY, struct drm_i915_query)
+#define DRM_IOCTL_I915_GEM_CREATE	DRM_IOWR(DRM_COMMAND_BASE + DRM_I915_GEM_CREATE, struct drm_i915_gem_create)
+#define DRM_IOCTL_I915_GEM_CREATE_EXT	DRM_IOWR(DRM_COMMAND_BASE + DRM_I915_GEM_CREATE, struct drm_i915_gem_create_ext)
+
+struct drm_i915_gem_create_ext {
+
+	/**
+	 * Requested size for the object.
+	 *
+	 * The (page-aligned) allocated size for the object will be returned.
+	 */
+	__u64 size;
+	/**
+	 * Returned handle for the object.
+	 *
+	 * Object handles are nonzero.
+	 */
+	__u32 handle;
+	__u32 pad;
+#define I915_GEM_CREATE_EXT_SETPARAM (1u << 0)
+#define I915_GEM_CREATE_EXT_FLAGS_UNKNOWN \
+	(-(I915_GEM_CREATE_EXT_SETPARAM << 1))
+	__u64 extensions;
+};
+
+struct drm_i915_gem_memory_class_instance {
+	__u16 memory_class; /* see enum drm_i915_gem_memory_class */
+	__u16 memory_instance;
+};
 
 struct drm_i915_memory_region_info {
+	/** class:instance pair encoding */
+	struct drm_i915_gem_memory_class_instance region;
 
-        /** Base type of a region
-         */
-#define I915_SYSTEM_MEMORY         0
-#define I915_DEVICE_MEMORY         1
+	/** MBZ */
+	__u32 rsvd0;
 
-        /** The region id is encoded in a layout which makes it possible to
-         *  retrieve the following information:
-         *
-         *  Base type: log2(ID >> 16)
-         *  Instance:  log2(ID & 0xffff)
-         */
-        __u32 id;
+	/** MBZ */
+	__u64 caps;
 
-        /** Reserved field. MBZ */
-        __u32 rsvd0;
+	/** MBZ */
+	__u64 flags;
 
-        /** Unused for now. MBZ */
-        __u64 flags;
+	/** Memory probed by the driver (-1 = unknown) */
+	__u64 probed_size;
 
-        __u64 size;
+	/** Estimate of memory remaining (-1 = unknown) */
+	__u64 unallocated_size;
 
-        /** Reserved fields must be cleared to zero. */
-        __u64 rsvd1[4];
+	/** MBZ */
+	__u64 rsvd1[8];
 };
 
 struct drm_i915_gem_object_param {
-        /** Handle for the object */
-        __u32 handle;
+	/* Object handle (0 for I915_GEM_CREATE_EXT_SETPARAM) */
+	__u32 handle;
 
-        __u32 size;
+	/* Data pointer size */
+	__u32 size;
 
-        /** Set the memory region for the object listed in preference order
-         *  as an array of region ids within data. To force an object
-         *  to a particular memory region, set the region as the sole entry.
-         *
-         *  Valid region ids are derived from the id field of
-         *  struct drm_i915_memory_region_info.
-         *  See struct drm_i915_query_memory_region_info.
-         */
+/*
+ * I915_OBJECT_PARAM:
+ *
+ * Select object namespace for the param.
+ */
 #define I915_OBJECT_PARAM  (1ull<<32)
-#define I915_PARAM_MEMORY_REGION 0x1
-        __u64 param;
 
-        __u64 data;
+/*
+ * I915_PARAM_MEMORY_REGIONS:
+ *
+ * Set the data pointer with the desired set of placements in priority
+ * order(each entry must be unique and supported by the device), as an array of
+ * drm_i915_gem_memory_class_instance, or an equivalent layout of class:instance
+ * pair encodings. See DRM_I915_QUERY_MEMORY_REGIONS for how to query the
+ * supported regions.
+ *
+ * Note that this requires the I915_OBJECT_PARAM namespace:
+ *	.param = I915_OBJECT_PARAM | I915_PARAM_MEMORY_REGIONS
+ */
+#define I915_PARAM_MEMORY_REGIONS 0x1
+	__u64 param;
+
+	/* Data value or pointer */
+	__u64 data;
 };
 
-struct drm_i915_query_memory_region_info {
-
-        /** Number of struct drm_i915_memory_region_info structs */
-        __u32 num_regions;
-
-        /** MBZ */
-        __u32 rsvd[3];
-
-        struct drm_i915_memory_region_info regions[];
+struct drm_i915_gem_create_ext_setparam {
+	struct i915_user_extension base;
+	struct drm_i915_gem_object_param param;
 };
+
+
+
+struct drm_i915_query_memory_regions {
+	/** Number of supported regions */
+	__u32 num_regions;
+
+	/** MBZ */
+	__u32 rsvd[3];
+
+	/* Info about each supported region */
+	struct drm_i915_memory_region_info regions[];
+};
+
 
 static const uint32_t render_target_formats[] = { DRM_FORMAT_ABGR8888,    DRM_FORMAT_ARGB1555,
 						  DRM_FORMAT_ARGB8888,    DRM_FORMAT_RGB565,
@@ -129,9 +178,9 @@ struct drm_i915_gem_mmap_offset {
         (I915_MMAP_OFFSET_WC | I915_MMAP_OFFSET_WB | I915_MMAP_OFFSET_UC)
 };
 
-struct memregion {
-       uint32_t id;
-       uint64_t size;
+struct iris_memregion {
+   struct drm_i915_gem_memory_class_instance region;
+   uint64_t size;
 };
 
 struct i915_device
@@ -141,7 +190,7 @@ struct i915_device
 	uint64_t cursor_width;
 	uint64_t cursor_height;
 	int32_t has_mmap_offset;
-	struct memregion vram, sys;
+	struct iris_memregion vram, sys;
 };
 
 static uint32_t i915_get_gen(int device_id)
@@ -425,18 +474,18 @@ util_last_bit(unsigned u)
 #endif
 }
 
-static void i915_bo_update_meminfo(struct i915_device* i915_dev, const struct drm_i915_query_memory_region_info *meminfo)
+static void i915_bo_update_meminfo(struct i915_device* i915_dev, const struct drm_i915_query_memory_regions *meminfo)
 {
     for (int i = 0; i < meminfo->num_regions; i++) {
-        uint32_t type = util_last_bit(meminfo->regions[i].id >> 16) - 1;
-        switch (type) {
-        case I915_SYSTEM_MEMORY:
-            i915_dev->sys.id = meminfo->regions[i].id;
-            i915_dev->sys.size = meminfo->regions[i].size;
+        const struct drm_i915_memory_region_info *mem = &meminfo->regions[i];
+        switch (mem->region.memory_class) {
+        case I915_MEMORY_CLASS_SYSTEM:
+            i915_dev->sys.region = mem->region;
+            i915_dev->sys.size = mem->probed_size;
             break;
-        case I915_DEVICE_MEMORY:
-            i915_dev->vram.id = meminfo->regions[i].id;
-            i915_dev->vram.size = meminfo->regions[i].size;
+        case I915_MEMORY_CLASS_DEVICE:
+            i915_dev->vram.region = mem->region;
+            i915_dev->vram.size = mem->probed_size;
             break;
         default:
             break;
@@ -447,7 +496,7 @@ static void i915_bo_update_meminfo(struct i915_device* i915_dev, const struct dr
 static bool i915_bo_query_meminfo(struct driver *drv, struct i915_device* i915_dev)
 {
     struct drm_i915_query_item item = {
-      .query_id = DRM_I915_QUERY_MEMREGION_INFO,
+      .query_id = DRM_I915_QUERY_MEMORY_REGIONS,
     };
 
     struct drm_i915_query query = {
@@ -458,8 +507,8 @@ static bool i915_bo_query_meminfo(struct driver *drv, struct i915_device* i915_d
     if (drmIoctl(drv->fd, DRM_IOCTL_I915_QUERY, &query))
         return false;
 
-    struct drm_i915_query_memory_region_info *meminfo = calloc(1, item.length);
-    item.data_ptr = (uintptr_t) meminfo;
+    struct drm_i915_query_memory_regions *meminfo = calloc(1, item.length);
+    item.data_ptr = (uintptr_t)meminfo;
 
     if (drmIoctl(drv->fd, DRM_IOCTL_I915_QUERY, &query) ||
         item.length <= 0)
@@ -509,8 +558,8 @@ static int i915_init(struct driver *drv)
 	i915->has_mmap_offset = gem_param(drv->fd, I915_PARAM_MMAP_GTT_VERSION) >= 4;
 	//ALOGI("%s : %d : has_mmap_offset = %d", __func__, __LINE__, i915->has_mmap_offset);
 
-        i915_bo_query_meminfo(drv, i915);
-        ALOGI("Gralloc: i915_bo_query_meminfo done");
+	i915_bo_query_meminfo(drv, i915);
+	ALOGI("Gralloc: i915_bo_query_meminfo done");
 
 	drv->priv = i915;
 
@@ -635,81 +684,102 @@ static int i915_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t h
         /*
          * Ensure we pass aligned width/height.
          */
-        bo->width = width;
-        bo->height = height;
+	bo->width = width;
+	bo->height = height;
 
-	memset(&gem_create, 0, sizeof(gem_create));
-	gem_create.size = bo->total_size;
+	static bool force_mem_type = false;
+	static bool force_mem_local = false;
+	static bool force_mem_read = false;
 
-	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_CREATE, &gem_create);
-	if (ret) {
-		ALOGE( "drv: DRM_IOCTL_I915_GEM_CREATE failed (size=%llu)\n",
-			gem_create.size);
-		return ret;
+	if (!force_mem_read) {
+#define FORCE_MEM_PROP "sys.icr.gralloc.force_mem"
+	    char mem_prop_buf[PROPERTY_VALUE_MAX];
+	    if (property_get(FORCE_MEM_PROP, mem_prop_buf, NULL) > 0) {
+	        const char *force_mem_property = mem_prop_buf;
+	        if (!strcmp(force_mem_property, "local")) {
+	            force_mem_local = true; /* always use local memory */
+	            force_mem_type = true;
+	        } else if (!strcmp(force_mem_property, "system")) {
+	            force_mem_local = false; /* always use system memory */
+	            force_mem_type = true;
+	        }
+	    }
+	    force_mem_read = true;
+
+	    if (force_mem_type) {
+	        ALOGI("Gralloc: Forcing all memory allocation to come from: %s",
+	          force_mem_local ? "local" : "system");
+	    }
 	}
 
-        static bool force_mem_type = false;
-        static bool force_mem_local = false;
-        static bool force_mem_read = false;
-
-        if (!force_mem_read) {
-	#define FORCE_MEM_PROP "sys.icr.gralloc.force_mem"
-            char mem_prop_buf[PROPERTY_VALUE_MAX];
-            if (property_get(FORCE_MEM_PROP, mem_prop_buf, NULL) > 0) {
-                const char *force_mem_property = mem_prop_buf;
-                if (!strcmp(force_mem_property, "local")) {
-                    force_mem_local = true; /* always use local memory */
-                    force_mem_type = true;
-                } else if (!strcmp(force_mem_property, "system")) {
-                    force_mem_local = false; /* always use system memory */
-                    force_mem_type = true;
-                }
-            }
-            force_mem_read = true;
-
-            if (force_mem_type) {
-                ALOGI("Gralloc: Forcing all memory allocation to come from: %s",
-                  force_mem_local ? "local" : "system");
-            }
-        }
-
-        if (force_mem_type) {
-        bool sysmem = !force_mem_local;
-
+	bool local = false;
+	if (force_mem_type) {
+	       local = force_mem_local;
+	}
+	uint32_t gem_handle;
 	/* If we have vram size, we have multiple memory regions and should choose
 	* one of them.
 	*/
 	if (i915_dev->vram.size > 0) {
-            uint32_t regions[2];
-	    uint32_t nregions = 0;
-	    if (sysmem) {
-		regions[nregions++] = i915_dev->sys.id;
-	    } else {
-	    /* For vram allocations, still use system memory as a fallback. */
-		regions[nregions++] = i915_dev->vram.id;
-		//regions[nregions++] = bo->drv->sys.id;
-	    }
+	   /* All new BOs we get from the kernel are zeroed, so we don't need to
+		* worry about that here.
+		*/
+	   struct drm_i915_gem_memory_class_instance regions[2];
+	   uint32_t nregions = 0;
+	   if (local) {
+		  /* For vram allocations, still use system memory as a fallback. */
+		  regions[nregions++] = i915_dev->vram.region;
+		  regions[nregions++] = i915_dev->sys.region;
+	   } else {
+		  regions[nregions++] = i915_dev->sys.region;
+	   }
 
-	    struct drm_i915_gem_object_param obj  = {
-		.handle = gem_create.handle,
-		.param = I915_PARAM_MEMORY_REGION | I915_OBJECT_PARAM,
-		.size = nregions,
-		.data = (uintptr_t)regions,
-	    };
-	    ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_OBJECT_SETPARAM, &obj);
-	    if (ret) {
-		struct drm_gem_close close_bo = {
-		    .handle = gem_create.handle,
-		};
-		drmIoctl(bo->drv->fd, DRM_IOCTL_GEM_CLOSE, &close_bo);
-		    ALOGE( "drv: DRM_IOCTL_I915_GEM_OBJECT_SETPARAM failed\n");
-		return ret;
-                }
-            }
-        }
+	   struct drm_i915_gem_object_param region_param = {
+		  .size = nregions,
+		  .data = (uintptr_t)regions,
+		  .param = I915_OBJECT_PARAM | I915_PARAM_MEMORY_REGIONS,
+	   };
+
+	   struct drm_i915_gem_create_ext_setparam setparam_region = {
+		  .base = { .name = I915_GEM_CREATE_EXT_SETPARAM },
+		  .param = region_param,
+	   };
+
+	   struct drm_i915_gem_create_ext create = {
+		  .size = bo->total_size,
+		  .extensions = (uintptr_t)&setparam_region,
+	   };
+
+	   /* It should be safe to use GEM_CREATE_EXT without checking, since we are
+		* in the side of the branch where discrete memory is available. So we
+		* can assume GEM_CREATE_EXT is supported already.
+		*/
+	   ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_CREATE_EXT, &create);
+	   if (ret) {
+		   ALOGE( "drv: DRM_IOCTL_I915_GEM_CREATE_EXT failed (size=%llu)\n",
+                  create.size);
+           return ret;
+	   }
+	   gem_handle = create.handle;
+	   ALOGI("Rachel: DRM_IOCTL_I915_GEM_CREATE_EXT handle");
+	} else {
+	   struct drm_i915_gem_create create = { .size = bo->total_size };
+	   /* All new BOs we get from the kernel are zeroed, so we don't need to
+		* worry about that here.
+		*/
+	   ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_CREATE, &create);
+	   if (ret) {
+		   ALOGE( "drv: DRM_IOCTL_I915_GEM_CREATE failed (size=%llu)\n",
+                  create.size);
+           return ret;
+	   }
+	   gem_handle = create.handle;
+	   ALOGI("Rachel: DRM_IOCTL_I915_GEM_CREATE handle");
+	}
+
 
 	for (plane = 0; plane < bo->num_planes; plane++)
-		bo->handles[plane].u32 = gem_create.handle;
+		bo->handles[plane].u32 = gem_handle;
 	if (i915_dev->gen < 12) {
 		memset(&gem_set_tiling, 0, sizeof(gem_set_tiling));
 		gem_set_tiling.handle = bo->handles[0].u32;
