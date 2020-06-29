@@ -26,6 +26,9 @@
 /* DRI backend decides tiling in this case. */
 #define TILE_TYPE_DRI 1
 
+/* Height alignement for Encoder/Decoder buffers */
+#define CHROME_HEIGHT_ALIGN 16
+
 struct amdgpu_priv {
 	struct dri_driver dri;
 	int drm_version;
@@ -413,6 +416,16 @@ static int amdgpu_create_bo_linear(struct bo *bo, uint32_t width, uint32_t heigh
 
 	stride = drv_stride_from_format(format, width, 0);
 	stride = ALIGN(stride, 256);
+
+	/*
+	* Currently, allocator used by chrome aligns the height for Encoder/
+	* Decoder buffers while allocator used by android(gralloc/minigbm)
+	* doesn't provide any aligment.
+	*
+	* See b/153130069
+	*/
+	if (use_flags & (BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER))
+		height = ALIGN(height, CHROME_HEIGHT_ALIGN);
 
 	drv_bo_from_format(bo, stride, height, format);
 
