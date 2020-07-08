@@ -482,7 +482,7 @@ int convertToFenceHandle(int fenceFd, hidl_handle* outFenceHandle) {
 
 std::optional<BufferDescriptorInfo> decodeBufferDescriptorInfo(const hidl_vec<uint32_t>& encoded) {
     if (encoded.size() != 5) {
-        drv_log("Failed to decodeBufferDescriptorInfo. Invalid size: %d.\n", encoded.size());
+        drv_log("Failed to decodeBufferDescriptorInfo. Invalid size: %zd.\n", encoded.size());
         return {};
     }
 
