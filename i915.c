@@ -81,25 +81,23 @@ static int i915_add_combinations(struct driver *drv)
 			     texture_only);
 
 	drv_modify_linear_combinations(drv);
-	/*
-	 * Chrome uses DMA-buf mmap to write to YV12 buffers, which are then accessed by the
-	 * Video Encoder Accelerator (VEA). It could also support NV12 potentially in the future.
-	 */
-	drv_modify_combination(drv, DRM_FORMAT_YVU420, &metadata, BO_USE_HW_VIDEO_ENCODER);
+
+	/* NV12 format for camera, display, decoding and encoding. */
 	/* IPU3 camera ISP supports only NV12 output. */
 	drv_modify_combination(drv, DRM_FORMAT_NV12, &metadata,
-			       BO_USE_HW_VIDEO_ENCODER | BO_USE_HW_VIDEO_DECODER |
-				   BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SCANOUT);
+			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SCANOUT |
+				   BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER);
 
 	/* Android CTS tests require this. */
 	drv_add_combination(drv, DRM_FORMAT_BGR888, &metadata, BO_USE_SW_MASK);
 
 	/*
 	 * R8 format is used for Android's HAL_PIXEL_FORMAT_BLOB and is used for JPEG snapshots
-	 * from camera.
+	 * from camera and input/output from hardware decoder/encoder.
 	 */
 	drv_modify_combination(drv, DRM_FORMAT_R8, &metadata,
-			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE);
+			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER |
+				   BO_USE_HW_VIDEO_ENCODER);
 
 	render = unset_flags(render, linear_mask);
 	scanout_and_render = unset_flags(scanout_and_render, linear_mask);
@@ -278,6 +276,8 @@ static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t heig
 		DRM_FORMAT_MOD_LINEAR,
 	};
 	uint64_t modifier;
+	struct i915_device *i915 = bo->drv->priv;
+	bool huge_bo = (i915->gen <= 11) && (width > 4096);
 
 	if (modifiers) {
 		modifier =
@@ -287,6 +287,21 @@ static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t heig
 		if (!combo)
 			return -EINVAL;
 		modifier = combo->metadata.modifier;
+	}
+
+	/*
+	 * i915 only supports linear/x-tiled above 4096 wide
+	 */
+	if (huge_bo && modifier != I915_FORMAT_MOD_X_TILED && modifier != DRM_FORMAT_MOD_LINEAR) {
+		uint32_t i;
+		for (i = 0; modifiers && i < count; i++) {
+			if (modifiers[i] == I915_FORMAT_MOD_X_TILED)
+				break;
+		}
+		if (i == count)
+			modifier = DRM_FORMAT_MOD_LINEAR;
+		else
+			modifier = I915_FORMAT_MOD_X_TILED;
 	}
 
 	switch (modifier) {
