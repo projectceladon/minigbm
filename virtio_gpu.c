@@ -868,10 +868,9 @@ static uint32_t virtio_gpu_resolve_format(struct driver *drv, uint32_t format, u
 {
 	switch (format) {
 	case DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED:
-		/* Camera subsystem requires NV12. */
-		if (use_flags & (BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE))
-			return DRM_FORMAT_NV12;
-		/*HACK: See b/28671744 */
+		// TODO(b/157902551): Cuttlefish's current camera hal implementation
+		// requires that the flex format is RGBA. Revert this edit and use YUV
+		// format when Cuttlefish switches to the newer camera hal.
 		return DRM_FORMAT_XBGR8888;
 	case DRM_FORMAT_FLEX_YCbCr_420_888:
 		/*
