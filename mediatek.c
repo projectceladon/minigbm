@@ -66,7 +66,10 @@ static int mediatek_init(struct driver *drv)
 	metadata.modifier = DRM_FORMAT_MOD_LINEAR;
 	drv_modify_combination(drv, DRM_FORMAT_YVU420, &metadata, BO_USE_HW_VIDEO_DECODER);
 	drv_modify_combination(drv, DRM_FORMAT_YVU420_ANDROID, &metadata, BO_USE_HW_VIDEO_DECODER);
+#ifdef MTK_MT8183
+	// TODO(hiroh): Switch to use NV12 for video decoder on MT8173 as well.
 	drv_modify_combination(drv, DRM_FORMAT_NV12, &metadata, BO_USE_HW_VIDEO_DECODER);
+#endif
 
 	/*
 	 * R8 format is used for Android's HAL_PIXEL_FORMAT_BLOB for input/output from
@@ -275,8 +278,14 @@ static uint32_t mediatek_resolve_format(struct driver *drv, uint32_t format, uin
 		/*HACK: See b/28671744 */
 		return DRM_FORMAT_XBGR8888;
 	case DRM_FORMAT_FLEX_YCbCr_420_888:
-		if (use_flags & (BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE |
-				 BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER)) {
+#ifdef MTK_MT8183
+		// TODO(hiroh): Switch to use NV12 for video decoder on MT8173 as well.
+		if (use_flags & (BO_USE_HW_VIDEO_DECODER)) {
+			return DRM_FORMAT_NV12;
+		}
+#endif
+		if (use_flags &
+		    (BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_ENCODER)) {
 			return DRM_FORMAT_NV12;
 		}
 		return DRM_FORMAT_YVU420;
