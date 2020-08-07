@@ -233,6 +233,10 @@ static int msm_init(struct driver *drv)
 	msm_add_ubwc_combinations(drv, texture_source_formats, ARRAY_SIZE(texture_source_formats),
 				  &metadata, texture_use_flags);
 
+	drv_modify_combination(drv, DRM_FORMAT_NV12, &metadata,
+			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SCANOUT |
+			       BO_USE_HW_VIDEO_ENCODER);
+
 	return 0;
 }
 
