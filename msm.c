@@ -7,6 +7,7 @@
 #ifdef DRV_MSM
 
 #include <assert.h>
+#include <dlfcn.h>
 #include <drm_fourcc.h>
 #include <errno.h>
 #include <inttypes.h>
@@ -157,6 +158,29 @@ static void msm_add_ubwc_combinations(struct driver *drv, const uint32_t *format
 	}
 }
 
+/**
+ * Check for buggy apps that are known to not support modifiers, to avoid surprising them
+ * with a UBWC buffer.
+ */
+static bool should_avoid_ubwc(void)
+{
+#ifndef __ANDROID__
+	/* waffle is buggy and, requests a renderable buffer (which on qcom platforms, we
+	 * want to use UBWC), and then passes it to the kernel discarding the modifier.
+	 * So mesa ends up correctly rendering to as tiled+compressed, but kernel tries
+	 * to display as linear.  Other platforms do not see this issue, simply because
+	 * they only use compressed (ex, AFBC) with the BO_USE_SCANOUT flag.
+	 *
+	 * See b/163137550
+	 */
+	if (dlsym(RTLD_DEFAULT, "waffle_display_connect")) {
+		drv_log("WARNING: waffle detected, disabling UBWC\n");
+		return true;
+	}
+#endif
+	return false;
+}
+
 static int msm_init(struct driver *drv)
 {
 	struct format_metadata metadata;
@@ -189,6 +213,9 @@ static int msm_init(struct driver *drv)
 	drv_add_combination(drv, DRM_FORMAT_BGR888, &LINEAR_METADATA, BO_USE_SW_MASK);
 
 	drv_modify_linear_combinations(drv);
+
+	if (should_avoid_ubwc())
+		return 0;
 
 	metadata.tiling = MSM_UBWC_TILING;
 	metadata.priority = 2;
