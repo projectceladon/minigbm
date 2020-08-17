@@ -85,7 +85,7 @@ Return<void> CrosGralloc4Mapper::importBuffer(const hidl_handle& handle, importB
 
     native_handle_t* importedBufferHandle = native_handle_clone(bufferHandle);
     if (!importedBufferHandle) {
-        drv_log("Failed to importBuffer. Handle clone failed.\n");
+        drv_log("Failed to importBuffer. Handle clone failed: %s.\n", strerror(errno));
         hidlCb(Error::NO_RESOURCES, nullptr);
         return Void();
     }
