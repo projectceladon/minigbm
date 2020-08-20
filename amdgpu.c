@@ -430,12 +430,12 @@ static int amdgpu_create_bo_linear(struct bo *bo, uint32_t width, uint32_t heigh
 	stride = ALIGN(stride, 256);
 
 	/*
-	* Currently, allocator used by chrome aligns the height for Encoder/
-	* Decoder buffers while allocator used by android(gralloc/minigbm)
-	* doesn't provide any aligment.
-	*
-	* See b/153130069
-	*/
+	 * Currently, allocator used by chrome aligns the height for Encoder/
+	 * Decoder buffers while allocator used by android(gralloc/minigbm)
+	 * doesn't provide any aligment.
+	 *
+	 * See b/153130069
+	 */
 	if (use_flags & (BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER))
 		height = ALIGN(height, CHROME_HEIGHT_ALIGN);
 
