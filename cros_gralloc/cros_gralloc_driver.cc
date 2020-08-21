@@ -55,7 +55,7 @@ int32_t cros_gralloc_driver::init()
 			if (asprintf(&node, str, DRM_DIR_NAME, j) < 0)
 				continue;
 
-			fd = open(node, O_RDWR, 0);
+			fd = open(node, O_RDWR | O_CLOEXEC);
 			free(node);
 
 			if (fd < 0)
