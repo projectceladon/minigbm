@@ -224,35 +224,11 @@ static int msm_init(struct driver *drv)
 	render_use_flags &= ~sw_flags;
 	texture_use_flags &= ~sw_flags;
 
-	/* TODO(hoegsberg): Disable UBWC while we roll out support for
-	 * passing modifiers from ARC++.  cros-gralloc actuallly
-	 * allocates UBWC buffers in ARC++, but mesa EGL imports
-	 * without a modifier and the ARC++ wayland_service hardcodes
-	 * modifier 0 (DRM_FORMAT_MOD_LINEAR).  As a result, both
-	 * sides think that they have a linear buffer and happly read
-	 * and write linear.  It "works" even though the buffer was
-	 * allocated as UBWC, since UBWC really just results in a
-	 * slightly larger buffer than what we'd allocate for linear.
-	 *
-	 * As we land support in mesa for importing with modifers,
-	 * mesa will start writing UBWC buffers.  Once we land the
-	 * wayland_service change in ARC++, exo will start receiving
-	 * the right modifier and read the buffers as UBWC.  We can't
-	 * synchronize landing these changes and as they land out of
-	 * order, the result is corrupted buffers for a while.  To
-	 * avoid breakage in the interim, we disable UBWC while the
-	 * changes land and then turn it back on when things settle
-	 * down.
-	 */
-	if (false) {
-		msm_add_ubwc_combinations(drv, render_target_formats,
-					  ARRAY_SIZE(render_target_formats),
-					  &metadata, render_use_flags);
+	msm_add_ubwc_combinations(drv, render_target_formats, ARRAY_SIZE(render_target_formats),
+				  &metadata, render_use_flags);
 
-		msm_add_ubwc_combinations(drv, texture_source_formats,
-					  ARRAY_SIZE(texture_source_formats),
-					  &metadata, texture_use_flags);
-	}
+	msm_add_ubwc_combinations(drv, texture_source_formats, ARRAY_SIZE(texture_source_formats),
+				  &metadata, texture_use_flags);
 
 	return 0;
 }
