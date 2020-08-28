@@ -419,33 +419,15 @@ static uint32_t use_flags_to_bind(uint64_t use_flags)
 	handle_flag(&use_flags, BO_USE_CURSOR, &bind, VIRGL_BIND_CURSOR);
 	handle_flag(&use_flags, BO_USE_LINEAR, &bind, VIRGL_BIND_LINEAR);
 
-	if (use_flags & BO_USE_PROTECTED) {
-		handle_flag(&use_flags, BO_USE_PROTECTED, &bind, VIRGL_BIND_MINIGBM_PROTECTED);
-	} else {
-		// Make sure we don't set both flags, since that could be mistaken for
-		// protected. Give OFTEN priority over RARELY.
-		if (use_flags & BO_USE_SW_READ_OFTEN) {
-			handle_flag(&use_flags, BO_USE_SW_READ_OFTEN, &bind,
-				    VIRGL_BIND_MINIGBM_SW_READ_OFTEN);
-		} else {
-			handle_flag(&use_flags, BO_USE_SW_READ_RARELY, &bind,
-				    VIRGL_BIND_MINIGBM_SW_READ_RARELY);
-		}
-		if (use_flags & BO_USE_SW_WRITE_OFTEN) {
-			handle_flag(&use_flags, BO_USE_SW_WRITE_OFTEN, &bind,
-				    VIRGL_BIND_MINIGBM_SW_WRITE_OFTEN);
-		} else {
-			handle_flag(&use_flags, BO_USE_SW_WRITE_RARELY, &bind,
-				    VIRGL_BIND_MINIGBM_SW_WRITE_RARELY);
-		}
-	}
+	handle_flag(&use_flags, BO_USE_SW_READ_OFTEN, &bind, VIRGL_BIND_LINEAR);
+	handle_flag(&use_flags, BO_USE_SW_READ_RARELY, &bind, VIRGL_BIND_LINEAR);
+	handle_flag(&use_flags, BO_USE_SW_WRITE_OFTEN, &bind, VIRGL_BIND_LINEAR);
+	handle_flag(&use_flags, BO_USE_SW_WRITE_RARELY, &bind, VIRGL_BIND_LINEAR);
 
-	handle_flag(&use_flags, BO_USE_CAMERA_WRITE, &bind, VIRGL_BIND_MINIGBM_CAMERA_WRITE);
-	handle_flag(&use_flags, BO_USE_CAMERA_READ, &bind, VIRGL_BIND_MINIGBM_CAMERA_READ);
-	handle_flag(&use_flags, BO_USE_HW_VIDEO_DECODER, &bind,
-		    VIRGL_BIND_MINIGBM_HW_VIDEO_DECODER);
-	handle_flag(&use_flags, BO_USE_HW_VIDEO_ENCODER, &bind,
-		    VIRGL_BIND_MINIGBM_HW_VIDEO_ENCODER);
+	// All host drivers only support linear camera buffer formats. If
+	// that changes, this will need to be modified.
+	handle_flag(&use_flags, BO_USE_CAMERA_READ, &bind, VIRGL_BIND_LINEAR);
+	handle_flag(&use_flags, BO_USE_CAMERA_WRITE, &bind, VIRGL_BIND_LINEAR);
 
 	if (use_flags) {
 		drv_log("Unhandled bo use flag: %llx\n", (unsigned long long)use_flags);
@@ -640,29 +622,22 @@ static int virtio_gpu_init(struct driver *drv)
 	virtio_gpu_add_combination(drv, DRM_FORMAT_ABGR16161616F, &LINEAR_METADATA,
 				   BO_USE_SW_MASK | BO_USE_TEXTURE_MASK);
 
-	drv_modify_combination(drv, DRM_FORMAT_ABGR8888, &LINEAR_METADATA,
-			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER |
-				   BO_USE_HW_VIDEO_ENCODER);
-	drv_modify_combination(drv, DRM_FORMAT_XBGR8888, &LINEAR_METADATA,
-			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER |
-				   BO_USE_HW_VIDEO_ENCODER);
 	drv_modify_combination(drv, DRM_FORMAT_NV12, &LINEAR_METADATA,
 			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER |
 				   BO_USE_HW_VIDEO_ENCODER);
 	drv_modify_combination(drv, DRM_FORMAT_NV21, &LINEAR_METADATA,
 			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER |
 				   BO_USE_HW_VIDEO_ENCODER);
-	drv_modify_combination(drv, DRM_FORMAT_R16, &LINEAR_METADATA,
-			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER);
-	drv_modify_combination(drv, DRM_FORMAT_R8, &LINEAR_METADATA,
-			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER |
-				   BO_USE_HW_VIDEO_ENCODER);
 	drv_modify_combination(drv, DRM_FORMAT_YVU420, &LINEAR_METADATA,
 			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER |
-				   BO_USE_HW_VIDEO_ENCODER);
+				   BO_USE_HW_VIDEO_ENCODER | BO_USE_RENDERSCRIPT);
 	drv_modify_combination(drv, DRM_FORMAT_YVU420_ANDROID, &LINEAR_METADATA,
 			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER |
-				   BO_USE_HW_VIDEO_ENCODER);
+				   BO_USE_HW_VIDEO_ENCODER | BO_USE_RENDERSCRIPT);
+	drv_modify_combination(drv, DRM_FORMAT_R8, &LINEAR_METADATA,
+			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER);
+	drv_modify_combination(drv, DRM_FORMAT_R16, &LINEAR_METADATA,
+			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER);
 
 	return drv_modify_linear_combinations(drv);
 }
@@ -717,18 +692,6 @@ static int virtio_gpu_bo_invalidate(struct bo *bo, struct mapping *mapping)
 
 	memset(&xfer, 0, sizeof(xfer));
 	xfer.bo_handle = mapping->vma->handle;
-
-	if (mapping->rect.x || mapping->rect.y) {
-		/*
-		 * virglrenderer uses the box parameters and assumes that offset == 0 for planar
-		 * images
-		 */
-		if (bo->meta.num_planes == 1) {
-			xfer.offset =
-			    (bo->meta.strides[0] * mapping->rect.y) +
-			    drv_bytes_per_pixel_from_format(bo->meta.format, 0) * mapping->rect.x;
-		}
-	}
 
 	if ((bo->meta.use_flags & BO_USE_RENDERING) == 0) {
 		// Unfortunately, the kernel doesn't actually pass the guest layer_stride
@@ -801,18 +764,6 @@ static int virtio_gpu_bo_flush(struct bo *bo, struct mapping *mapping)
 	memset(&xfer, 0, sizeof(xfer));
 	xfer.bo_handle = mapping->vma->handle;
 
-	if (mapping->rect.x || mapping->rect.y) {
-		/*
-		 * virglrenderer uses the box parameters and assumes that offset == 0 for planar
-		 * images
-		 */
-		if (bo->meta.num_planes == 1) {
-			xfer.offset =
-			    (bo->meta.strides[0] * mapping->rect.y) +
-			    drv_bytes_per_pixel_from_format(bo->meta.format, 0) * mapping->rect.x;
-		}
-	}
-
 	// Unfortunately, the kernel doesn't actually pass the guest layer_stride and
 	// guest stride to the host (compare virtio_gpu.h and virtgpu_drm.h). We can use
 	// the level to work around this.
@@ -868,9 +819,10 @@ static uint32_t virtio_gpu_resolve_format(struct driver *drv, uint32_t format, u
 {
 	switch (format) {
 	case DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED:
-		// TODO(b/157902551): Cuttlefish's current camera hal implementation
-		// requires that the flex format is RGBA. Revert this edit and use YUV
-		// format when Cuttlefish switches to the newer camera hal.
+		/* Camera subsystem requires NV12. */
+		if (use_flags & (BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE))
+			return DRM_FORMAT_NV12;
+		/*HACK: See b/28671744 */
 		return DRM_FORMAT_XBGR8888;
 	case DRM_FORMAT_FLEX_YCbCr_420_888:
 		/*

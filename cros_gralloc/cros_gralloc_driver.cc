@@ -96,10 +96,10 @@ bool cros_gralloc_driver::is_supported(const struct cros_gralloc_buffer_descript
 
 int32_t create_reserved_region(const std::string &buffer_name, uint64_t reserved_region_size)
 {
+	int32_t reserved_region_fd;
 	std::string reserved_region_name = buffer_name + " reserved region";
 
-#ifdef __NR_memfd_create
-	int32_t reserved_region_fd = memfd_create(reserved_region_name.c_str(), FD_CLOEXEC);
+	reserved_region_fd = memfd_create(reserved_region_name.c_str(), FD_CLOEXEC);
 	if (reserved_region_fd == -1) {
 		drv_log("Failed to create reserved region fd: %s.\n", strerror(errno));
 		return -errno;
@@ -111,11 +111,6 @@ int32_t create_reserved_region(const std::string &buffer_name, uint64_t reserved
 	}
 
 	return reserved_region_fd;
-#else
-	drv_log("Failed to create reserved region '%s': memfd_create not available.",
-		reserved_region_name.c_str());
-	return -1;
-#endif
 }
 
 int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descriptor *descriptor,
@@ -196,7 +191,7 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 	num_bytes = ALIGN(num_bytes, sizeof(int));
 	num_ints = num_bytes - sizeof(native_handle_t) - num_fds;
 	/*
-	 * Malloc is used as handles are ultimately destroyed via free in
+	 * Malloc is used as handles are ultimetly destroyed via free in
 	 * native_handle_delete().
 	 */
 	hnd = static_cast<struct cros_gralloc_handle *>(malloc(num_bytes));

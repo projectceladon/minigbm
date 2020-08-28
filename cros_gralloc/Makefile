@@ -16,9 +16,9 @@ VPATH = $(dir $(SOURCES))
 LIBDRM_CFLAGS := $(shell $(PKG_CONFIG) --cflags libdrm)
 LIBDRM_LIBS := $(shell $(PKG_CONFIG) --libs libdrm)
 
-CPPFLAGS += -Wall -fPIC -Werror -flto $(LIBDRM_CFLAGS) -D_GNU_SOURCE=1
+CPPFLAGS += -Wall -fPIC -Werror -flto $(LIBDRM_CFLAGS)
 CXXFLAGS += -std=c++14
-CFLAGS   += -std=c99 -D_GNU_SOURCE=1
+CFLAGS   += -std=c99
 LIBS     += -shared -lcutils -lhardware -lsync $(LIBDRM_LIBS)
 
 OBJS =  $(foreach source, $(SOURCES), $(addsuffix .o, $(basename $(source))))
