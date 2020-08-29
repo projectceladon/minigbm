@@ -38,10 +38,6 @@ cc_defaults {
     ],
 
     cppflags: ["-std=c++14"],
-
-    shared_libs: [
-        "libdrm",
-    ],
 }
 
 cc_defaults {
@@ -77,6 +73,7 @@ cc_defaults {
 
     shared_libs: [
         "libcutils",
+        "libdrm",
         "libnativewindow",
         "libsync",
         "liblog",
@@ -86,7 +83,6 @@ cc_defaults {
 cc_library_host_shared {
     name: "libgbm",
     defaults: ["minigbm_defaults"],
-    static_libs: ["libdrm"],
 
     srcs: [
         "gbm.c",
@@ -94,6 +90,12 @@ cc_library_host_shared {
     ],
 
     export_include_dirs: ["."],
+
+    // Avoid linking to another host copy of libdrm; this library will cause
+    // binary GPU drivers to be loaded from the host, which might be linked
+    // to a system copy of libdrm, which conflicts with the AOSP one
+    allow_undefined_symbols: true,
+    header_libs: ["libdrm"],
 }
 
 cc_library_static {
