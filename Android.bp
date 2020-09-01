@@ -1,8 +1,5 @@
-/*
- * Copyright 2020 The Chromium OS Authors. All rights reserved.
- * Use of this source code is governed by a BSD-style license that can be
- * found in the LICENSE file.
- */
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
 
 cc_defaults {
     name: "minigbm_defaults",
@@ -44,7 +41,7 @@ cc_defaults {
 }
 
 cc_defaults {
-    name: "minigbm_gralloc_defaults",
+    name: "minigbm_cros_gralloc_defaults",
 
     defaults: ["minigbm_defaults"],
 
@@ -81,8 +78,6 @@ cc_defaults {
         "libsync",
         "liblog",
     ],
-
-    relative_install_path: "hw",
 }
 
 cc_defaults {
@@ -121,8 +116,8 @@ cc_library {
 }
 
 cc_library_static {
-    name: "libminigbm_gralloc",
-    defaults: ["minigbm_gralloc_defaults"],
+    name: "libminigbm_cros_gralloc",
+    defaults: ["minigbm_cros_gralloc_defaults"],
     shared_libs: ["liblog"],
     static_libs: ["libdrm"],
 
@@ -131,13 +126,13 @@ cc_library_static {
 
 cc_library_shared {
     name: "gralloc.minigbm",
-    defaults: ["minigbm_gralloc_defaults"],
+    defaults: ["minigbm_cros_gralloc_defaults"],
     srcs: ["cros_gralloc/gralloc0/gralloc0.cc"],
 }
 
 cc_library_shared {
     name: "gralloc.minigbm_intel",
-    defaults: ["minigbm_gralloc_defaults"],
+    defaults: ["minigbm_cros_gralloc_defaults"],
     enabled: false,
     arch: {
         x86: {
@@ -153,7 +148,7 @@ cc_library_shared {
 
 cc_library_shared {
     name: "gralloc.minigbm_meson",
-    defaults: ["minigbm_gralloc_defaults"],
+    defaults: ["minigbm_cros_gralloc_defaults"],
     cflags: ["-DDRV_MESON"],
     srcs: ["cros_gralloc/gralloc0/gralloc0.cc"],
 }
