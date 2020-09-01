@@ -80,8 +80,9 @@ cc_defaults {
     ],
 }
 
-cc_library_host_shared {
-    name: "libgbm",
+cc_defaults {
+    name: "gbm_defaults",
+
     defaults: ["minigbm_defaults"],
 
     srcs: [
@@ -90,12 +91,28 @@ cc_library_host_shared {
     ],
 
     export_include_dirs: ["."],
+}
 
-    // Avoid linking to another host copy of libdrm; this library will cause
-    // binary GPU drivers to be loaded from the host, which might be linked
-    // to a system copy of libdrm, which conflicts with the AOSP one
-    allow_undefined_symbols: true,
-    header_libs: ["libdrm"],
+cc_library {
+    name: "libgbm",
+    defaults: ["gbm_defaults"],
+    host_supported: true,
+
+    target: {
+        host: {
+            // Avoid linking to another host copy of libdrm; this library will cause
+            // binary GPU drivers to be loaded from the host, which might be linked
+            // to a system copy of libdrm, which conflicts with the AOSP one
+            allow_undefined_symbols: true,
+            header_libs: ["libdrm"],
+        },
+        android: {
+            shared_libs: [
+                "libdrm",
+                "liblog"
+            ],
+        },
+    },
 }
 
 cc_library_static {
