@@ -872,7 +872,32 @@ static void *i915_bo_map(struct bo *bo, struct map_info *data, size_t plane, uin
 	int ret;
 	void *addr;
 
-	if (bo->tiling == I915_TILING_NONE) {
+	struct i915_device *i915 = (struct i915_device *)(bo->drv->priv);
+
+	if(i915->has_mmap_offset) {
+
+		bool wc = true;
+			
+		struct drm_i915_gem_mmap_offset mmap_arg = {
+			.handle =  bo->handles[0].u32,
+			.flags = wc ? I915_MMAP_OFFSET_WC : I915_MMAP_OFFSET_WB,
+		};
+			
+		/* Get the fake offset back */
+		int ret = gen_ioctl(bo->drv->fd, DRM_IOCTL_I915_GEM_MMAP_OFFSET, &mmap_arg);
+		if (ret != 0) {
+			ALOGE( "drv: DRM_IOCTL_I915_GEM_MMAP_OFFSET failed\n");
+			return MAP_FAILED;
+		}
+
+		ALOGI("%s : %d : handle = %x, size = %d, mmpa_arg.offset = %x",  
+				__func__, __LINE__, mmap_arg.handle, bo->total_size, mmap_arg.offset);
+				
+		/* And map it */
+		addr = mmap(0, bo->total_size, PROT_READ | PROT_WRITE, MAP_SHARED,
+							 bo->drv->fd, mmap_arg.offset);
+	}
+	else if (bo->tiling == I915_TILING_NONE) {
 		struct drm_i915_gem_mmap gem_map;
 		memset(&gem_map, 0, sizeof(gem_map));
 
@@ -891,48 +916,19 @@ static void *i915_bo_map(struct bo *bo, struct map_info *data, size_t plane, uin
 
 		addr = (void *)(uintptr_t)gem_map.addr_ptr;
 	} else {
+		struct drm_i915_gem_mmap_gtt gem_map;
+		memset(&gem_map, 0, sizeof(gem_map));
 
-		struct i915_device *i915 = (struct i915_device *)(bo->drv->priv);
+		gem_map.handle = bo->handles[0].u32;
 
-		if(i915->has_mmap_offset) {
-
-			bool wc = false;
-			
-			struct drm_i915_gem_mmap_offset mmap_arg = {
-			   .handle =  bo->handles[0].u32,
-			   .flags = wc ? I915_MMAP_OFFSET_WC : I915_MMAP_OFFSET_WB,
-			};
-			
-			/* Get the fake offset back */
-			int ret = gen_ioctl(bo->drv->fd, DRM_IOCTL_I915_GEM_MMAP_OFFSET, &mmap_arg);
-			if (ret != 0) {
-			   ALOGE( "drv: DRM_IOCTL_I915_GEM_MMAP_OFFSET failed\n");
-			   return MAP_FAILED;
-			}
-
-			ALOGI("%s : %d : handle = %x, size = %d, mmpa_arg.offset = %x",  
-				__func__, __LINE__, mmap_arg.handle, bo->total_size, mmap_arg.offset);
-				
-			/* And map it */
-			addr = mmap(0, bo->total_size, PROT_READ | PROT_WRITE, MAP_SHARED,
-							 bo->drv->fd, mmap_arg.offset);
-			
+		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_MMAP_GTT, &gem_map);
+		if (ret) {
+			ALOGE( "drv: DRM_IOCTL_I915_GEM_MMAP_GTT failed\n");
+			return MAP_FAILED;
 		}
-		else {	
-			struct drm_i915_gem_mmap_gtt gem_map;
-			memset(&gem_map, 0, sizeof(gem_map));
 
-			gem_map.handle = bo->handles[0].u32;
-
-			ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_MMAP_GTT, &gem_map);
-			if (ret) {
-				ALOGE( "drv: DRM_IOCTL_I915_GEM_MMAP_GTT failed\n");
-				return MAP_FAILED;
-			}
-
-			addr = mmap(0, bo->total_size, drv_get_prot(map_flags), MAP_SHARED, bo->drv->fd,
+		addr = mmap(0, bo->total_size, drv_get_prot(map_flags), MAP_SHARED, bo->drv->fd,
 				    gem_map.offset);
-		}
 	}
 
 	if (addr == MAP_FAILED) {
