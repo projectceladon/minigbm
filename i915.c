@@ -713,7 +713,7 @@ static int i915_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t h
 	    }
 	}
 
-	bool local = false;
+	bool local = true;
 	if (force_mem_type) {
 	       local = force_mem_local;
 	}
