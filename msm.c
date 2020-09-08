@@ -186,7 +186,7 @@ static int msm_init(struct driver *drv)
 	struct format_metadata metadata;
 	uint64_t render_use_flags = BO_USE_RENDER_MASK | BO_USE_SCANOUT;
 	uint64_t texture_use_flags = BO_USE_TEXTURE_MASK | BO_USE_HW_VIDEO_DECODER;
-	uint64_t sw_flags = (BO_USE_RENDERSCRIPT | BO_USE_SW_WRITE_OFTEN | BO_USE_SW_READ_OFTEN |
+	uint64_t sw_flags = (BO_USE_RENDERSCRIPT | BO_USE_SW_MASK |
 			     BO_USE_LINEAR | BO_USE_PROTECTED);
 
 	drv_add_combinations(drv, render_target_formats, ARRAY_SIZE(render_target_formats),
