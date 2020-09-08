@@ -4,12 +4,14 @@
  * found in the LICENSE file.
  */
 
-#include <optional>
 #include <string>
 #include <vector>
 
+#include <aidl/android/hardware/graphics/common/PlaneLayout.h>
 #include <android/hardware/graphics/common/1.2/types.h>
-#include <android/hardware/graphics/mapper/3.0/IMapper.h>
+#include <android/hardware/graphics/mapper/4.0/IMapper.h>
+
+#include "cros_gralloc/cros_gralloc_types.h"
 
 std::string getDrmFormatString(uint32_t drmFormat);
 
@@ -24,18 +26,16 @@ int convertToDrmFormat(android::hardware::graphics::common::V1_2::PixelFormat fo
 
 int convertToBufferUsage(uint64_t grallocUsage, uint64_t* outBufferUsage);
 
-int convertToMapUsage(uint64_t grallocUsage, uint32_t* outMapUsage);
-
 int convertToCrosDescriptor(
-        const android::hardware::graphics::mapper::V3_0::IMapper::BufferDescriptorInfo& descriptor,
+        const android::hardware::graphics::mapper::V4_0::IMapper::BufferDescriptorInfo& descriptor,
         struct cros_gralloc_buffer_descriptor* outCrosDescriptor);
+
+int convertToMapUsage(uint64_t grallocUsage, uint32_t* outMapUsage);
 
 int convertToFenceFd(const android::hardware::hidl_handle& fence_handle, int* out_fence_fd);
 
 int convertToFenceHandle(int fence_fd, android::hardware::hidl_handle* out_fence_handle);
 
-std::optional<android::hardware::graphics::mapper::V3_0::IMapper::BufferDescriptorInfo>
-decodeBufferDescriptorInfo(const android::hardware::hidl_vec<uint32_t>& encoded);
-
-std::optional<android::hardware::hidl_vec<uint32_t>> encodeBufferDescriptorInfo(
-        const android::hardware::graphics::mapper::V3_0::IMapper::BufferDescriptorInfo& info);
+int getPlaneLayouts(
+        uint32_t drm_format,
+        std::vector<aidl::android::hardware::graphics::common::PlaneLayout>* out_layouts);

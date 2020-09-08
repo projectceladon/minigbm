@@ -4,14 +4,13 @@
  * found in the LICENSE file.
  */
 
-#include "cros_gralloc/gralloc3/CrosGralloc3Allocator.h"
+#include "cros_gralloc/gralloc4/CrosGralloc4Allocator.h"
 
-#include <optional>
-
-#include <android/hardware/graphics/mapper/3.0/IMapper.h>
+#include <android/hardware/graphics/mapper/4.0/IMapper.h>
+#include <gralloctypes/Gralloc4.h>
 
 #include "cros_gralloc/cros_gralloc_helpers.h"
-#include "cros_gralloc/gralloc3/CrosGralloc3Utils.h"
+#include "cros_gralloc/gralloc4/CrosGralloc4Utils.h"
 
 using android::hardware::hidl_handle;
 using android::hardware::hidl_vec;
@@ -19,19 +18,19 @@ using android::hardware::Return;
 using android::hardware::Void;
 using android::hardware::graphics::common::V1_2::BufferUsage;
 using android::hardware::graphics::common::V1_2::PixelFormat;
-using android::hardware::graphics::mapper::V3_0::Error;
+using android::hardware::graphics::mapper::V4_0::Error;
 
 using BufferDescriptorInfo =
-        android::hardware::graphics::mapper::V3_0::IMapper::BufferDescriptorInfo;
+        android::hardware::graphics::mapper::V4_0::IMapper::BufferDescriptorInfo;
 
-CrosGralloc3Allocator::CrosGralloc3Allocator() : mDriver(std::make_unique<cros_gralloc_driver>()) {
+CrosGralloc4Allocator::CrosGralloc4Allocator() : mDriver(std::make_unique<cros_gralloc_driver>()) {
     if (mDriver->init()) {
         drv_log("Failed to initialize driver.\n");
         mDriver = nullptr;
     }
 }
 
-Error CrosGralloc3Allocator::allocate(const BufferDescriptorInfo& descriptor, uint32_t* outStride,
+Error CrosGralloc4Allocator::allocate(const BufferDescriptorInfo& descriptor, uint32_t* outStride,
                                       hidl_handle* outHandle) {
     if (!mDriver) {
         drv_log("Failed to allocate. Driver is uninitialized.\n");
@@ -79,7 +78,7 @@ Error CrosGralloc3Allocator::allocate(const BufferDescriptorInfo& descriptor, ui
     return Error::NONE;
 }
 
-Return<void> CrosGralloc3Allocator::allocate(const hidl_vec<uint32_t>& encoded, uint32_t count,
+Return<void> CrosGralloc4Allocator::allocate(const hidl_vec<uint8_t>& descriptor, uint32_t count,
                                              allocate_cb hidlCb) {
     hidl_vec<hidl_handle> handles;
 
@@ -89,20 +88,20 @@ Return<void> CrosGralloc3Allocator::allocate(const hidl_vec<uint32_t>& encoded, 
         return Void();
     }
 
-    auto descriptor_opt = decodeBufferDescriptorInfo(encoded);
-    if (!descriptor_opt) {
-        drv_log("Failed to allocate. Failed to decode buffer descriptor.\n");
+    BufferDescriptorInfo description;
+
+    int ret = android::gralloc4::decodeBufferDescriptorInfo(descriptor, &description);
+    if (ret) {
+        drv_log("Failed to allocate. Failed to decode buffer descriptor: %d.\n", ret);
         hidlCb(Error::BAD_DESCRIPTOR, 0, handles);
         return Void();
     }
-
-    BufferDescriptorInfo descriptor = *descriptor_opt;
 
     handles.resize(count);
 
     uint32_t stride = 0;
     for (int i = 0; i < handles.size(); i++) {
-        Error err = allocate(descriptor, &stride, &(handles[i]));
+        Error err = allocate(description, &stride, &(handles[i]));
         if (err != Error::NONE) {
             for (int j = 0; j < i; j++) {
                 mDriver->release(handles[j].getNativeHandle());
@@ -119,10 +118,5 @@ Return<void> CrosGralloc3Allocator::allocate(const hidl_vec<uint32_t>& encoded, 
         mDriver->release(handle.getNativeHandle());
     }
 
-    return Void();
-}
-
-Return<void> CrosGralloc3Allocator::dumpDebugInfo(dumpDebugInfo_cb hidl_cb) {
-    hidl_cb("CrosGralloc3Allocator::dumpDebugInfo unimplemented.");
     return Void();
 }

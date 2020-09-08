@@ -56,6 +56,12 @@ static int mediatek_init(struct driver *drv)
 
 	drv_add_combination(drv, DRM_FORMAT_R8, &LINEAR_METADATA,
 			    BO_USE_SW_MASK | BO_USE_LINEAR | BO_USE_PROTECTED);
+	/*
+	 * Chrome uses DMA-buf mmap to write to YV12 buffers, which are then accessed by the
+	 * Video Encoder Accelerator (VEA). It could also support NV12 potentially in the future.
+	 */
+	drv_modify_combination(drv, DRM_FORMAT_YVU420, &LINEAR_METADATA, BO_USE_HW_VIDEO_ENCODER);
+	drv_modify_combination(drv, DRM_FORMAT_NV12, &LINEAR_METADATA, BO_USE_HW_VIDEO_ENCODER);
 
 	/* Android CTS tests require this. */
 	drv_add_combination(drv, DRM_FORMAT_BGR888, &LINEAR_METADATA, BO_USE_SW_MASK);
@@ -68,18 +74,7 @@ static int mediatek_init(struct driver *drv)
 	drv_modify_combination(drv, DRM_FORMAT_YVU420_ANDROID, &metadata, BO_USE_HW_VIDEO_DECODER);
 	drv_modify_combination(drv, DRM_FORMAT_NV12, &metadata, BO_USE_HW_VIDEO_DECODER);
 
-	/*
-	 * R8 format is used for Android's HAL_PIXEL_FORMAT_BLOB for input/output from
-	 * hardware decoder/encoder.
-	 */
-	drv_modify_combination(drv, DRM_FORMAT_R8, &metadata,
-			       BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER);
-
 #ifdef MTK_MT8183
-	/* NV12 format for encoding and display. */
-	drv_modify_combination(drv, DRM_FORMAT_NV12, &metadata,
-			       BO_USE_SCANOUT | BO_USE_HW_VIDEO_ENCODER);
-
 	/* Only for MT8183 Camera subsystem */
 	drv_modify_combination(drv, DRM_FORMAT_NV12, &metadata,
 			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE);
