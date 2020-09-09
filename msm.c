@@ -83,11 +83,14 @@ static void msm_calculate_layout(struct bo *bo)
 		y_stride = ALIGN(width, VENUS_STRIDE_ALIGN);
 		uv_stride = ALIGN(width, VENUS_STRIDE_ALIGN);
 		y_scanline = ALIGN(height, VENUS_SCANLINE_ALIGN * 2);
-		uv_scanline = ALIGN(DIV_ROUND_UP(height, 2), VENUS_SCANLINE_ALIGN);
+		uv_scanline = ALIGN(DIV_ROUND_UP(height, 2),
+			VENUS_SCANLINE_ALIGN * (bo->meta.tiling ? 2 : 1));
 		y_plane = y_stride * y_scanline;
 		uv_plane = uv_stride * uv_scanline;
 
 		if (bo->meta.tiling == MSM_UBWC_TILING) {
+			y_plane = ALIGN(y_plane, PLANE_SIZE_ALIGN);
+			uv_plane = ALIGN(uv_plane, PLANE_SIZE_ALIGN);
 			y_plane += get_ubwc_meta_size(width, height, 32, 8);
 			uv_plane += get_ubwc_meta_size(width >> 1, height >> 1, 16, 8);
 			extra_padding = NV12_UBWC_PADDING(y_stride);
