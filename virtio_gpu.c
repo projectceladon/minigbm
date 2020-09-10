@@ -687,10 +687,15 @@ static int virtio_gpu_bo_create_blob(struct driver *drv, struct bo *bo)
 	uint32_t cmd[VIRGL_PIPE_RES_CREATE_SIZE + 1] = { 0 };
 	struct drm_virtgpu_resource_create_blob drm_rc_blob = { 0 };
 
+	uint32_t blob_flags = VIRTGPU_BLOB_FLAG_USE_MAPPABLE | VIRTGPU_BLOB_FLAG_USE_SHAREABLE;
+	if (bo->meta.use_flags & BO_USE_NON_GPU_HW) {
+		blob_flags |= VIRTGPU_BLOB_FLAG_USE_CROSS_DEVICE;
+	}
+
 	stride = drv_stride_from_format(bo->meta.format, bo->meta.width, 0);
 	drv_bo_from_format(bo, stride, bo->meta.height, bo->meta.format);
 	bo->meta.total_size = ALIGN(bo->meta.total_size, PAGE_SIZE);
-	bo->meta.tiling = VIRTGPU_BLOB_FLAG_USE_MAPPABLE | VIRTGPU_BLOB_FLAG_USE_SHAREABLE;
+	bo->meta.tiling = blob_flags;
 
 	cmd[0] = VIRGL_CMD0(VIRGL_CCMD_PIPE_RESOURCE_CREATE, 0, VIRGL_PIPE_RES_CREATE_SIZE);
 	cmd[VIRGL_PIPE_RES_CREATE_TARGET] = PIPE_TEXTURE_2D;
@@ -704,7 +709,7 @@ static int virtio_gpu_bo_create_blob(struct driver *drv, struct bo *bo)
 	drm_rc_blob.cmd_size = 4 * (VIRGL_PIPE_RES_CREATE_SIZE + 1);
 	drm_rc_blob.size = bo->meta.total_size;
 	drm_rc_blob.blob_mem = VIRTGPU_BLOB_MEM_HOST3D;
-	drm_rc_blob.blob_flags = VIRTGPU_BLOB_FLAG_USE_MAPPABLE | VIRTGPU_BLOB_FLAG_USE_SHAREABLE;
+	drm_rc_blob.blob_flags = blob_flags;
 
 	ret = drmIoctl(drv->fd, DRM_IOCTL_VIRTGPU_RESOURCE_CREATE_BLOB, &drm_rc_blob);
 	if (ret < 0) {
@@ -731,16 +736,16 @@ static bool should_use_blob(struct driver *drv, uint32_t format, uint64_t use_fl
 	if (!priv->host_gbm_enabled)
 		return false;
 
-	// Focus on SW read/write apps for now
-	if (use_flags & (BO_USE_RENDERING | BO_USE_HW_VIDEO_ENCODER | BO_USE_HW_VIDEO_DECODER))
+	// Focus on non-GPU apps for now
+	if (use_flags & (BO_USE_RENDERING | BO_USE_TEXTURE))
 		return false;
 
 	// Simple, strictly defined formats for now
-	if (format != DRM_FORMAT_YVU420_ANDROID || format != DRM_FORMAT_R8)
+	if (format != DRM_FORMAT_YVU420_ANDROID && format != DRM_FORMAT_R8)
 		return false;
 
-	if (use_flags & (BO_USE_SW_READ_OFTEN | BO_USE_SW_WRITE_OFTEN | BO_USE_LINEAR |
-			 BO_USE_CAMERA_WRITE | BO_USE_CAMERA_READ))
+	if (use_flags &
+	    (BO_USE_SW_READ_OFTEN | BO_USE_SW_WRITE_OFTEN | BO_USE_LINEAR | BO_USE_NON_GPU_HW))
 		return true;
 
 	return false;

@@ -31,6 +31,7 @@ struct cros_gralloc_handle {
 	uint32_t width;
 	uint32_t height;
 	uint32_t format; /* DRM format */
+	uint32_t tiling;
 	uint64_t format_modifier;
 	uint64_t use_flags; /* Buffer creation flags */
 	uint32_t magic;
