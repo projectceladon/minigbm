@@ -66,30 +66,31 @@ static int mediatek_init(struct driver *drv)
 	metadata.modifier = DRM_FORMAT_MOD_LINEAR;
 	drv_modify_combination(drv, DRM_FORMAT_YVU420, &metadata, BO_USE_HW_VIDEO_DECODER);
 	drv_modify_combination(drv, DRM_FORMAT_YVU420_ANDROID, &metadata, BO_USE_HW_VIDEO_DECODER);
+#ifdef MTK_MT8183
+	// TODO(hiroh): Switch to use NV12 for video decoder on MT8173 as well.
 	drv_modify_combination(drv, DRM_FORMAT_NV12, &metadata, BO_USE_HW_VIDEO_DECODER);
+#endif
 
 	/*
 	 * R8 format is used for Android's HAL_PIXEL_FORMAT_BLOB for input/output from
 	 * hardware decoder/encoder.
 	 */
 	drv_modify_combination(drv, DRM_FORMAT_R8, &metadata,
-			       BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER);
+			       BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER |
+				   BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE);
 
-#ifdef MTK_MT8183
 	/* NV12 format for encoding and display. */
 	drv_modify_combination(drv, DRM_FORMAT_NV12, &metadata,
-			       BO_USE_SCANOUT | BO_USE_HW_VIDEO_ENCODER);
+			       BO_USE_SCANOUT | BO_USE_HW_VIDEO_ENCODER | BO_USE_CAMERA_READ |
+				   BO_USE_CAMERA_WRITE);
 
+#ifdef MTK_MT8183
 	/* Only for MT8183 Camera subsystem */
-	drv_modify_combination(drv, DRM_FORMAT_NV12, &metadata,
-			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE);
 	drv_modify_combination(drv, DRM_FORMAT_NV21, &metadata,
 			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE);
 	drv_modify_combination(drv, DRM_FORMAT_YUYV, &metadata,
 			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE);
 	drv_modify_combination(drv, DRM_FORMAT_YVU420, &metadata,
-			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE);
-	drv_modify_combination(drv, DRM_FORMAT_R8, &metadata,
 			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE);
 	/* Private formats for private reprocessing in camera */
 	drv_add_combination(drv, DRM_FORMAT_MTISP_SXYZW10, &metadata,
@@ -270,21 +271,23 @@ static uint32_t mediatek_resolve_format(struct driver *drv, uint32_t format, uin
 		 * reprocessing and hence given the private format for MTK. */
 		if (use_flags & BO_USE_CAMERA_READ)
 			return DRM_FORMAT_MTISP_SXYZW10;
-		/* For non-reprocessing uses, only MT8183 Camera subsystem
-		 * requires NV12. */
-		else if (use_flags & BO_USE_CAMERA_WRITE)
-			return DRM_FORMAT_NV12;
 #endif
+		if (use_flags & BO_USE_CAMERA_WRITE)
+			return DRM_FORMAT_NV12;
+
 		/*HACK: See b/28671744 */
 		return DRM_FORMAT_XBGR8888;
 	case DRM_FORMAT_FLEX_YCbCr_420_888:
 #ifdef MTK_MT8183
-		/* MT8183 camera and decoder subsystems require NV12. */
-		if (use_flags & (BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE |
-				 BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER)) {
+		// TODO(hiroh): Switch to use NV12 for video decoder on MT8173 as well.
+		if (use_flags & (BO_USE_HW_VIDEO_DECODER)) {
 			return DRM_FORMAT_NV12;
 		}
 #endif
+		if (use_flags &
+		    (BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_ENCODER)) {
+			return DRM_FORMAT_NV12;
+		}
 		return DRM_FORMAT_YVU420;
 	default:
 		return format;

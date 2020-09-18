@@ -55,7 +55,7 @@ int32_t cros_gralloc_driver::init()
 			if (asprintf(&node, str, DRM_DIR_NAME, j) < 0)
 				continue;
 
-			fd = open(node, O_RDWR, 0);
+			fd = open(node, O_RDWR | O_CLOEXEC);
 			free(node);
 
 			if (fd < 0)
@@ -217,6 +217,7 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 	hnd->width = drv_bo_get_width(bo);
 	hnd->height = drv_bo_get_height(bo);
 	hnd->format = drv_bo_get_format(bo);
+	hnd->tiling = bo->meta.tiling;
 	hnd->format_modifier = drv_bo_get_plane_format_modifier(bo, 0);
 	hnd->use_flags = descriptor->use_flags;
 	bytes_per_pixel = drv_bytes_per_pixel_from_format(hnd->format, 0);
@@ -271,6 +272,7 @@ int32_t cros_gralloc_driver::retain(buffer_handle_t handle)
 		struct bo *bo;
 		struct drv_import_fd_data data;
 		data.format = hnd->format;
+		data.tiling = hnd->tiling;
 
 		data.width = hnd->width;
 		data.height = hnd->height;

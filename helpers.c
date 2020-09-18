@@ -451,6 +451,7 @@ int drv_prime_bo_import(struct bo *bo, struct drv_import_fd_data *data)
 
 		bo->handles[plane].u32 = prime_handle.handle;
 	}
+	bo->meta.tiling = data->tiling;
 
 	return 0;
 }

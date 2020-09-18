@@ -7,6 +7,7 @@
 #ifdef DRV_MSM
 
 #include <assert.h>
+#include <dlfcn.h>
 #include <drm_fourcc.h>
 #include <errno.h>
 #include <inttypes.h>
@@ -82,11 +83,14 @@ static void msm_calculate_layout(struct bo *bo)
 		y_stride = ALIGN(width, VENUS_STRIDE_ALIGN);
 		uv_stride = ALIGN(width, VENUS_STRIDE_ALIGN);
 		y_scanline = ALIGN(height, VENUS_SCANLINE_ALIGN * 2);
-		uv_scanline = ALIGN(DIV_ROUND_UP(height, 2), VENUS_SCANLINE_ALIGN);
+		uv_scanline = ALIGN(DIV_ROUND_UP(height, 2),
+			VENUS_SCANLINE_ALIGN * (bo->meta.tiling ? 2 : 1));
 		y_plane = y_stride * y_scanline;
 		uv_plane = uv_stride * uv_scanline;
 
 		if (bo->meta.tiling == MSM_UBWC_TILING) {
+			y_plane = ALIGN(y_plane, PLANE_SIZE_ALIGN);
+			uv_plane = ALIGN(uv_plane, PLANE_SIZE_ALIGN);
 			y_plane += get_ubwc_meta_size(width, height, 32, 8);
 			uv_plane += get_ubwc_meta_size(width >> 1, height >> 1, 16, 8);
 			extra_padding = NV12_UBWC_PADDING(y_stride);
@@ -157,12 +161,35 @@ static void msm_add_ubwc_combinations(struct driver *drv, const uint32_t *format
 	}
 }
 
+/**
+ * Check for buggy apps that are known to not support modifiers, to avoid surprising them
+ * with a UBWC buffer.
+ */
+static bool should_avoid_ubwc(void)
+{
+#ifndef __ANDROID__
+	/* waffle is buggy and, requests a renderable buffer (which on qcom platforms, we
+	 * want to use UBWC), and then passes it to the kernel discarding the modifier.
+	 * So mesa ends up correctly rendering to as tiled+compressed, but kernel tries
+	 * to display as linear.  Other platforms do not see this issue, simply because
+	 * they only use compressed (ex, AFBC) with the BO_USE_SCANOUT flag.
+	 *
+	 * See b/163137550
+	 */
+	if (dlsym(RTLD_DEFAULT, "waffle_display_connect")) {
+		drv_log("WARNING: waffle detected, disabling UBWC\n");
+		return true;
+	}
+#endif
+	return false;
+}
+
 static int msm_init(struct driver *drv)
 {
 	struct format_metadata metadata;
 	uint64_t render_use_flags = BO_USE_RENDER_MASK | BO_USE_SCANOUT;
 	uint64_t texture_use_flags = BO_USE_TEXTURE_MASK | BO_USE_HW_VIDEO_DECODER;
-	uint64_t sw_flags = (BO_USE_RENDERSCRIPT | BO_USE_SW_WRITE_OFTEN | BO_USE_SW_READ_OFTEN |
+	uint64_t sw_flags = (BO_USE_RENDERSCRIPT | BO_USE_SW_MASK |
 			     BO_USE_LINEAR | BO_USE_PROTECTED);
 
 	drv_add_combinations(drv, render_target_formats, ARRAY_SIZE(render_target_formats),
@@ -181,7 +208,7 @@ static int msm_init(struct driver *drv)
 	 * R8 format is used for Android's HAL_PIXEL_FORMAT_BLOB and is used for JPEG snapshots
 	 * from camera and input/output from hardware decoder/encoder.
 	 */
-	drv_modify_combination(drv, DRM_FORMAT_R8, &metadata,
+	drv_modify_combination(drv, DRM_FORMAT_R8, &LINEAR_METADATA,
 			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER |
 				   BO_USE_HW_VIDEO_ENCODER);
 
@@ -189,6 +216,9 @@ static int msm_init(struct driver *drv)
 	drv_add_combination(drv, DRM_FORMAT_BGR888, &LINEAR_METADATA, BO_USE_SW_MASK);
 
 	drv_modify_linear_combinations(drv);
+
+	if (should_avoid_ubwc())
+		return 0;
 
 	metadata.tiling = MSM_UBWC_TILING;
 	metadata.priority = 2;
