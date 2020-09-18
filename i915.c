@@ -34,21 +34,51 @@ static const uint32_t render_formats[] = { DRM_FORMAT_ABGR16161616F };
 static const uint32_t texture_only_formats[] = { DRM_FORMAT_R8, DRM_FORMAT_NV12, DRM_FORMAT_P010,
 						 DRM_FORMAT_YVU420, DRM_FORMAT_YVU420_ANDROID };
 
+static const uint64_t gen_modifier_order[] = { I915_FORMAT_MOD_Y_TILED, I915_FORMAT_MOD_X_TILED,
+					       DRM_FORMAT_MOD_LINEAR };
+
+static const uint64_t gen11_modifier_order[] = { I915_FORMAT_MOD_Y_TILED_CCS,
+						 I915_FORMAT_MOD_Y_TILED, I915_FORMAT_MOD_X_TILED,
+						 DRM_FORMAT_MOD_LINEAR };
+
+struct modifier_support_t {
+	const uint64_t *order;
+	uint32_t count;
+};
+
 struct i915_device {
 	uint32_t gen;
 	int32_t has_llc;
+	struct modifier_support_t modifier;
 };
 
 static uint32_t i915_get_gen(int device_id)
 {
 	const uint16_t gen3_ids[] = { 0x2582, 0x2592, 0x2772, 0x27A2, 0x27AE,
 				      0x29C2, 0x29B2, 0x29D2, 0xA001, 0xA011 };
+	const uint16_t gen11_ids[] = { 0x4E71, 0x4E61, 0x4E51, 0x4E55, 0x4E57 };
+
 	unsigned i;
 	for (i = 0; i < ARRAY_SIZE(gen3_ids); i++)
 		if (gen3_ids[i] == device_id)
 			return 3;
+	/* Gen 11 */
+	for (i = 0; i < ARRAY_SIZE(gen11_ids); i++)
+		if (gen11_ids[i] == device_id)
+			return 11;
 
 	return 4;
+}
+
+static void i915_get_modifier_order(struct i915_device *i915)
+{
+	if (i915->gen == 11) {
+		i915->modifier.order = gen11_modifier_order;
+		i915->modifier.count = ARRAY_SIZE(gen11_modifier_order);
+	} else {
+		i915->modifier.order = gen_modifier_order;
+		i915->modifier.count = ARRAY_SIZE(gen_modifier_order);
+	}
 }
 
 static uint64_t unset_flags(uint64_t current_flags, uint64_t mask)
@@ -221,6 +251,7 @@ static int i915_init(struct driver *drv)
 	}
 
 	i915->gen = i915_get_gen(device_id);
+	i915_get_modifier_order(i915);
 
 	memset(&get_param, 0, sizeof(get_param));
 	get_param.param = I915_PARAM_HAS_LLC;
@@ -270,18 +301,13 @@ static int i915_bo_from_format(struct bo *bo, uint32_t width, uint32_t height, u
 static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t height, uint32_t format,
 				    uint64_t use_flags, const uint64_t *modifiers, uint32_t count)
 {
-	static const uint64_t modifier_order[] = {
-		I915_FORMAT_MOD_Y_TILED,
-		I915_FORMAT_MOD_X_TILED,
-		DRM_FORMAT_MOD_LINEAR,
-	};
 	uint64_t modifier;
 	struct i915_device *i915 = bo->drv->priv;
 	bool huge_bo = (i915->gen <= 11) && (width > 4096);
 
 	if (modifiers) {
 		modifier =
-		    drv_pick_modifier(modifiers, count, modifier_order, ARRAY_SIZE(modifier_order));
+		    drv_pick_modifier(modifiers, count, i915->modifier.order, i915->modifier.count);
 	} else {
 		struct combination *combo = drv_get_combination(bo->drv, format, use_flags);
 		if (!combo)

@@ -59,7 +59,7 @@ static int vc4_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t he
 
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_VC4_CREATE_BO, &bo_create);
 	if (ret) {
-		drv_log("DRM_IOCTL_VC4_GEM_CREATE failed (size=%zu)\n", bo->meta.total_size);
+		drv_log("DRM_IOCTL_VC4_CREATE_BO failed (size=%zu)\n", bo->meta.total_size);
 		return -errno;
 	}
 

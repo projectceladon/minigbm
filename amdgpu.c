@@ -47,9 +47,11 @@ struct amdgpu_linear_vma_priv {
 	uint32_t map_flags;
 };
 
-const static uint32_t render_target_formats[] = { DRM_FORMAT_ABGR8888, DRM_FORMAT_ARGB8888,
-						  DRM_FORMAT_RGB565, DRM_FORMAT_XBGR8888,
-						  DRM_FORMAT_XRGB8888 };
+const static uint32_t render_target_formats[] = {
+	DRM_FORMAT_ABGR8888,	DRM_FORMAT_ARGB8888,	DRM_FORMAT_RGB565,
+	DRM_FORMAT_XBGR8888,	DRM_FORMAT_XRGB8888,	DRM_FORMAT_ABGR2101010,
+	DRM_FORMAT_ARGB2101010, DRM_FORMAT_XBGR2101010, DRM_FORMAT_XRGB2101010,
+};
 
 const static uint32_t texture_source_formats[] = { DRM_FORMAT_GR88,	      DRM_FORMAT_R8,
 						   DRM_FORMAT_NV21,	      DRM_FORMAT_NV12,
@@ -364,6 +366,11 @@ static int amdgpu_init(struct driver *drv)
 	drv_modify_combination(drv, DRM_FORMAT_ABGR8888, &metadata, BO_USE_SCANOUT);
 	drv_modify_combination(drv, DRM_FORMAT_XBGR8888, &metadata, BO_USE_SCANOUT);
 
+	drv_modify_combination(drv, DRM_FORMAT_ABGR2101010, &metadata, BO_USE_SCANOUT);
+	drv_modify_combination(drv, DRM_FORMAT_ARGB2101010, &metadata, BO_USE_SCANOUT);
+	drv_modify_combination(drv, DRM_FORMAT_XBGR2101010, &metadata, BO_USE_SCANOUT);
+	drv_modify_combination(drv, DRM_FORMAT_XRGB2101010, &metadata, BO_USE_SCANOUT);
+
 	drv_modify_combination(drv, DRM_FORMAT_NV21, &metadata, BO_USE_SCANOUT);
 
 	/*
@@ -395,6 +402,11 @@ static int amdgpu_init(struct driver *drv)
 	drv_modify_combination(drv, DRM_FORMAT_XRGB8888, &metadata, BO_USE_CURSOR | BO_USE_SCANOUT);
 	drv_modify_combination(drv, DRM_FORMAT_ABGR8888, &metadata, BO_USE_SCANOUT);
 	drv_modify_combination(drv, DRM_FORMAT_XBGR8888, &metadata, BO_USE_SCANOUT);
+
+	drv_modify_combination(drv, DRM_FORMAT_ABGR2101010, &metadata, BO_USE_SCANOUT);
+	drv_modify_combination(drv, DRM_FORMAT_ARGB2101010, &metadata, BO_USE_SCANOUT);
+	drv_modify_combination(drv, DRM_FORMAT_XBGR2101010, &metadata, BO_USE_SCANOUT);
+	drv_modify_combination(drv, DRM_FORMAT_XRGB2101010, &metadata, BO_USE_SCANOUT);
 	return 0;
 }
 
@@ -418,12 +430,12 @@ static int amdgpu_create_bo_linear(struct bo *bo, uint32_t width, uint32_t heigh
 	stride = ALIGN(stride, 256);
 
 	/*
-	* Currently, allocator used by chrome aligns the height for Encoder/
-	* Decoder buffers while allocator used by android(gralloc/minigbm)
-	* doesn't provide any aligment.
-	*
-	* See b/153130069
-	*/
+	 * Currently, allocator used by chrome aligns the height for Encoder/
+	 * Decoder buffers while allocator used by android(gralloc/minigbm)
+	 * doesn't provide any aligment.
+	 *
+	 * See b/153130069
+	 */
 	if (use_flags & (BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER))
 		height = ALIGN(height, CHROME_HEIGHT_ALIGN);
 
