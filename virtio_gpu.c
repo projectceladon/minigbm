@@ -683,10 +683,11 @@ static int virtio_gpu_bo_create_blob(struct driver *drv, struct bo *bo)
 	uint32_t cmd[VIRGL_PIPE_RES_CREATE_SIZE + 1] = { 0 };
 	struct drm_virtgpu_resource_create_blob drm_rc_blob = { 0 };
 
-	uint32_t blob_flags = VIRTGPU_BLOB_FLAG_USE_MAPPABLE | VIRTGPU_BLOB_FLAG_USE_SHAREABLE;
-	if (bo->meta.use_flags & BO_USE_NON_GPU_HW) {
+	uint32_t blob_flags = VIRTGPU_BLOB_FLAG_USE_SHAREABLE;
+	if (bo->meta.use_flags & BO_USE_SW_MASK)
+		blob_flags |= VIRTGPU_BLOB_FLAG_USE_MAPPABLE;
+	if (bo->meta.use_flags & BO_USE_NON_GPU_HW)
 		blob_flags |= VIRTGPU_BLOB_FLAG_USE_CROSS_DEVICE;
-	}
 
 	stride = drv_stride_from_format(bo->meta.format, bo->meta.width, 0);
 	drv_bo_from_format(bo, stride, bo->meta.height, bo->meta.format);
@@ -732,19 +733,23 @@ static bool should_use_blob(struct driver *drv, uint32_t format, uint64_t use_fl
 	if (!priv->host_gbm_enabled)
 		return false;
 
-	// Focus on non-GPU apps for now
-	if (use_flags & (BO_USE_RENDERING | BO_USE_TEXTURE))
+	// Use regular resources if only the GPU needs efficient access
+	if (!(use_flags &
+	      (BO_USE_SW_READ_OFTEN | BO_USE_SW_WRITE_OFTEN | BO_USE_LINEAR | BO_USE_NON_GPU_HW)))
 		return false;
 
-	// Simple, strictly defined formats for now
-	if (format != DRM_FORMAT_YVU420_ANDROID && format != DRM_FORMAT_R8)
-		return false;
-
-	if (use_flags &
-	    (BO_USE_SW_READ_OFTEN | BO_USE_SW_WRITE_OFTEN | BO_USE_LINEAR | BO_USE_NON_GPU_HW))
+	switch (format) {
+	case DRM_FORMAT_YVU420_ANDROID:
+	case DRM_FORMAT_R8:
+		// Formats with strictly defined strides are supported
 		return true;
-
-	return false;
+	case DRM_FORMAT_NV12:
+		// Knowing buffer metadata at buffer creation isn't yet supported, so buffers
+		// can't be properly mapped into the guest.
+		return (use_flags & BO_USE_SW_MASK) == 0;
+	default:
+		return false;
+	}
 }
 
 static int virtio_gpu_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint32_t format,
