@@ -53,9 +53,10 @@ const static uint32_t render_target_formats[] = {
 	DRM_FORMAT_ARGB2101010, DRM_FORMAT_XBGR2101010, DRM_FORMAT_XRGB2101010,
 };
 
-const static uint32_t texture_source_formats[] = { DRM_FORMAT_GR88,	      DRM_FORMAT_R8,
-						   DRM_FORMAT_NV21,	      DRM_FORMAT_NV12,
-						   DRM_FORMAT_YVU420_ANDROID, DRM_FORMAT_YVU420 };
+const static uint32_t texture_source_formats[] = {
+	DRM_FORMAT_GR88,	   DRM_FORMAT_R8,     DRM_FORMAT_NV21, DRM_FORMAT_NV12,
+	DRM_FORMAT_YVU420_ANDROID, DRM_FORMAT_YVU420, DRM_FORMAT_P010
+};
 
 static int query_dev_info(int fd, struct drm_amdgpu_info_device *dev_info)
 {
@@ -356,6 +357,9 @@ static int amdgpu_init(struct driver *drv)
 	drv_modify_combination(drv, DRM_FORMAT_NV12, &metadata,
 			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SCANOUT |
 				   BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER);
+
+	drv_modify_combination(drv, DRM_FORMAT_P010, &metadata,
+			       BO_USE_SCANOUT | BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER);
 
 	/* Android CTS tests require this. */
 	drv_add_combination(drv, DRM_FORMAT_BGR888, &metadata, BO_USE_SW_MASK);
