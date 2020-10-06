@@ -13,7 +13,9 @@
 #include <cutils/native_handle.h>
 #include <gralloctypes/Gralloc4.h>
 
+#include "cros_gralloc/cros_gralloc_helpers.h"
 #include "cros_gralloc/gralloc4/CrosGralloc4Utils.h"
+
 #include "helpers.h"
 
 using aidl::android::hardware::graphics::common::BlendMode;
@@ -602,7 +604,7 @@ int CrosGralloc4Mapper::getResolvedDrmFormat(PixelFormat pixelFormat, uint64_t b
 
     uint32_t resolvedDrmFormat = mDriver->get_resolved_drm_format(drmFormat, usage);
     if (resolvedDrmFormat == DRM_FORMAT_INVALID) {
-        std::string drmFormatString = getDrmFormatString(drmFormat);
+        std::string drmFormatString = get_drm_format_string(drmFormat);
         drv_log("Failed to getResolvedDrmFormat. Failed to resolve drm format %s\n",
                 drmFormatString.c_str());
         return -1;
