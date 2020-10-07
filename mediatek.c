@@ -107,7 +107,7 @@ static int mediatek_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint
 	int ret;
 	size_t plane;
 	uint32_t stride;
-	struct drm_mtk_gem_create gem_create;
+	struct drm_mtk_gem_create gem_create = { 0 };
 
 	if (!drv_has_modifier(modifiers, count, DRM_FORMAT_MOD_LINEAR)) {
 		errno = EINVAL;
@@ -146,7 +146,6 @@ static int mediatek_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint
 		drv_bo_from_format(bo, stride, height, format);
 	}
 
-	memset(&gem_create, 0, sizeof(gem_create));
 	gem_create.size = bo->meta.total_size;
 
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_MTK_GEM_CREATE, &gem_create);
@@ -172,10 +171,9 @@ static int mediatek_bo_create(struct bo *bo, uint32_t width, uint32_t height, ui
 static void *mediatek_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t map_flags)
 {
 	int ret, prime_fd;
-	struct drm_mtk_gem_map_off gem_map;
+	struct drm_mtk_gem_map_off gem_map = { 0 };
 	struct mediatek_private_map_data *priv;
 
-	memset(&gem_map, 0, sizeof(gem_map));
 	gem_map.handle = bo->handles[0].u32;
 
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_MTK_GEM_MAP_OFFSET, &gem_map);

@@ -423,7 +423,7 @@ static int amdgpu_create_bo_linear(struct bo *bo, uint32_t width, uint32_t heigh
 {
 	int ret;
 	uint32_t plane, stride;
-	union drm_amdgpu_gem_create gem_create;
+	union drm_amdgpu_gem_create gem_create = { { 0 } };
 	struct amdgpu_priv *priv = bo->drv->priv;
 
 	stride = drv_stride_from_format(format, width, 0);
@@ -441,7 +441,6 @@ static int amdgpu_create_bo_linear(struct bo *bo, uint32_t width, uint32_t heigh
 
 	drv_bo_from_format(bo, stride, height, format);
 
-	memset(&gem_create, 0, sizeof(gem_create));
 	gem_create.in.bo_size =
 	    ALIGN(bo->meta.total_size, priv->dev_info.virtual_address_alignment);
 	gem_create.in.alignment = 256;
@@ -555,7 +554,7 @@ static void *amdgpu_map_bo(struct bo *bo, struct vma *vma, size_t plane, uint32_
 {
 	void *addr = MAP_FAILED;
 	int ret;
-	union drm_amdgpu_gem_mmap gem_map;
+	union drm_amdgpu_gem_mmap gem_map = { { 0 } };
 	struct drm_amdgpu_gem_create_in bo_info = { 0 };
 	struct drm_amdgpu_gem_op gem_op = { 0 };
 	uint32_t handle = bo->handles[plane].u32;
@@ -608,9 +607,7 @@ static void *amdgpu_map_bo(struct bo *bo, struct vma *vma, size_t plane, uint32_
 		}
 	}
 
-	memset(&gem_map, 0, sizeof(gem_map));
 	gem_map.in.handle = handle;
-
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_AMDGPU_GEM_MMAP, &gem_map);
 	if (ret) {
 		drv_log("DRM_IOCTL_AMDGPU_GEM_MMAP failed\n");
@@ -666,12 +663,11 @@ static int amdgpu_unmap_bo(struct bo *bo, struct vma *vma)
 static int amdgpu_bo_invalidate(struct bo *bo, struct mapping *mapping)
 {
 	int ret;
-	union drm_amdgpu_gem_wait_idle wait_idle;
+	union drm_amdgpu_gem_wait_idle wait_idle = { { 0 } };
 
 	if (bo->priv)
 		return 0;
 
-	memset(&wait_idle, 0, sizeof(wait_idle));
 	wait_idle.in.handle = bo->handles[0].u32;
 	wait_idle.in.timeout = AMDGPU_TIMEOUT_INFINITE;
 

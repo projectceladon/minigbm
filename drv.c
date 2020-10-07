@@ -444,7 +444,7 @@ void *drv_bo_map(struct bo *bo, const struct rectangle *rect, uint32_t map_flags
 {
 	uint32_t i;
 	uint8_t *addr;
-	struct mapping mapping;
+	struct mapping mapping = { 0 };
 
 	assert(rect->width >= 0);
 	assert(rect->height >= 0);
@@ -458,7 +458,6 @@ void *drv_bo_map(struct bo *bo, const struct rectangle *rect, uint32_t map_flags
 		return MAP_FAILED;
 	}
 
-	memset(&mapping, 0, sizeof(mapping));
 	mapping.rect = *rect;
 	mapping.refcount = 1;
 

@@ -34,7 +34,7 @@ static int vc4_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t he
 	int ret;
 	size_t plane;
 	uint32_t stride;
-	struct drm_vc4_create_bo bo_create;
+	struct drm_vc4_create_bo bo_create = { 0 };
 
 	switch (modifier) {
 	case DRM_FORMAT_MOD_LINEAR:
@@ -54,7 +54,6 @@ static int vc4_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t he
 	stride = ALIGN(stride, 64);
 	drv_bo_from_format(bo, stride, height, format);
 
-	memset(&bo_create, 0, sizeof(bo_create));
 	bo_create.size = bo->meta.total_size;
 
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_VC4_CREATE_BO, &bo_create);
@@ -97,11 +96,9 @@ static int vc4_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint32_t 
 static void *vc4_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t map_flags)
 {
 	int ret;
-	struct drm_vc4_mmap_bo bo_map;
+	struct drm_vc4_mmap_bo bo_map = { 0 };
 
-	memset(&bo_map, 0, sizeof(bo_map));
 	bo_map.handle = bo->handles[0].u32;
-
 	ret = drmCommandWriteRead(bo->drv->fd, DRM_VC4_MMAP_BO, &bo_map, sizeof(bo_map));
 	if (ret) {
 		drv_log("DRM_VC4_MMAP_BO failed\n");

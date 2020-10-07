@@ -194,13 +194,12 @@ PUBLIC struct gbm_bo *gbm_bo_import(struct gbm_device *gbm, uint32_t type, void 
 				    uint32_t usage)
 {
 	struct gbm_bo *bo;
-	struct drv_import_fd_data drv_data;
+	struct drv_import_fd_data drv_data = { 0 };
 	struct gbm_import_fd_data *fd_data = buffer;
 	struct gbm_import_fd_modifier_data *fd_modifier_data = buffer;
 	uint32_t gbm_format;
 	size_t num_planes, i, num_fds;
 
-	memset(&drv_data, 0, sizeof(drv_data));
 	drv_data.use_flags = gbm_convert_usage(usage);
 	switch (type) {
 	case GBM_BO_IMPORT_FD:

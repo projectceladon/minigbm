@@ -113,7 +113,7 @@ static int rockchip_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint
 {
 	int ret;
 	size_t plane;
-	struct drm_rockchip_gem_create gem_create;
+	struct drm_rockchip_gem_create gem_create = { 0 };
 
 	if (format == DRM_FORMAT_NV12) {
 		uint32_t w_mbs = DIV_ROUND_UP(width, 16);
@@ -156,9 +156,7 @@ static int rockchip_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint
 		drv_bo_from_format(bo, stride, height, format);
 	}
 
-	memset(&gem_create, 0, sizeof(gem_create));
 	gem_create.size = bo->meta.total_size;
-
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_ROCKCHIP_GEM_CREATE, &gem_create);
 
 	if (ret) {
@@ -184,17 +182,15 @@ static int rockchip_bo_create(struct bo *bo, uint32_t width, uint32_t height, ui
 static void *rockchip_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t map_flags)
 {
 	int ret;
-	struct drm_rockchip_gem_map_off gem_map;
 	struct rockchip_private_map_data *priv;
+	struct drm_rockchip_gem_map_off gem_map = { 0 };
 
 	/* We can only map buffers created with SW access flags, which should
 	 * have no modifiers (ie, not AFBC). */
 	if (bo->meta.format_modifiers[0] == DRM_FORMAT_MOD_CHROMEOS_ROCKCHIP_AFBC)
 		return MAP_FAILED;
 
-	memset(&gem_map, 0, sizeof(gem_map));
 	gem_map.handle = bo->handles[0].u32;
-
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_ROCKCHIP_GEM_MAP_OFFSET, &gem_map);
 	if (ret) {
 		drv_log("DRM_IOCTL_ROCKCHIP_GEM_MAP_OFFSET failed\n");

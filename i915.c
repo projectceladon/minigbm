@@ -234,13 +234,12 @@ static int i915_init(struct driver *drv)
 	int ret;
 	int device_id;
 	struct i915_device *i915;
-	drm_i915_getparam_t get_param;
+	drm_i915_getparam_t get_param = { 0 };
 
 	i915 = calloc(1, sizeof(*i915));
 	if (!i915)
 		return -ENOMEM;
 
-	memset(&get_param, 0, sizeof(get_param));
 	get_param.param = I915_PARAM_CHIPSET_ID;
 	get_param.value = &device_id;
 	ret = drmIoctl(drv->fd, DRM_IOCTL_I915_GETPARAM, &get_param);
@@ -407,12 +406,10 @@ static int i915_bo_create_from_metadata(struct bo *bo)
 {
 	int ret;
 	size_t plane;
-	struct drm_i915_gem_create gem_create;
-	struct drm_i915_gem_set_tiling gem_set_tiling;
+	struct drm_i915_gem_create gem_create = { 0 };
+	struct drm_i915_gem_set_tiling gem_set_tiling = { 0 };
 
-	memset(&gem_create, 0, sizeof(gem_create));
 	gem_create.size = bo->meta.total_size;
-
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_CREATE, &gem_create);
 	if (ret) {
 		drv_log("DRM_IOCTL_I915_GEM_CREATE failed (size=%llu)\n", gem_create.size);
@@ -422,15 +419,13 @@ static int i915_bo_create_from_metadata(struct bo *bo)
 	for (plane = 0; plane < bo->meta.num_planes; plane++)
 		bo->handles[plane].u32 = gem_create.handle;
 
-	memset(&gem_set_tiling, 0, sizeof(gem_set_tiling));
 	gem_set_tiling.handle = bo->handles[0].u32;
 	gem_set_tiling.tiling_mode = bo->meta.tiling;
 	gem_set_tiling.stride = bo->meta.strides[0];
 
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_SET_TILING, &gem_set_tiling);
 	if (ret) {
-		struct drm_gem_close gem_close;
-		memset(&gem_close, 0, sizeof(gem_close));
+		struct drm_gem_close gem_close = { 0 };
 		gem_close.handle = bo->handles[0].u32;
 		drmIoctl(bo->drv->fd, DRM_IOCTL_GEM_CLOSE, &gem_close);
 
@@ -450,14 +445,13 @@ static void i915_close(struct driver *drv)
 static int i915_bo_import(struct bo *bo, struct drv_import_fd_data *data)
 {
 	int ret;
-	struct drm_i915_gem_get_tiling gem_get_tiling;
+	struct drm_i915_gem_get_tiling gem_get_tiling = { 0 };
 
 	ret = drv_prime_bo_import(bo, data);
 	if (ret)
 		return ret;
 
 	/* TODO(gsingh): export modifiers and get rid of backdoor tiling. */
-	memset(&gem_get_tiling, 0, sizeof(gem_get_tiling));
 	gem_get_tiling.handle = bo->handles[0].u32;
 
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_GET_TILING, &gem_get_tiling);
@@ -480,9 +474,7 @@ static void *i915_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t 
 		return MAP_FAILED;
 
 	if (bo->meta.tiling == I915_TILING_NONE) {
-		struct drm_i915_gem_mmap gem_map;
-		memset(&gem_map, 0, sizeof(gem_map));
-
+		struct drm_i915_gem_mmap gem_map = { 0 };
 		/* TODO(b/118799155): We don't seem to have a good way to
 		 * detect the use cases for which WC mapping is really needed.
 		 * The current heuristic seems overly coarse and may be slowing
@@ -508,11 +500,9 @@ static void *i915_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t 
 
 		addr = (void *)(uintptr_t)gem_map.addr_ptr;
 	} else {
-		struct drm_i915_gem_mmap_gtt gem_map;
-		memset(&gem_map, 0, sizeof(gem_map));
+		struct drm_i915_gem_mmap_gtt gem_map = { 0 };
 
 		gem_map.handle = bo->handles[0].u32;
-
 		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_MMAP_GTT, &gem_map);
 		if (ret) {
 			drv_log("DRM_IOCTL_I915_GEM_MMAP_GTT failed\n");
@@ -535,9 +525,8 @@ static void *i915_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t 
 static int i915_bo_invalidate(struct bo *bo, struct mapping *mapping)
 {
 	int ret;
-	struct drm_i915_gem_set_domain set_domain;
+	struct drm_i915_gem_set_domain set_domain = { 0 };
 
-	memset(&set_domain, 0, sizeof(set_domain));
 	set_domain.handle = bo->handles[0].u32;
 	if (bo->meta.tiling == I915_TILING_NONE) {
 		set_domain.read_domains = I915_GEM_DOMAIN_CPU;
