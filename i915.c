@@ -49,6 +49,7 @@ struct modifier_support_t {
 struct i915_device {
 	uint32_t gen;
 	int32_t has_llc;
+	int32_t has_hw_protection;
 	struct modifier_support_t modifier;
 };
 
@@ -96,11 +97,14 @@ static uint64_t unset_flags(uint64_t current_flags, uint64_t mask)
 static int i915_add_combinations(struct driver *drv)
 {
 	struct format_metadata metadata;
-	uint64_t render, scanout_and_render, texture_only;
+	uint64_t render, scanout_and_render, texture_only, hw_protected;
+	struct i915_device *i915 = drv->priv;
 
 	scanout_and_render = BO_USE_RENDER_MASK | BO_USE_SCANOUT;
 	render = BO_USE_RENDER_MASK;
 	texture_only = BO_USE_TEXTURE_MASK;
+	hw_protected = (i915->has_hw_protection) ? BO_USE_PROTECTED : 0;
+
 	uint64_t linear_mask =
 	    BO_USE_RENDERSCRIPT | BO_USE_LINEAR | BO_USE_SW_READ_OFTEN | BO_USE_SW_WRITE_OFTEN;
 
@@ -122,7 +126,8 @@ static int i915_add_combinations(struct driver *drv)
 	/* IPU3 camera ISP supports only NV12 output. */
 	drv_modify_combination(drv, DRM_FORMAT_NV12, &metadata,
 			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SCANOUT |
-				   BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER);
+				   BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER |
+				   hw_protected);
 
 	/* Android CTS tests require this. */
 	drv_add_combination(drv, DRM_FORMAT_BGR888, &metadata, BO_USE_SW_MASK);
@@ -155,7 +160,8 @@ static int i915_add_combinations(struct driver *drv)
 /* Support y-tiled NV12 and P010 for libva */
 #ifdef I915_SCANOUT_Y_TILED
 	drv_add_combination(drv, DRM_FORMAT_NV12, &metadata,
-			    BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER | BO_USE_SCANOUT);
+			    BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER | BO_USE_SCANOUT |
+				hw_protected);
 #else
 	drv_add_combination(drv, DRM_FORMAT_NV12, &metadata,
 			    BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER);
@@ -268,8 +274,10 @@ static int i915_init(struct driver *drv)
 		return -EINVAL;
 	}
 
-	drv->priv = i915;
+	if (i915->gen >= 12)
+		i915->has_hw_protection = 1;
 
+	drv->priv = i915;
 	return i915_add_combinations(drv);
 }
 
@@ -414,18 +422,48 @@ static int i915_bo_create_from_metadata(struct bo *bo)
 {
 	int ret;
 	size_t plane;
-	struct drm_i915_gem_create gem_create = { 0 };
+	uint32_t gem_handle;
 	struct drm_i915_gem_set_tiling gem_set_tiling = { 0 };
+	struct i915_device *i915 = bo->drv->priv;
 
-	gem_create.size = bo->meta.total_size;
-	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_CREATE, &gem_create);
-	if (ret) {
-		drv_log("DRM_IOCTL_I915_GEM_CREATE failed (size=%llu)\n", gem_create.size);
-		return -errno;
+	if (i915->has_hw_protection && (bo->meta.use_flags & BO_USE_PROTECTED)) {
+		struct drm_i915_gem_object_param protected_param = {
+			.param = I915_OBJECT_PARAM | I915_PARAM_PROTECTED_CONTENT,
+			.data = 1,
+		};
+
+		struct drm_i915_gem_create_ext_setparam setparam_protected = {
+			.base = { .name = I915_GEM_CREATE_EXT_SETPARAM },
+			.param = protected_param,
+		};
+
+		struct drm_i915_gem_create_ext create_ext = {
+			.size = bo->meta.total_size,
+			.extensions = (uintptr_t)&setparam_protected,
+		};
+
+		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_CREATE_EXT, &create_ext);
+		if (ret) {
+			drv_log("DRM_IOCTL_I915_GEM_CREATE_EXT failed (size=%llu)\n",
+				create_ext.size);
+			return -errno;
+		}
+
+		gem_handle = create_ext.handle;
+	} else {
+		struct drm_i915_gem_create gem_create = { 0 };
+		gem_create.size = bo->meta.total_size;
+		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_CREATE, &gem_create);
+		if (ret) {
+			drv_log("DRM_IOCTL_I915_GEM_CREATE failed (size=%llu)\n", gem_create.size);
+			return -errno;
+		}
+
+		gem_handle = gem_create.handle;
 	}
 
 	for (plane = 0; plane < bo->meta.num_planes; plane++)
-		bo->handles[plane].u32 = gem_create.handle;
+		bo->handles[plane].u32 = gem_handle;
 
 	gem_set_tiling.handle = bo->handles[0].u32;
 	gem_set_tiling.tiling_mode = bo->meta.tiling;
