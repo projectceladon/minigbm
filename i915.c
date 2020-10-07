@@ -8,7 +8,6 @@
 
 #include <assert.h>
 #include <errno.h>
-#include <i915_drm.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
@@ -17,6 +16,7 @@
 #include <xf86drm.h>
 
 #include "drv_priv.h"
+#include "external/i915_drm.h"
 #include "helpers.h"
 #include "util.h"
 
