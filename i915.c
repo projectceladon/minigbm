@@ -309,7 +309,7 @@ static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t heig
 {
 	uint64_t modifier;
 	struct i915_device *i915 = bo->drv->priv;
-	bool huge_bo = (i915->gen <= 11) && (width > 4096);
+	bool huge_bo = (i915->gen < 11) && (width > 4096);
 
 	if (modifiers) {
 		modifier =
