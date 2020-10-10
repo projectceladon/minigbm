@@ -119,10 +119,9 @@ static int gralloc0_alloc(alloc_device_t *dev, int w, int h, int format, int usa
 	descriptor.width = w;
 	descriptor.height = h;
 	descriptor.droid_format = format;
-	descriptor.droid_usage = usage;
+	descriptor.producer_usage = descriptor.consumer_usage = usage;
 	descriptor.drm_format = cros_gralloc_convert_format(format);
 	descriptor.use_flags = gralloc0_convert_usage(usage);
-	descriptor.reserved_region_size = 0;
 
 	supported = mod->driver->is_supported(&descriptor);
 	if (!supported && (usage & GRALLOC_USAGE_HW_COMPOSER)) {
@@ -249,7 +248,7 @@ static int gralloc0_unlock(struct gralloc_module_t const *module, buffer_handle_
 	if (ret)
 		return ret;
 
-	ret = cros_gralloc_sync_wait(fence_fd, /*close_acquire_fence=*/true);
+	ret = cros_gralloc_sync_wait(fence_fd);
 	if (ret)
 		return ret;
 
@@ -360,7 +359,7 @@ static int gralloc0_lock_async(struct gralloc_module_t const *module, buffer_han
 	assert(h >= 0);
 
 	map_flags = gralloc0_convert_map_usage(usage);
-	ret = mod->driver->lock(handle, fence_fd, true, &rect, map_flags, addr);
+	ret = mod->driver->lock(handle, fence_fd, &rect, map_flags, addr);
 	*vaddr = addr[0];
 	return ret;
 }
@@ -405,7 +404,7 @@ static int gralloc0_lock_async_ycbcr(struct gralloc_module_t const *module, buff
 	assert(h >= 0);
 
 	map_flags = gralloc0_convert_map_usage(usage);
-	ret = mod->driver->lock(handle, fence_fd, true, &rect, map_flags, addr);
+	ret = mod->driver->lock(handle, fence_fd, &rect, map_flags, addr);
 	if (ret)
 		return ret;
 

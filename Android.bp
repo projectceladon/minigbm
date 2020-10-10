@@ -24,6 +24,11 @@ cc_defaults {
         "vc4.c",
         "vgem.c",
         "virtio_gpu.c",
+
+        "cros_gralloc/cros_gralloc_buffer.cc",
+        "cros_gralloc/cros_gralloc_driver.cc",
+        "cros_gralloc/cros_gralloc_helpers.cc",
+        "cros_gralloc/gralloc0/gralloc0.cc",
     ],
 
     cflags: [
@@ -126,7 +131,7 @@ cc_library_static {
 
 cc_library_shared {
     name: "gralloc.minigbm",
-    defaults: ["minigbm_cros_gralloc_defaults"],
+    defaults: ["gralloc.minigbm_defaults"],
     srcs: ["cros_gralloc/gralloc0/gralloc0.cc"],
 }
 

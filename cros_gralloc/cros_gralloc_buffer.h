@@ -14,8 +14,7 @@ class cros_gralloc_buffer
 {
       public:
 	cros_gralloc_buffer(uint32_t id, struct bo *acquire_bo,
-			    struct cros_gralloc_handle *acquire_handle, int32_t reserved_region_fd,
-			    uint64_t reserved_region_size);
+			    struct cros_gralloc_handle *acquire_handle);
 	~cros_gralloc_buffer();
 
 	uint32_t get_id() const;
@@ -29,19 +28,12 @@ class cros_gralloc_buffer
 	int32_t unlock();
 	int32_t resource_info(uint32_t strides[DRV_MAX_PLANES], uint32_t offsets[DRV_MAX_PLANES]);
 
-	int32_t invalidate();
-	int32_t flush();
-
-	int32_t get_reserved_region(void **reserved_region_addr, uint64_t *reserved_region_size);
-
       private:
 	cros_gralloc_buffer(cros_gralloc_buffer const &);
 	cros_gralloc_buffer operator=(cros_gralloc_buffer const &);
 
 	uint32_t id_;
 	struct bo *bo_;
-
-	/* Note: this will be nullptr for imported/retained buffers. */
 	struct cros_gralloc_handle *hnd_;
 
 	int32_t refcount_;
@@ -49,11 +41,6 @@ class cros_gralloc_buffer
 	uint32_t num_planes_;
 
 	struct mapping *lock_data_[DRV_MAX_PLANES];
-
-	/* Optional additional shared memory region attached to some gralloc4 buffers. */
-	int32_t reserved_region_fd_;
-	uint64_t reserved_region_size_;
-	void *reserved_region_addr_;
 };
 
 #endif
