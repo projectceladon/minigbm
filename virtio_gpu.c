@@ -631,9 +631,6 @@ static int virtio_gpu_init(struct driver *drv)
 	drv_modify_combination(drv, DRM_FORMAT_YVU420, &LINEAR_METADATA,
 			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER |
 				   BO_USE_HW_VIDEO_ENCODER | BO_USE_RENDERSCRIPT);
-	drv_modify_combination(drv, DRM_FORMAT_YVU420_ANDROID, &LINEAR_METADATA,
-			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER |
-				   BO_USE_HW_VIDEO_ENCODER | BO_USE_RENDERSCRIPT);
 	drv_modify_combination(drv, DRM_FORMAT_R8, &LINEAR_METADATA,
 			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER);
 	drv_modify_combination(drv, DRM_FORMAT_R16, &LINEAR_METADATA,
@@ -832,7 +829,7 @@ static uint32_t virtio_gpu_resolve_format(struct driver *drv, uint32_t format, u
 		if (features[feat_3d].enabled)
 			return DRM_FORMAT_NV12;
 		else
-			return DRM_FORMAT_YVU420_ANDROID;
+			return DRM_FORMAT_YVU420;
 	default:
 		return format;
 	}
