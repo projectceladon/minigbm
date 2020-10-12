@@ -321,9 +321,11 @@ static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t heig
 	}
 
 	/*
-	 * i915 only supports linear/x-tiled above 4096 wide
+	 * i915 only supports linear/x-tiled above 4096 wide on Gen9/Gen10 GPU.
+	 * VAAPI decode in NV12 Y tiled format so skip modifier change for NV12/P010 huge bo.
 	 */
-	if (huge_bo && modifier != I915_FORMAT_MOD_X_TILED && modifier != DRM_FORMAT_MOD_LINEAR) {
+	if (huge_bo && format != DRM_FORMAT_NV12 && format != DRM_FORMAT_P010 &&
+	    modifier != I915_FORMAT_MOD_X_TILED && modifier != DRM_FORMAT_MOD_LINEAR) {
 		uint32_t i;
 		for (i = 0; modifiers && i < count; i++) {
 			if (modifiers[i] == I915_FORMAT_MOD_X_TILED)
