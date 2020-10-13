@@ -14,10 +14,10 @@
 // limitations under the License.
 
 cc_binary {
-    name: "android.hardware.graphics.allocator@4.0-service.minigbm",
+    name: "android.hardware.graphics.allocator@3.0-service.minigbm",
     relative_install_path: "hw",
     vendor: true,
-    init_rc: ["android.hardware.graphics.allocator@4.0-service.minigbm.rc"],
+    init_rc: ["android.hardware.graphics.allocator@3.0-service.minigbm.rc"],
 
     cflags: [
         "-Wall",
@@ -25,11 +25,10 @@ cc_binary {
     ],
 
     shared_libs: [
-        "android.hardware.graphics.allocator@4.0",
-        "android.hardware.graphics.mapper@4.0",
+        "android.hardware.graphics.allocator@3.0",
+        "android.hardware.graphics.mapper@3.0",
         "libbase",
         "libcutils",
-        "libgralloctypes",
         "libhidlbase",
         "liblog",
         "libsync",
@@ -42,14 +41,14 @@ cc_binary {
     ],
 
     srcs: [
-        "CrosGralloc4Allocator.cc",
-        "CrosGralloc4AllocatorService.cc",
-        "CrosGralloc4Utils.cc",
+        "CrosGralloc3Allocator.cc",
+        "CrosGralloc3AllocatorService.cc",
+        "CrosGralloc3Utils.cc",
     ],
 }
 
 cc_library_shared {
-    name: "android.hardware.graphics.mapper@4.0-impl.minigbm",
+    name: "android.hardware.graphics.mapper@3.0-impl.minigbm",
     relative_install_path: "hw",
     vendor: true,
 
@@ -59,10 +58,9 @@ cc_library_shared {
     ],
 
     shared_libs: [
-        "android.hardware.graphics.mapper@4.0",
+        "android.hardware.graphics.mapper@3.0",
         "libbase",
         "libcutils",
-        "libgralloctypes",
         "libhidlbase",
         "liblog",
         "libsync",
@@ -75,7 +73,7 @@ cc_library_shared {
     ],
 
     srcs: [
-        "CrosGralloc4Mapper.cc",
-        "CrosGralloc4Utils.cc",
+        "CrosGralloc3Mapper.cc",
+        "CrosGralloc3Utils.cc",
     ],
 }
