@@ -102,8 +102,8 @@ static int i915_add_combinations(struct driver *drv)
 	scanout_and_render = BO_USE_RENDER_MASK | BO_USE_SCANOUT;
 	render = BO_USE_RENDER_MASK;
 	texture_only = BO_USE_TEXTURE_MASK;
-	uint64_t linear_mask = BO_USE_RENDERSCRIPT | BO_USE_LINEAR | BO_USE_PROTECTED |
-			       BO_USE_SW_READ_OFTEN | BO_USE_SW_WRITE_OFTEN;
+	uint64_t linear_mask =
+	    BO_USE_RENDERSCRIPT | BO_USE_LINEAR | BO_USE_SW_READ_OFTEN | BO_USE_SW_WRITE_OFTEN;
 
 	metadata.tiling = I915_TILING_NONE;
 	metadata.priority = 1;
