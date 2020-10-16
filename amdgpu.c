@@ -422,12 +422,24 @@ static int amdgpu_create_bo_linear(struct bo *bo, uint32_t width, uint32_t heigh
 				   uint64_t use_flags)
 {
 	int ret;
+	size_t num_planes;
 	uint32_t plane, stride;
 	union drm_amdgpu_gem_create gem_create = { { 0 } };
 	struct amdgpu_priv *priv = bo->drv->priv;
 
 	stride = drv_stride_from_format(format, width, 0);
-	stride = ALIGN(stride, 256);
+	num_planes = drv_num_planes_from_format(format);
+
+	/*
+	 * For multiplane formats, align the stride to 512 to ensure that subsample strides are 256
+	 * aligned. This uses more memory than necessary since the first plane only needs to be
+	 * 256 aligned, but it's acceptable for a short-term fix. It's probably safe for other gpu
+	 * families, but let's restrict it to Raven for now (b/171013552).
+	 * */
+	if (priv->dev_info.family == AMDGPU_FAMILY_RV && num_planes > 1)
+		stride = ALIGN(stride, 512);
+	else
+		stride = ALIGN(stride, 256);
 
 	/*
 	 * Currently, allocator used by chrome aligns the height for Encoder/
