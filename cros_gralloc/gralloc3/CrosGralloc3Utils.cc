@@ -278,9 +278,9 @@ int convertToBufferUsage(uint64_t grallocUsage, uint64_t* outBufferUsage) {
         /* HWC wants to use display hardware, but can defer to OpenGL. */
         bufferUsage |= BO_USE_SCANOUT | BO_USE_TEXTURE;
     }
-    /* Ignore this flag until real HW protection is available on minigbm Android drivers. */
+    /* Map this flag to linear until real HW protection is available on Android. */
     if (grallocUsage & BufferUsage::PROTECTED) {
-        bufferUsage |= 0;
+        bufferUsage |= BO_USE_LINEAR;
     }
     if (grallocUsage & BufferUsage::COMPOSER_CURSOR) {
         bufferUsage |= BO_USE_NONE;
