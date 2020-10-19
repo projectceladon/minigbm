@@ -50,7 +50,7 @@ class cros_gralloc_buffer
 
 	struct mapping *lock_data_[DRV_MAX_PLANES];
 
-	/* Optional additional shared memory region attached to some gralloc buffers. */
+	/* Optional additional shared memory region attached to some gralloc4 buffers. */
 	int32_t reserved_region_fd_;
 	uint64_t reserved_region_size_;
 	void *reserved_region_addr_;

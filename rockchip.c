@@ -88,21 +88,24 @@ static int rockchip_init(struct driver *drv)
 	drv_add_combinations(drv, texture_only_formats, ARRAY_SIZE(texture_only_formats), &metadata,
 			     BO_USE_TEXTURE_MASK);
 
-	/* NV12 format for camera, display, decoding and encoding. */
+	/*
+	 * Chrome uses DMA-buf mmap to write to YV12 buffers, which are then accessed by the
+	 * Video Encoder Accelerator (VEA). It could also support NV12 potentially in the future.
+	 */
+	drv_modify_combination(drv, DRM_FORMAT_YVU420, &metadata, BO_USE_HW_VIDEO_ENCODER);
 	/* Camera ISP supports only NV12 output. */
 	drv_modify_combination(drv, DRM_FORMAT_NV12, &metadata,
-			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SCANOUT |
-				   BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER);
+			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER |
+				   BO_USE_HW_VIDEO_ENCODER | BO_USE_SCANOUT);
 
 	drv_modify_linear_combinations(drv);
 	/*
 	 * R8 format is used for Android's HAL_PIXEL_FORMAT_BLOB and is used for JPEG snapshots
-	 * from camera and input/output from hardware decoder/encoder.
+	 * from camera.
 	 */
 	drv_add_combination(drv, DRM_FORMAT_R8, &metadata,
 			    BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SW_MASK |
-				BO_USE_LINEAR | BO_USE_PROTECTED | BO_USE_HW_VIDEO_DECODER |
-				BO_USE_HW_VIDEO_ENCODER);
+				BO_USE_LINEAR | BO_USE_PROTECTED);
 
 	return 0;
 }
