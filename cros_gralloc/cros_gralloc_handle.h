@@ -45,6 +45,8 @@ struct cros_gralloc_handle {
 	uint32_t compression_mode;
 	uint32_t compression_hint;
 	uint32_t codec;
+	uint32_t aligned_width;
+	uint32_t aligned_height;
 };
 
 typedef const struct cros_gralloc_handle *cros_gralloc_handle_t;

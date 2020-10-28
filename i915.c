@@ -685,8 +685,8 @@ static int i915_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t h
         /*
          * Ensure we pass aligned width/height.
          */
-	bo->width = width;
-	bo->height = height;
+	bo->aligned_width = width;
+	bo->aligned_height = height;
 
 	static bool force_mem_type = false;
 	static bool force_mem_local = false;

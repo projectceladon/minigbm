@@ -502,6 +502,21 @@ uint32_t drv_bo_get_height(struct bo *bo)
 	return bo->height;
 }
 
+uint32_t drv_bo_get_aligned_width(struct bo *bo)
+{
+	return bo->aligned_width;
+}
+
+uint32_t drv_bo_get_aligned_height(struct bo *bo)
+{
+	return bo->aligned_height;
+}
+
+uint32_t drv_bo_get_total_size(struct bo *bo)
+{
+	return bo->total_size;
+}
+
 uint32_t drv_bo_get_stride_or_tiling(struct bo *bo)
 {
 	return bo->tiling ? bo->tiling : drv_bo_get_plane_stride(bo, 0);

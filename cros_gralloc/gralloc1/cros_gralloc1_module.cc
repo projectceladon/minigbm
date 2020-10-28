@@ -921,8 +921,8 @@ int32_t CrosGralloc1::getDimensions(buffer_handle_t buffer, uint32_t *outWidth, 
 		return CROS_GRALLOC_ERROR_BAD_HANDLE;
 	}
 
-	*outWidth = hnd->width;
-	*outHeight = hnd->height;
+	*outWidth = hnd->aligned_width;
+	*outHeight = hnd->aligned_height;
 	return CROS_GRALLOC_ERROR_NONE;
 }
 

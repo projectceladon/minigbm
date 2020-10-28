@@ -77,6 +77,8 @@ struct drv_import_fd_data {
 	uint32_t format;
 	uint32_t tiling;
 	uint64_t use_flags;
+	uint32_t aligned_width;
+	uint32_t aligned_height;
 };
 
 struct map_info {
@@ -138,6 +140,12 @@ int drv_bo_flush(struct bo *bo, struct map_info *data);
 uint32_t drv_bo_get_width(struct bo *bo);
 
 uint32_t drv_bo_get_height(struct bo *bo);
+
+uint32_t drv_bo_get_aligned_width(struct bo *bo);
+
+uint32_t drv_bo_get_aligned_height(struct bo *bo);
+
+uint32_t drv_bo_get_total_size(struct bo *bo);
 
 uint32_t drv_bo_get_stride_or_tiling(struct bo *bo);
 

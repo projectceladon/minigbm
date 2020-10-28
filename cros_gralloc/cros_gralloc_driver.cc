@@ -183,6 +183,8 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 	hnd->usage = descriptor->producer_usage;
 	hnd->producer_usage = descriptor->producer_usage;
 	hnd->consumer_usage = descriptor->consumer_usage;
+	hnd->aligned_width = drv_bo_get_aligned_width(bo);
+	hnd->aligned_height = drv_bo_get_aligned_height(bo);
 
 	id = drv_bo_get_plane_handle(bo, 0).u32;
 	auto buffer = new cros_gralloc_buffer(id, bo, hnd);
@@ -195,6 +197,7 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 	ALOGI("%s : %d : hnd = %p", __FUNCTION__, __LINE__, *out_handle);
 	ALOGI("\t width = %d, height = %d, stride = %d", hnd->width, hnd->height, hnd->pixel_stride);
 	ALOGI("\t usage = %x, format = %x, droid_format = %x, tiling = %d", hnd->usage, hnd->format, hnd->droid_format, hnd->tiling_mode);
+	ALOGI("\t aligned_width = %d, aligned_height = %d", hnd->aligned_width, hnd->aligned_height);
 
 	return 0;
 }
@@ -234,6 +237,8 @@ int32_t cros_gralloc_driver::retain(buffer_handle_t handle)
 		data.tiling = hnd->tiling_mode;
 		data.use_flags = static_cast<uint64_t>(hnd->use_flags[0]) << 32;
 		data.use_flags |= hnd->use_flags[1];
+		data.aligned_width = hnd->aligned_width;
+		data.aligned_height = hnd->aligned_height;
 
 		memcpy(data.fds, hnd->fds, sizeof(data.fds));
 		memcpy(data.strides, hnd->strides, sizeof(data.strides));
@@ -256,6 +261,7 @@ int32_t cros_gralloc_driver::retain(buffer_handle_t handle)
 		ALOGI("%s : %d : hnd = %p", __FUNCTION__, __LINE__, hnd);
 		ALOGI("\t width = %d, height = %d, stride = %d", hnd->width, hnd->height, hnd->pixel_stride);
 		ALOGI("\t usage = %x, format = %x, droid_format = %x, tiling = %d", hnd->usage, hnd->format, hnd->droid_format, hnd->tiling_mode);
+		ALOGI("\t aligned_width = %d, aligned_height = %d, total_size = %d", hnd->aligned_width, hnd->aligned_height, drv_bo_get_total_size(bo));;
 		ALOGI("\t bo = %p, id = %d, buffer = %p", bo, id, buffer);
 
 	}

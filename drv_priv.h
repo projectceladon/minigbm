@@ -44,6 +44,8 @@ struct bo {
 	uint64_t use_flags;
 	size_t total_size;    
     uint32_t fb_id;
+	uint32_t aligned_width;
+	uint32_t aligned_height;
 	void *priv;
 };
 
