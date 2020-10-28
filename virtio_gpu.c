@@ -13,10 +13,11 @@
 #include <xf86drm.h>
 
 #include "drv_priv.h"
+#include "external/virgl_hw.h"
+#include "external/virgl_protocol.h"
+#include "external/virtgpu_drm.h"
 #include "helpers.h"
 #include "util.h"
-#include "virgl_hw.h"
-#include "virtgpu_drm.h"
 
 #ifndef PAGE_SIZE
 #define PAGE_SIZE 0x1000
@@ -35,6 +36,9 @@ struct feature {
 enum feature_id {
 	feat_3d,
 	feat_capset_fix,
+	feat_resource_blob,
+	feat_host_visible,
+	feat_host_cross_device,
 	feat_max,
 };
 
@@ -44,8 +48,11 @@ enum feature_id {
 		x, #x, 0                                                                           \
 	}
 
-static struct feature features[] = { FEATURE(VIRTGPU_PARAM_3D_FEATURES),
-				     FEATURE(VIRTGPU_PARAM_CAPSET_QUERY_FIX) };
+static struct feature features[] = {
+	FEATURE(VIRTGPU_PARAM_3D_FEATURES),   FEATURE(VIRTGPU_PARAM_CAPSET_QUERY_FIX),
+	FEATURE(VIRTGPU_PARAM_RESOURCE_BLOB), FEATURE(VIRTGPU_PARAM_HOST_VISIBLE),
+	FEATURE(VIRTGPU_PARAM_CROSS_DEVICE),
+};
 
 static const uint32_t render_target_formats[] = { DRM_FORMAT_ABGR8888, DRM_FORMAT_ARGB8888,
 						  DRM_FORMAT_RGB565, DRM_FORMAT_XBGR8888,
@@ -419,15 +426,33 @@ static uint32_t use_flags_to_bind(uint64_t use_flags)
 	handle_flag(&use_flags, BO_USE_CURSOR, &bind, VIRGL_BIND_CURSOR);
 	handle_flag(&use_flags, BO_USE_LINEAR, &bind, VIRGL_BIND_LINEAR);
 
-	handle_flag(&use_flags, BO_USE_SW_READ_OFTEN, &bind, VIRGL_BIND_LINEAR);
-	handle_flag(&use_flags, BO_USE_SW_READ_RARELY, &bind, VIRGL_BIND_LINEAR);
-	handle_flag(&use_flags, BO_USE_SW_WRITE_OFTEN, &bind, VIRGL_BIND_LINEAR);
-	handle_flag(&use_flags, BO_USE_SW_WRITE_RARELY, &bind, VIRGL_BIND_LINEAR);
+	if (use_flags & BO_USE_PROTECTED) {
+		handle_flag(&use_flags, BO_USE_PROTECTED, &bind, VIRGL_BIND_MINIGBM_PROTECTED);
+	} else {
+		// Make sure we don't set both flags, since that could be mistaken for
+		// protected. Give OFTEN priority over RARELY.
+		if (use_flags & BO_USE_SW_READ_OFTEN) {
+			handle_flag(&use_flags, BO_USE_SW_READ_OFTEN, &bind,
+				    VIRGL_BIND_MINIGBM_SW_READ_OFTEN);
+		} else {
+			handle_flag(&use_flags, BO_USE_SW_READ_RARELY, &bind,
+				    VIRGL_BIND_MINIGBM_SW_READ_RARELY);
+		}
+		if (use_flags & BO_USE_SW_WRITE_OFTEN) {
+			handle_flag(&use_flags, BO_USE_SW_WRITE_OFTEN, &bind,
+				    VIRGL_BIND_MINIGBM_SW_WRITE_OFTEN);
+		} else {
+			handle_flag(&use_flags, BO_USE_SW_WRITE_RARELY, &bind,
+				    VIRGL_BIND_MINIGBM_SW_WRITE_RARELY);
+		}
+	}
 
-	// All host drivers only support linear camera buffer formats. If
-	// that changes, this will need to be modified.
-	handle_flag(&use_flags, BO_USE_CAMERA_READ, &bind, VIRGL_BIND_LINEAR);
-	handle_flag(&use_flags, BO_USE_CAMERA_WRITE, &bind, VIRGL_BIND_LINEAR);
+	handle_flag(&use_flags, BO_USE_CAMERA_WRITE, &bind, VIRGL_BIND_MINIGBM_CAMERA_WRITE);
+	handle_flag(&use_flags, BO_USE_CAMERA_READ, &bind, VIRGL_BIND_MINIGBM_CAMERA_READ);
+	handle_flag(&use_flags, BO_USE_HW_VIDEO_DECODER, &bind,
+		    VIRGL_BIND_MINIGBM_HW_VIDEO_DECODER);
+	handle_flag(&use_flags, BO_USE_HW_VIDEO_ENCODER, &bind,
+		    VIRGL_BIND_MINIGBM_HW_VIDEO_ENCODER);
 
 	if (use_flags) {
 		drv_log("Unhandled bo use flag: %llx\n", (unsigned long long)use_flags);
@@ -622,22 +647,29 @@ static int virtio_gpu_init(struct driver *drv)
 	virtio_gpu_add_combination(drv, DRM_FORMAT_ABGR16161616F, &LINEAR_METADATA,
 				   BO_USE_SW_MASK | BO_USE_TEXTURE_MASK);
 
+	drv_modify_combination(drv, DRM_FORMAT_ABGR8888, &LINEAR_METADATA,
+			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER |
+				   BO_USE_HW_VIDEO_ENCODER);
+	drv_modify_combination(drv, DRM_FORMAT_XBGR8888, &LINEAR_METADATA,
+			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER |
+				   BO_USE_HW_VIDEO_ENCODER);
 	drv_modify_combination(drv, DRM_FORMAT_NV12, &LINEAR_METADATA,
 			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER |
 				   BO_USE_HW_VIDEO_ENCODER);
 	drv_modify_combination(drv, DRM_FORMAT_NV21, &LINEAR_METADATA,
 			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER |
 				   BO_USE_HW_VIDEO_ENCODER);
-	drv_modify_combination(drv, DRM_FORMAT_YVU420, &LINEAR_METADATA,
-			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER |
-				   BO_USE_HW_VIDEO_ENCODER | BO_USE_RENDERSCRIPT);
-	drv_modify_combination(drv, DRM_FORMAT_YVU420_ANDROID, &LINEAR_METADATA,
-			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER |
-				   BO_USE_HW_VIDEO_ENCODER | BO_USE_RENDERSCRIPT);
-	drv_modify_combination(drv, DRM_FORMAT_R8, &LINEAR_METADATA,
-			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER);
 	drv_modify_combination(drv, DRM_FORMAT_R16, &LINEAR_METADATA,
 			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER);
+	drv_modify_combination(drv, DRM_FORMAT_R8, &LINEAR_METADATA,
+			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER |
+				   BO_USE_HW_VIDEO_ENCODER);
+	drv_modify_combination(drv, DRM_FORMAT_YVU420, &LINEAR_METADATA,
+			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER |
+				   BO_USE_HW_VIDEO_ENCODER);
+	drv_modify_combination(drv, DRM_FORMAT_YVU420_ANDROID, &LINEAR_METADATA,
+			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER |
+				   BO_USE_HW_VIDEO_ENCODER);
 
 	return drv_modify_linear_combinations(drv);
 }
@@ -648,9 +680,84 @@ static void virtio_gpu_close(struct driver *drv)
 	drv->priv = NULL;
 }
 
+static int virtio_gpu_bo_create_blob(struct driver *drv, struct bo *bo)
+{
+	int ret;
+	uint32_t stride;
+	uint32_t cmd[VIRGL_PIPE_RES_CREATE_SIZE + 1] = { 0 };
+	struct drm_virtgpu_resource_create_blob drm_rc_blob = { 0 };
+
+	uint32_t blob_flags = VIRTGPU_BLOB_FLAG_USE_MAPPABLE | VIRTGPU_BLOB_FLAG_USE_SHAREABLE;
+	if (bo->meta.use_flags & BO_USE_NON_GPU_HW) {
+		blob_flags |= VIRTGPU_BLOB_FLAG_USE_CROSS_DEVICE;
+	}
+
+	stride = drv_stride_from_format(bo->meta.format, bo->meta.width, 0);
+	drv_bo_from_format(bo, stride, bo->meta.height, bo->meta.format);
+	bo->meta.total_size = ALIGN(bo->meta.total_size, PAGE_SIZE);
+	bo->meta.tiling = blob_flags;
+
+	cmd[0] = VIRGL_CMD0(VIRGL_CCMD_PIPE_RESOURCE_CREATE, 0, VIRGL_PIPE_RES_CREATE_SIZE);
+	cmd[VIRGL_PIPE_RES_CREATE_TARGET] = PIPE_TEXTURE_2D;
+	cmd[VIRGL_PIPE_RES_CREATE_WIDTH] = bo->meta.width;
+	cmd[VIRGL_PIPE_RES_CREATE_HEIGHT] = bo->meta.height;
+	cmd[VIRGL_PIPE_RES_CREATE_FORMAT] = translate_format(bo->meta.format);
+	cmd[VIRGL_PIPE_RES_CREATE_BIND] = use_flags_to_bind(bo->meta.use_flags);
+	cmd[VIRGL_PIPE_RES_CREATE_DEPTH] = 1;
+
+	drm_rc_blob.cmd = (uint64_t)&cmd;
+	drm_rc_blob.cmd_size = 4 * (VIRGL_PIPE_RES_CREATE_SIZE + 1);
+	drm_rc_blob.size = bo->meta.total_size;
+	drm_rc_blob.blob_mem = VIRTGPU_BLOB_MEM_HOST3D;
+	drm_rc_blob.blob_flags = blob_flags;
+
+	ret = drmIoctl(drv->fd, DRM_IOCTL_VIRTGPU_RESOURCE_CREATE_BLOB, &drm_rc_blob);
+	if (ret < 0) {
+		drv_log("DRM_VIRTGPU_RESOURCE_CREATE_BLOB failed with %s\n", strerror(errno));
+		return -errno;
+	}
+
+	for (uint32_t plane = 0; plane < bo->meta.num_planes; plane++)
+		bo->handles[plane].u32 = drm_rc_blob.bo_handle;
+
+	return 0;
+}
+
+static bool should_use_blob(struct driver *drv, uint32_t format, uint64_t use_flags)
+{
+	struct virtio_gpu_priv *priv = (struct virtio_gpu_priv *)drv->priv;
+
+	// TODO(gurchetansingh): remove once all minigbm users are blob-safe
+#ifndef VIRTIO_GPU_NEXT
+	return false;
+#endif
+
+	// Only use blob when host gbm is available
+	if (!priv->host_gbm_enabled)
+		return false;
+
+	// Focus on non-GPU apps for now
+	if (use_flags & (BO_USE_RENDERING | BO_USE_TEXTURE))
+		return false;
+
+	// Simple, strictly defined formats for now
+	if (format != DRM_FORMAT_YVU420_ANDROID && format != DRM_FORMAT_R8)
+		return false;
+
+	if (use_flags &
+	    (BO_USE_SW_READ_OFTEN | BO_USE_SW_WRITE_OFTEN | BO_USE_LINEAR | BO_USE_NON_GPU_HW))
+		return true;
+
+	return false;
+}
+
 static int virtio_gpu_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint32_t format,
 				uint64_t use_flags)
 {
+	if (features[feat_resource_blob].enabled && features[feat_host_visible].enabled &&
+	    should_use_blob(bo->drv, format, use_flags))
+		return virtio_gpu_bo_create_blob(bo->drv, bo);
+
 	if (features[feat_3d].enabled)
 		return virtio_virgl_bo_create(bo, width, height, format, use_flags);
 	else
@@ -690,8 +797,24 @@ static int virtio_gpu_bo_invalidate(struct bo *bo, struct mapping *mapping)
 				   BO_USE_HW_VIDEO_ENCODER | BO_USE_HW_VIDEO_DECODER)) == 0)
 		return 0;
 
+	if (features[feat_resource_blob].enabled &&
+	    (bo->meta.tiling & VIRTGPU_BLOB_FLAG_USE_MAPPABLE))
+		return 0;
+
 	memset(&xfer, 0, sizeof(xfer));
 	xfer.bo_handle = mapping->vma->handle;
+
+	if (mapping->rect.x || mapping->rect.y) {
+		/*
+		 * virglrenderer uses the box parameters and assumes that offset == 0 for planar
+		 * images
+		 */
+		if (bo->meta.num_planes == 1) {
+			xfer.offset =
+			    (bo->meta.strides[0] * mapping->rect.y) +
+			    drv_bytes_per_pixel_from_format(bo->meta.format, 0) * mapping->rect.x;
+		}
+	}
 
 	if ((bo->meta.use_flags & BO_USE_RENDERING) == 0) {
 		// Unfortunately, the kernel doesn't actually pass the guest layer_stride
@@ -761,8 +884,24 @@ static int virtio_gpu_bo_flush(struct bo *bo, struct mapping *mapping)
 	if (!(mapping->vma->map_flags & BO_MAP_WRITE))
 		return 0;
 
+	if (features[feat_resource_blob].enabled &&
+	    (bo->meta.tiling & VIRTGPU_BLOB_FLAG_USE_MAPPABLE))
+		return 0;
+
 	memset(&xfer, 0, sizeof(xfer));
 	xfer.bo_handle = mapping->vma->handle;
+
+	if (mapping->rect.x || mapping->rect.y) {
+		/*
+		 * virglrenderer uses the box parameters and assumes that offset == 0 for planar
+		 * images
+		 */
+		if (bo->meta.num_planes == 1) {
+			xfer.offset =
+			    (bo->meta.strides[0] * mapping->rect.y) +
+			    drv_bytes_per_pixel_from_format(bo->meta.format, 0) * mapping->rect.x;
+		}
+	}
 
 	// Unfortunately, the kernel doesn't actually pass the guest layer_stride and
 	// guest stride to the host (compare virtio_gpu.h and virtgpu_drm.h). We can use
