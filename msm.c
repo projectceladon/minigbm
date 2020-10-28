@@ -84,7 +84,7 @@ static void msm_calculate_layout(struct bo *bo)
 		uv_stride = ALIGN(width, VENUS_STRIDE_ALIGN);
 		y_scanline = ALIGN(height, VENUS_SCANLINE_ALIGN * 2);
 		uv_scanline = ALIGN(DIV_ROUND_UP(height, 2),
-			VENUS_SCANLINE_ALIGN * (bo->meta.tiling ? 2 : 1));
+				    VENUS_SCANLINE_ALIGN * (bo->meta.tiling ? 2 : 1));
 		y_plane = y_stride * y_scanline;
 		uv_plane = uv_stride * uv_scanline;
 
@@ -189,8 +189,7 @@ static int msm_init(struct driver *drv)
 	struct format_metadata metadata;
 	uint64_t render_use_flags = BO_USE_RENDER_MASK | BO_USE_SCANOUT;
 	uint64_t texture_use_flags = BO_USE_TEXTURE_MASK | BO_USE_HW_VIDEO_DECODER;
-	uint64_t sw_flags = (BO_USE_RENDERSCRIPT | BO_USE_SW_MASK |
-			     BO_USE_LINEAR | BO_USE_PROTECTED);
+	uint64_t sw_flags = (BO_USE_RENDERSCRIPT | BO_USE_SW_MASK | BO_USE_LINEAR);
 
 	drv_add_combinations(drv, render_target_formats, ARRAY_SIZE(render_target_formats),
 			     &LINEAR_METADATA, render_use_flags);
@@ -233,21 +232,23 @@ static int msm_init(struct driver *drv)
 	msm_add_ubwc_combinations(drv, texture_source_formats, ARRAY_SIZE(texture_source_formats),
 				  &metadata, texture_use_flags);
 
+	drv_modify_combination(drv, DRM_FORMAT_NV12, &metadata,
+			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SCANOUT |
+				   BO_USE_HW_VIDEO_ENCODER);
+
 	return 0;
 }
 
 static int msm_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t height,
 				      uint32_t format, const uint64_t modifier)
 {
-	struct drm_msm_gem_new req;
+	struct drm_msm_gem_new req = { 0 };
 	int ret;
 	size_t i;
 
 	bo->meta.tiling = (modifier == DRM_FORMAT_MOD_QCOM_COMPRESSED) ? MSM_UBWC_TILING : 0;
-
 	msm_calculate_layout(bo);
 
-	memset(&req, 0, sizeof(req));
 	req.flags = MSM_BO_WC | MSM_BO_SCANOUT;
 	req.size = bo->meta.total_size;
 
@@ -300,11 +301,9 @@ static int msm_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint32_
 static void *msm_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t map_flags)
 {
 	int ret;
-	struct drm_msm_gem_info req;
+	struct drm_msm_gem_info req = { 0 };
 
-	memset(&req, 0, sizeof(req));
 	req.handle = bo->handles[0].u32;
-
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_MSM_GEM_INFO, &req);
 	if (ret) {
 		drv_log("DRM_IOCLT_MSM_GEM_INFO failed with %s\n", strerror(errno));

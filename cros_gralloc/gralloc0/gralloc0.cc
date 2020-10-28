@@ -80,8 +80,9 @@ static uint64_t gralloc0_convert_usage(int usage)
 		 * rockchip) and usb monitors (evdi/udl). It's complicated so ignore it.
 		 * */
 		use_flags |= BO_USE_NONE;
+	/* Map this flag to linear until real HW protection is available on Android. */
 	if (usage & GRALLOC_USAGE_PROTECTED)
-		use_flags |= BO_USE_PROTECTED;
+		use_flags |= BO_USE_LINEAR;
 	if (usage & GRALLOC_USAGE_HW_VIDEO_ENCODER) {
 		use_flags |= BO_USE_HW_VIDEO_ENCODER;
 		/*HACK: See b/30054495 */

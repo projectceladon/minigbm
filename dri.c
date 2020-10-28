@@ -71,10 +71,9 @@ static bool lookup_extension(const __DRIextension *const *extensions, const char
  */
 static void close_gem_handle(uint32_t handle, int fd)
 {
-	struct drm_gem_close gem_close;
+	struct drm_gem_close gem_close = { 0 };
 	int ret = 0;
 
-	memset(&gem_close, 0, sizeof(gem_close));
 	gem_close.handle = handle;
 	ret = drmIoctl(fd, DRM_IOCTL_GEM_CLOSE, &gem_close);
 	if (ret)
