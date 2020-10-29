@@ -13,7 +13,9 @@
 #include <cutils/native_handle.h>
 #include <gralloctypes/Gralloc4.h>
 
+#include "cros_gralloc/cros_gralloc_helpers.h"
 #include "cros_gralloc/gralloc4/CrosGralloc4Utils.h"
+
 #include "helpers.h"
 
 using aidl::android::hardware::graphics::common::BlendMode;
@@ -85,7 +87,7 @@ Return<void> CrosGralloc4Mapper::importBuffer(const hidl_handle& handle, importB
 
     native_handle_t* importedBufferHandle = native_handle_clone(bufferHandle);
     if (!importedBufferHandle) {
-        drv_log("Failed to importBuffer. Handle clone failed.\n");
+        drv_log("Failed to importBuffer. Handle clone failed: %s.\n", strerror(errno));
         hidlCb(Error::NO_RESOURCES, nullptr);
         return Void();
     }
@@ -467,7 +469,12 @@ Return<void> CrosGralloc4Mapper::get(cros_gralloc_handle_t crosHandle,
         PixelFormat pixelFormat = static_cast<PixelFormat>(crosHandle->droid_format);
         status = android::gralloc4::encodePixelFormatRequested(pixelFormat, &encodedMetadata);
     } else if (metadataType == android::gralloc4::MetadataType_PixelFormatFourCC) {
-        status = android::gralloc4::encodePixelFormatFourCC(crosHandle->format, &encodedMetadata);
+        uint32_t format = crosHandle->format;
+        // Map internal fourcc codes back to standard fourcc codes.
+        if (format == DRM_FORMAT_YVU420_ANDROID) {
+            format = DRM_FORMAT_YVU420;
+        }
+        status = android::gralloc4::encodePixelFormatFourCC(format, &encodedMetadata);
     } else if (metadataType == android::gralloc4::MetadataType_PixelFormatModifier) {
         status = android::gralloc4::encodePixelFormatModifier(crosHandle->format_modifier,
                                                               &encodedMetadata);
@@ -497,8 +504,8 @@ Return<void> CrosGralloc4Mapper::get(cros_gralloc_handle_t crosHandle,
             planeLayout.offsetInBytes = crosHandle->offsets[plane];
             planeLayout.strideInBytes = crosHandle->strides[plane];
             planeLayout.totalSizeInBytes = crosHandle->sizes[plane];
-            planeLayout.widthInSamples = crosHandle->width;
-            planeLayout.heightInSamples = crosHandle->height;
+            planeLayout.widthInSamples = crosHandle->width / planeLayout.horizontalSubsampling;
+            planeLayout.heightInSamples = crosHandle->height / planeLayout.verticalSubsampling;
         }
 
         status = android::gralloc4::encodePlaneLayouts(planeLayouts, &encodedMetadata);
@@ -597,7 +604,7 @@ int CrosGralloc4Mapper::getResolvedDrmFormat(PixelFormat pixelFormat, uint64_t b
 
     uint32_t resolvedDrmFormat = mDriver->get_resolved_drm_format(drmFormat, usage);
     if (resolvedDrmFormat == DRM_FORMAT_INVALID) {
-        std::string drmFormatString = getDrmFormatString(drmFormat);
+        std::string drmFormatString = get_drm_format_string(drmFormat);
         drv_log("Failed to getResolvedDrmFormat. Failed to resolve drm format %s\n",
                 drmFormatString.c_str());
         return -1;
