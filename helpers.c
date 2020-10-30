@@ -312,7 +312,7 @@ int drv_dumb_bo_create_ex(struct bo *bo, uint32_t width, uint32_t height, uint32
 	int ret;
 	size_t plane;
 	uint32_t aligned_width, aligned_height;
-	struct drm_mode_create_dumb create_dumb;
+	struct drm_mode_create_dumb create_dumb = { 0 };
 
 	aligned_width = width;
 	aligned_height = height;
@@ -345,7 +345,6 @@ int drv_dumb_bo_create_ex(struct bo *bo, uint32_t width, uint32_t height, uint32
 		break;
 	}
 
-	memset(&create_dumb, 0, sizeof(create_dumb));
 	if (quirks & BO_QUIRK_DUMB32BPP) {
 		aligned_width =
 		    DIV_ROUND_UP(aligned_width * layout_from_format(format)->bytes_per_pixel[0], 4);
@@ -380,12 +379,10 @@ int drv_dumb_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint32_t 
 
 int drv_dumb_bo_destroy(struct bo *bo)
 {
-	struct drm_mode_destroy_dumb destroy_dumb;
 	int ret;
+	struct drm_mode_destroy_dumb destroy_dumb = { 0 };
 
-	memset(&destroy_dumb, 0, sizeof(destroy_dumb));
 	destroy_dumb.handle = bo->handles[0].u32;
-
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_MODE_DESTROY_DUMB, &destroy_dumb);
 	if (ret) {
 		drv_log("DRM_IOCTL_MODE_DESTROY_DUMB failed (handle=%x)\n", bo->handles[0].u32);
@@ -451,6 +448,7 @@ int drv_prime_bo_import(struct bo *bo, struct drv_import_fd_data *data)
 
 		bo->handles[plane].u32 = prime_handle.handle;
 	}
+	bo->meta.tiling = data->tiling;
 
 	return 0;
 }

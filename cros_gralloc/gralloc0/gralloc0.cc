@@ -19,6 +19,15 @@ struct gralloc0_module {
 	std::mutex initialization_mutex;
 };
 
+struct cros_gralloc0_buffer_info {
+	uint32_t drm_fourcc;
+	int num_fds;
+	int fds[4];
+	uint64_t modifier;
+	uint32_t offset[4];
+	uint32_t stride[4];
+};
+
 /* This enumeration must match the one in <gralloc_drm.h>.
  * The functions supported by this gralloc's temporary private API are listed
  * below. Use of these functions is highly discouraged and should only be
@@ -31,6 +40,7 @@ enum {
 	GRALLOC_DRM_GET_FORMAT,
 	GRALLOC_DRM_GET_DIMENSIONS,
 	GRALLOC_DRM_GET_BACKING_STORE,
+	GRALLOC_DRM_GET_BUFFER_INFO,
 };
 // clang-format on
 
@@ -70,8 +80,9 @@ static uint64_t gralloc0_convert_usage(int usage)
 		 * rockchip) and usb monitors (evdi/udl). It's complicated so ignore it.
 		 * */
 		use_flags |= BO_USE_NONE;
+	/* Map this flag to linear until real HW protection is available on Android. */
 	if (usage & GRALLOC_USAGE_PROTECTED)
-		use_flags |= BO_USE_PROTECTED;
+		use_flags |= BO_USE_LINEAR;
 	if (usage & GRALLOC_USAGE_HW_VIDEO_ENCODER) {
 		use_flags |= BO_USE_HW_VIDEO_ENCODER;
 		/*HACK: See b/30054495 */
@@ -265,6 +276,7 @@ static int gralloc0_perform(struct gralloc_module_t const *module, int op, ...)
 	uint32_t *out_width, *out_height, *out_stride;
 	uint32_t strides[DRV_MAX_PLANES] = { 0, 0, 0, 0 };
 	uint32_t offsets[DRV_MAX_PLANES] = { 0, 0, 0, 0 };
+	struct cros_gralloc0_buffer_info *info;
 	auto mod = (struct gralloc0_module const *)module;
 
 	switch (op) {
@@ -272,6 +284,7 @@ static int gralloc0_perform(struct gralloc_module_t const *module, int op, ...)
 	case GRALLOC_DRM_GET_FORMAT:
 	case GRALLOC_DRM_GET_DIMENSIONS:
 	case GRALLOC_DRM_GET_BACKING_STORE:
+	case GRALLOC_DRM_GET_BUFFER_INFO:
 		break;
 	default:
 		return -EINVAL;
@@ -315,6 +328,17 @@ static int gralloc0_perform(struct gralloc_module_t const *module, int op, ...)
 	case GRALLOC_DRM_GET_BACKING_STORE:
 		out_store = va_arg(args, uint64_t *);
 		ret = mod->driver->get_backing_store(handle, out_store);
+		break;
+	case GRALLOC_DRM_GET_BUFFER_INFO:
+		info = va_arg(args, struct cros_gralloc0_buffer_info *);
+		info->drm_fourcc = hnd->format;
+		info->num_fds = hnd->num_planes;
+		info->modifier = hnd->format_modifier;
+		for (uint32_t i = 0; i < hnd->num_planes; i++) {
+			info->fds[i] = hnd->fds[i];
+			info->offset[i] = hnd->offsets[i];
+			info->stride[i] = hnd->strides[i];
+		}
 		break;
 	default:
 		ret = -EINVAL;

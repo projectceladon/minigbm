@@ -34,21 +34,58 @@ static const uint32_t render_formats[] = { DRM_FORMAT_ABGR16161616F };
 static const uint32_t texture_only_formats[] = { DRM_FORMAT_R8, DRM_FORMAT_NV12, DRM_FORMAT_P010,
 						 DRM_FORMAT_YVU420, DRM_FORMAT_YVU420_ANDROID };
 
+static const uint64_t gen_modifier_order[] = { I915_FORMAT_MOD_Y_TILED, I915_FORMAT_MOD_X_TILED,
+					       DRM_FORMAT_MOD_LINEAR };
+
+static const uint64_t gen11_modifier_order[] = { I915_FORMAT_MOD_Y_TILED_CCS,
+						 I915_FORMAT_MOD_Y_TILED, I915_FORMAT_MOD_X_TILED,
+						 DRM_FORMAT_MOD_LINEAR };
+
+struct modifier_support_t {
+	const uint64_t *order;
+	uint32_t count;
+};
+
 struct i915_device {
 	uint32_t gen;
 	int32_t has_llc;
+	struct modifier_support_t modifier;
 };
 
 static uint32_t i915_get_gen(int device_id)
 {
 	const uint16_t gen3_ids[] = { 0x2582, 0x2592, 0x2772, 0x27A2, 0x27AE,
 				      0x29C2, 0x29B2, 0x29D2, 0xA001, 0xA011 };
+	const uint16_t gen11_ids[] = { 0x4E71, 0x4E61, 0x4E51, 0x4E55, 0x4E57 };
+	const uint16_t gen12_ids[] = { 0x9A40, 0x9A49, 0x9A59, 0x9A60, 0x9A68,
+					0x9A70, 0x9A78, 0x9AC0, 0x9AC9, 0x9AD9, 
+					0x9AF8 };
 	unsigned i;
 	for (i = 0; i < ARRAY_SIZE(gen3_ids); i++)
 		if (gen3_ids[i] == device_id)
 			return 3;
+	/* Gen 11 */
+	for (i = 0; i < ARRAY_SIZE(gen11_ids); i++)
+		if (gen11_ids[i] == device_id)
+			return 11;
+
+	/* Gen 12 */
+	for (i = 0; i < ARRAY_SIZE(gen12_ids); i++)
+		if (gen12_ids[i] == device_id)
+			return 12;
 
 	return 4;
+}
+
+static void i915_get_modifier_order(struct i915_device *i915)
+{
+	if (i915->gen == 11) {
+		i915->modifier.order = gen11_modifier_order;
+		i915->modifier.count = ARRAY_SIZE(gen11_modifier_order);
+	} else {
+		i915->modifier.order = gen_modifier_order;
+		i915->modifier.count = ARRAY_SIZE(gen_modifier_order);
+	}
 }
 
 static uint64_t unset_flags(uint64_t current_flags, uint64_t mask)
@@ -65,8 +102,8 @@ static int i915_add_combinations(struct driver *drv)
 	scanout_and_render = BO_USE_RENDER_MASK | BO_USE_SCANOUT;
 	render = BO_USE_RENDER_MASK;
 	texture_only = BO_USE_TEXTURE_MASK;
-	uint64_t linear_mask = BO_USE_RENDERSCRIPT | BO_USE_LINEAR | BO_USE_PROTECTED |
-			       BO_USE_SW_READ_OFTEN | BO_USE_SW_WRITE_OFTEN;
+	uint64_t linear_mask =
+	    BO_USE_RENDERSCRIPT | BO_USE_LINEAR | BO_USE_SW_READ_OFTEN | BO_USE_SW_WRITE_OFTEN;
 
 	metadata.tiling = I915_TILING_NONE;
 	metadata.priority = 1;
@@ -81,25 +118,23 @@ static int i915_add_combinations(struct driver *drv)
 			     texture_only);
 
 	drv_modify_linear_combinations(drv);
-	/*
-	 * Chrome uses DMA-buf mmap to write to YV12 buffers, which are then accessed by the
-	 * Video Encoder Accelerator (VEA). It could also support NV12 potentially in the future.
-	 */
-	drv_modify_combination(drv, DRM_FORMAT_YVU420, &metadata, BO_USE_HW_VIDEO_ENCODER);
+
+	/* NV12 format for camera, display, decoding and encoding. */
 	/* IPU3 camera ISP supports only NV12 output. */
 	drv_modify_combination(drv, DRM_FORMAT_NV12, &metadata,
-			       BO_USE_HW_VIDEO_ENCODER | BO_USE_HW_VIDEO_DECODER |
-				   BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SCANOUT);
+			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SCANOUT |
+				   BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER);
 
 	/* Android CTS tests require this. */
 	drv_add_combination(drv, DRM_FORMAT_BGR888, &metadata, BO_USE_SW_MASK);
 
 	/*
 	 * R8 format is used for Android's HAL_PIXEL_FORMAT_BLOB and is used for JPEG snapshots
-	 * from camera.
+	 * from camera and input/output from hardware decoder/encoder.
 	 */
 	drv_modify_combination(drv, DRM_FORMAT_R8, &metadata,
-			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE);
+			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER |
+				   BO_USE_HW_VIDEO_ENCODER);
 
 	render = unset_flags(render, linear_mask);
 	scanout_and_render = unset_flags(scanout_and_render, linear_mask);
@@ -206,13 +241,12 @@ static int i915_init(struct driver *drv)
 	int ret;
 	int device_id;
 	struct i915_device *i915;
-	drm_i915_getparam_t get_param;
+	drm_i915_getparam_t get_param = { 0 };
 
 	i915 = calloc(1, sizeof(*i915));
 	if (!i915)
 		return -ENOMEM;
 
-	memset(&get_param, 0, sizeof(get_param));
 	get_param.param = I915_PARAM_CHIPSET_ID;
 	get_param.value = &device_id;
 	ret = drmIoctl(drv->fd, DRM_IOCTL_I915_GETPARAM, &get_param);
@@ -223,6 +257,7 @@ static int i915_init(struct driver *drv)
 	}
 
 	i915->gen = i915_get_gen(device_id);
+	i915_get_modifier_order(i915);
 
 	memset(&get_param, 0, sizeof(get_param));
 	get_param.param = I915_PARAM_HAS_LLC;
@@ -272,21 +307,33 @@ static int i915_bo_from_format(struct bo *bo, uint32_t width, uint32_t height, u
 static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t height, uint32_t format,
 				    uint64_t use_flags, const uint64_t *modifiers, uint32_t count)
 {
-	static const uint64_t modifier_order[] = {
-		I915_FORMAT_MOD_Y_TILED,
-		I915_FORMAT_MOD_X_TILED,
-		DRM_FORMAT_MOD_LINEAR,
-	};
 	uint64_t modifier;
+	struct i915_device *i915 = bo->drv->priv;
+	bool huge_bo = (i915->gen < 11) && (width > 4096);
 
 	if (modifiers) {
 		modifier =
-		    drv_pick_modifier(modifiers, count, modifier_order, ARRAY_SIZE(modifier_order));
+		    drv_pick_modifier(modifiers, count, i915->modifier.order, i915->modifier.count);
 	} else {
 		struct combination *combo = drv_get_combination(bo->drv, format, use_flags);
 		if (!combo)
 			return -EINVAL;
 		modifier = combo->metadata.modifier;
+	}
+
+	/*
+	 * i915 only supports linear/x-tiled above 4096 wide
+	 */
+	if (huge_bo && modifier != I915_FORMAT_MOD_X_TILED && modifier != DRM_FORMAT_MOD_LINEAR) {
+		uint32_t i;
+		for (i = 0; modifiers && i < count; i++) {
+			if (modifiers[i] == I915_FORMAT_MOD_X_TILED)
+				break;
+		}
+		if (i == count)
+			modifier = DRM_FORMAT_MOD_LINEAR;
+		else
+			modifier = I915_FORMAT_MOD_X_TILED;
 	}
 
 	switch (modifier) {
@@ -366,12 +413,10 @@ static int i915_bo_create_from_metadata(struct bo *bo)
 {
 	int ret;
 	size_t plane;
-	struct drm_i915_gem_create gem_create;
-	struct drm_i915_gem_set_tiling gem_set_tiling;
+	struct drm_i915_gem_create gem_create = { 0 };
+	struct drm_i915_gem_set_tiling gem_set_tiling = { 0 };
 
-	memset(&gem_create, 0, sizeof(gem_create));
 	gem_create.size = bo->meta.total_size;
-
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_CREATE, &gem_create);
 	if (ret) {
 		drv_log("DRM_IOCTL_I915_GEM_CREATE failed (size=%llu)\n", gem_create.size);
@@ -381,15 +426,13 @@ static int i915_bo_create_from_metadata(struct bo *bo)
 	for (plane = 0; plane < bo->meta.num_planes; plane++)
 		bo->handles[plane].u32 = gem_create.handle;
 
-	memset(&gem_set_tiling, 0, sizeof(gem_set_tiling));
 	gem_set_tiling.handle = bo->handles[0].u32;
 	gem_set_tiling.tiling_mode = bo->meta.tiling;
 	gem_set_tiling.stride = bo->meta.strides[0];
 
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_SET_TILING, &gem_set_tiling);
 	if (ret) {
-		struct drm_gem_close gem_close;
-		memset(&gem_close, 0, sizeof(gem_close));
+		struct drm_gem_close gem_close = { 0 };
 		gem_close.handle = bo->handles[0].u32;
 		drmIoctl(bo->drv->fd, DRM_IOCTL_GEM_CLOSE, &gem_close);
 
@@ -409,14 +452,13 @@ static void i915_close(struct driver *drv)
 static int i915_bo_import(struct bo *bo, struct drv_import_fd_data *data)
 {
 	int ret;
-	struct drm_i915_gem_get_tiling gem_get_tiling;
+	struct drm_i915_gem_get_tiling gem_get_tiling = { 0 };
 
 	ret = drv_prime_bo_import(bo, data);
 	if (ret)
 		return ret;
 
 	/* TODO(gsingh): export modifiers and get rid of backdoor tiling. */
-	memset(&gem_get_tiling, 0, sizeof(gem_get_tiling));
 	gem_get_tiling.handle = bo->handles[0].u32;
 
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_GET_TILING, &gem_get_tiling);
@@ -439,9 +481,7 @@ static void *i915_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t 
 		return MAP_FAILED;
 
 	if (bo->meta.tiling == I915_TILING_NONE) {
-		struct drm_i915_gem_mmap gem_map;
-		memset(&gem_map, 0, sizeof(gem_map));
-
+		struct drm_i915_gem_mmap gem_map = { 0 };
 		/* TODO(b/118799155): We don't seem to have a good way to
 		 * detect the use cases for which WC mapping is really needed.
 		 * The current heuristic seems overly coarse and may be slowing
@@ -467,11 +507,9 @@ static void *i915_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t 
 
 		addr = (void *)(uintptr_t)gem_map.addr_ptr;
 	} else {
-		struct drm_i915_gem_mmap_gtt gem_map;
-		memset(&gem_map, 0, sizeof(gem_map));
+		struct drm_i915_gem_mmap_gtt gem_map = { 0 };
 
 		gem_map.handle = bo->handles[0].u32;
-
 		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_MMAP_GTT, &gem_map);
 		if (ret) {
 			drv_log("DRM_IOCTL_I915_GEM_MMAP_GTT failed\n");
@@ -494,9 +532,8 @@ static void *i915_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t 
 static int i915_bo_invalidate(struct bo *bo, struct mapping *mapping)
 {
 	int ret;
-	struct drm_i915_gem_set_domain set_domain;
+	struct drm_i915_gem_set_domain set_domain = { 0 };
 
-	memset(&set_domain, 0, sizeof(set_domain));
 	set_domain.handle = bo->handles[0].u32;
 	if (bo->meta.tiling == I915_TILING_NONE) {
 		set_domain.read_domains = I915_GEM_DOMAIN_CPU;

@@ -476,7 +476,7 @@ static int test_perform(struct gralloctest_context *ctx)
 	CHECK(allocate(ctx->device, &info));
 
 	CHECK(mod->perform(mod, GRALLOC_DRM_GET_STRIDE, info.handle, &stride) == 0);
-	CHECK(stride == info.stride);
+	CHECK(stride >= info.stride);
 
 	CHECK(mod->perform(mod, GRALLOC_DRM_GET_FORMAT, info.handle, &format) == 0);
 	CHECK(format == info.format);
@@ -674,11 +674,12 @@ int main(int argc, char *argv[])
 			if (strcmp(tests[i].name, name) && strcmp("all", name))
 				continue;
 
+			printf("[ RUN      ] gralloctest.%s\n", tests[i].name);
+
 			int success = 1;
 			if (ctx->api >= tests[i].required_api)
 				success = tests[i].run_test(ctx);
 
-			printf("[ RUN      ] gralloctest.%s\n", tests[i].name);
 			if (!success) {
 				fprintf(stderr, "[  FAILED  ] gralloctest.%s\n", tests[i].name);
 				ret |= 1;
