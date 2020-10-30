@@ -8,7 +8,9 @@
 
 #include <cutils/native_handle.h>
 
+#include "cros_gralloc/cros_gralloc_helpers.h"
 #include "cros_gralloc/gralloc3/CrosGralloc3Utils.h"
+
 #include "helpers.h"
 
 using android::hardware::hidl_handle;
@@ -291,7 +293,7 @@ Return<void> CrosGralloc3Mapper::lockYCbCr(void* rawHandle, uint64_t cpuUsage,
             break;
         }
         default: {
-            std::string format = getDrmFormatString(crosHandle->format);
+            std::string format = get_drm_format_string(crosHandle->format);
             drv_log("Failed to lockYCbCr. Unhandled format: %s\n", format.c_str());
             hidlCb(Error::BAD_BUFFER, ycbcr);
             return Void();
@@ -472,7 +474,7 @@ int CrosGralloc3Mapper::getResolvedDrmFormat(PixelFormat pixelFormat, uint64_t b
 
     uint32_t resolvedDrmFormat = mDriver->get_resolved_drm_format(drmFormat, usage);
     if (resolvedDrmFormat == DRM_FORMAT_INVALID) {
-        std::string drmFormatString = getDrmFormatString(drmFormat);
+        std::string drmFormatString = get_drm_format_string(drmFormat);
         drv_log("Failed to getResolvedDrmFormat. Failed to resolve drm format %s\n",
                 drmFormatString.c_str());
         return -1;

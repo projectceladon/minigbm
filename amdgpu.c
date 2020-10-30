@@ -422,12 +422,24 @@ static int amdgpu_create_bo_linear(struct bo *bo, uint32_t width, uint32_t heigh
 				   uint64_t use_flags)
 {
 	int ret;
+	size_t num_planes;
 	uint32_t plane, stride;
-	union drm_amdgpu_gem_create gem_create;
+	union drm_amdgpu_gem_create gem_create = { { 0 } };
 	struct amdgpu_priv *priv = bo->drv->priv;
 
 	stride = drv_stride_from_format(format, width, 0);
-	stride = ALIGN(stride, 256);
+	num_planes = drv_num_planes_from_format(format);
+
+	/*
+	 * For multiplane formats, align the stride to 512 to ensure that subsample strides are 256
+	 * aligned. This uses more memory than necessary since the first plane only needs to be
+	 * 256 aligned, but it's acceptable for a short-term fix. It's probably safe for other gpu
+	 * families, but let's restrict it to Raven for now (b/171013552).
+	 * */
+	if (priv->dev_info.family == AMDGPU_FAMILY_RV && num_planes > 1)
+		stride = ALIGN(stride, 512);
+	else
+		stride = ALIGN(stride, 256);
 
 	/*
 	 * Currently, allocator used by chrome aligns the height for Encoder/
@@ -441,7 +453,6 @@ static int amdgpu_create_bo_linear(struct bo *bo, uint32_t width, uint32_t heigh
 
 	drv_bo_from_format(bo, stride, height, format);
 
-	memset(&gem_create, 0, sizeof(gem_create));
 	gem_create.in.bo_size =
 	    ALIGN(bo->meta.total_size, priv->dev_info.virtual_address_alignment);
 	gem_create.in.alignment = 256;
@@ -555,7 +566,7 @@ static void *amdgpu_map_bo(struct bo *bo, struct vma *vma, size_t plane, uint32_
 {
 	void *addr = MAP_FAILED;
 	int ret;
-	union drm_amdgpu_gem_mmap gem_map;
+	union drm_amdgpu_gem_mmap gem_map = { { 0 } };
 	struct drm_amdgpu_gem_create_in bo_info = { 0 };
 	struct drm_amdgpu_gem_op gem_op = { 0 };
 	uint32_t handle = bo->handles[plane].u32;
@@ -608,9 +619,7 @@ static void *amdgpu_map_bo(struct bo *bo, struct vma *vma, size_t plane, uint32_
 		}
 	}
 
-	memset(&gem_map, 0, sizeof(gem_map));
 	gem_map.in.handle = handle;
-
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_AMDGPU_GEM_MMAP, &gem_map);
 	if (ret) {
 		drv_log("DRM_IOCTL_AMDGPU_GEM_MMAP failed\n");
@@ -666,12 +675,11 @@ static int amdgpu_unmap_bo(struct bo *bo, struct vma *vma)
 static int amdgpu_bo_invalidate(struct bo *bo, struct mapping *mapping)
 {
 	int ret;
-	union drm_amdgpu_gem_wait_idle wait_idle;
+	union drm_amdgpu_gem_wait_idle wait_idle = { { 0 } };
 
 	if (bo->priv)
 		return 0;
 
-	memset(&wait_idle, 0, sizeof(wait_idle));
 	wait_idle.in.handle = bo->handles[0].u32;
 	wait_idle.in.timeout = AMDGPU_TIMEOUT_INFINITE;
 

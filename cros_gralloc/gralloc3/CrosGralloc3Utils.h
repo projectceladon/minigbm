@@ -11,8 +11,6 @@
 #include <android/hardware/graphics/common/1.2/types.h>
 #include <android/hardware/graphics/mapper/3.0/IMapper.h>
 
-std::string getDrmFormatString(uint32_t drmFormat);
-
 std::string getPixelFormatString(android::hardware::graphics::common::V1_2::PixelFormat format);
 
 std::string getUsageString(
