@@ -193,7 +193,15 @@ static int i915_align_dimensions(struct bo *bo, uint32_t tiling, uint32_t *strid
 		 * horizontal alignment so that row start on a cache line (64
 		 * bytes).
 		 */
+#ifdef LINEAR_ALIGN_256
+		/*
+		 * If we want to import these buffers to amdgpu they need to
+		 * their match LINEAR_ALIGNED requirement of 256 byte alignement.
+		 */
+		horizontal_alignment = 256;
+#else
 		horizontal_alignment = 64;
+#endif
 		vertical_alignment = 4;
 		break;
 
