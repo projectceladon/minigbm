@@ -189,7 +189,8 @@ size_t drv_num_planes_from_modifier(struct driver *drv, uint32_t format, uint64_
 	if (!planes)
 		return 0;
 
-	if (drv->backend->num_planes_from_modifier && modifier != DRM_FORMAT_MOD_INVALID)
+	if (drv->backend->num_planes_from_modifier && modifier != DRM_FORMAT_MOD_INVALID &&
+	    modifier != DRM_FORMAT_MOD_LINEAR)
 		return drv->backend->num_planes_from_modifier(drv, format, modifier);
 
 	return planes;
