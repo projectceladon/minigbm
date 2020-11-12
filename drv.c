@@ -93,8 +93,9 @@ static const struct backend *drv_get_backend(int fd)
 #ifdef DRV_VC4
 		&backend_vc4,
 #endif
-		&backend_marvell,  &backend_meson,     &backend_nouveau,    &backend_komeda,
-		&backend_radeon,   &backend_synaptics, &backend_virtio_gpu,
+		&backend_evdi,	    &backend_marvell,	 &backend_meson,
+		&backend_nouveau,   &backend_komeda,	 &backend_radeon,
+		&backend_synaptics, &backend_virtio_gpu, &backend_udl,
 	};
 
 	for (i = 0; i < ARRAY_SIZE(backend_list); i++) {

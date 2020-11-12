@@ -57,9 +57,8 @@ static uint32_t i915_get_gen(int device_id)
 	const uint16_t gen3_ids[] = { 0x2582, 0x2592, 0x2772, 0x27A2, 0x27AE,
 				      0x29C2, 0x29B2, 0x29D2, 0xA001, 0xA011 };
 	const uint16_t gen11_ids[] = { 0x4E71, 0x4E61, 0x4E51, 0x4E55, 0x4E57 };
-	const uint16_t gen12_ids[] = { 0x9A40, 0x9A49, 0x9A59, 0x9A60, 0x9A68,
-					0x9A70, 0x9A78, 0x9AC0, 0x9AC9, 0x9AD9, 
-					0x9AF8 };
+	const uint16_t gen12_ids[] = { 0x9A40, 0x9A49, 0x9A59, 0x9A60, 0x9A68, 0x9A70,
+				       0x9A78, 0x9AC0, 0x9AC9, 0x9AD9, 0x9AF8 };
 	unsigned i;
 	for (i = 0; i < ARRAY_SIZE(gen3_ids); i++)
 		if (gen3_ids[i] == device_id)
@@ -322,9 +321,11 @@ static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t heig
 	}
 
 	/*
-	 * i915 only supports linear/x-tiled above 4096 wide
+	 * i915 only supports linear/x-tiled above 4096 wide on Gen9/Gen10 GPU.
+	 * VAAPI decode in NV12 Y tiled format so skip modifier change for NV12/P010 huge bo.
 	 */
-	if (huge_bo && modifier != I915_FORMAT_MOD_X_TILED && modifier != DRM_FORMAT_MOD_LINEAR) {
+	if (huge_bo && format != DRM_FORMAT_NV12 && format != DRM_FORMAT_P010 &&
+	    modifier != I915_FORMAT_MOD_X_TILED && modifier != DRM_FORMAT_MOD_LINEAR) {
 		uint32_t i;
 		for (i = 0; modifiers && i < count; i++) {
 			if (modifiers[i] == I915_FORMAT_MOD_X_TILED)
