@@ -9,11 +9,31 @@
 #include <cstdlib>
 #include <fcntl.h>
 #include <sys/mman.h>
+#include <syscall.h>
 #include <xf86drm.h>
 
 #include "../drv_priv.h"
 #include "../helpers.h"
 #include "../util.h"
+
+int memfd_create_wrapper(const char *name, unsigned int flags)
+{
+	int fd;
+
+#if defined(HAVE_MEMFD_CREATE)
+	fd = memfd_create(name, flags);
+#elif defined(__NR_memfd_create)
+	fd = syscall(__NR_memfd_create, name, flags);
+#else
+	drv_log("Failed to create memfd '%s': memfd_create not available.", name);
+	return -1;
+#endif
+
+	if (fd == -1) {
+		drv_log("Failed to create memfd '%s': %s.\n", name, strerror(errno));
+	}
+	return fd;
+}
 
 cros_gralloc_driver::cros_gralloc_driver() : drv_(nullptr)
 {
@@ -98,11 +118,9 @@ int32_t create_reserved_region(const std::string &buffer_name, uint64_t reserved
 {
 	std::string reserved_region_name = buffer_name + " reserved region";
 
-#ifdef __NR_memfd_create
-	int32_t reserved_region_fd = memfd_create(reserved_region_name.c_str(), FD_CLOEXEC);
+	int32_t reserved_region_fd = memfd_create_wrapper(reserved_region_name.c_str(), FD_CLOEXEC);
 	if (reserved_region_fd == -1) {
-		drv_log("Failed to create reserved region fd: %s.\n", strerror(errno));
-		return -errno;
+		return -1;
 	}
 
 	if (ftruncate(reserved_region_fd, reserved_region_size)) {
@@ -111,11 +129,6 @@ int32_t create_reserved_region(const std::string &buffer_name, uint64_t reserved
 	}
 
 	return reserved_region_fd;
-#else
-	drv_log("Failed to create reserved region '%s': memfd_create not available.",
-		reserved_region_name.c_str());
-	return -1;
-#endif
 }
 
 int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descriptor *descriptor,

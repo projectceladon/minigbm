@@ -6,6 +6,7 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <stdatomic.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -71,6 +72,7 @@ struct virtio_gpu_priv {
 	int caps_is_v2;
 	union virgl_caps caps;
 	int host_gbm_enabled;
+	atomic_int next_blob_id;
 };
 
 static uint32_t translate_format(uint32_t drm_fourcc)
@@ -88,7 +90,7 @@ static uint32_t translate_format(uint32_t drm_fourcc)
 	case DRM_FORMAT_ABGR8888:
 		return VIRGL_FORMAT_R8G8B8A8_UNORM;
 	case DRM_FORMAT_ABGR16161616F:
-		return VIRGL_FORMAT_R16G16B16A16_UNORM;
+		return VIRGL_FORMAT_R16G16B16A16_FLOAT;
 	case DRM_FORMAT_RGB565:
 		return VIRGL_FORMAT_B5G6R5_UNORM;
 	case DRM_FORMAT_R8:
@@ -680,8 +682,10 @@ static int virtio_gpu_bo_create_blob(struct driver *drv, struct bo *bo)
 {
 	int ret;
 	uint32_t stride;
+	uint32_t cur_blob_id;
 	uint32_t cmd[VIRGL_PIPE_RES_CREATE_SIZE + 1] = { 0 };
 	struct drm_virtgpu_resource_create_blob drm_rc_blob = { 0 };
+	struct virtio_gpu_priv *priv = (struct virtio_gpu_priv *)drv->priv;
 
 	uint32_t blob_flags = VIRTGPU_BLOB_FLAG_USE_SHAREABLE;
 	if (bo->meta.use_flags & BO_USE_SW_MASK)
@@ -689,6 +693,7 @@ static int virtio_gpu_bo_create_blob(struct driver *drv, struct bo *bo)
 	if (bo->meta.use_flags & BO_USE_NON_GPU_HW)
 		blob_flags |= VIRTGPU_BLOB_FLAG_USE_CROSS_DEVICE;
 
+	cur_blob_id = atomic_fetch_add(&priv->next_blob_id, 1);
 	stride = drv_stride_from_format(bo->meta.format, bo->meta.width, 0);
 	drv_bo_from_format(bo, stride, bo->meta.height, bo->meta.format);
 	bo->meta.total_size = ALIGN(bo->meta.total_size, PAGE_SIZE);
@@ -701,12 +706,14 @@ static int virtio_gpu_bo_create_blob(struct driver *drv, struct bo *bo)
 	cmd[VIRGL_PIPE_RES_CREATE_FORMAT] = translate_format(bo->meta.format);
 	cmd[VIRGL_PIPE_RES_CREATE_BIND] = use_flags_to_bind(bo->meta.use_flags);
 	cmd[VIRGL_PIPE_RES_CREATE_DEPTH] = 1;
+	cmd[VIRGL_PIPE_RES_CREATE_BLOB_ID] = cur_blob_id;
 
 	drm_rc_blob.cmd = (uint64_t)&cmd;
 	drm_rc_blob.cmd_size = 4 * (VIRGL_PIPE_RES_CREATE_SIZE + 1);
 	drm_rc_blob.size = bo->meta.total_size;
 	drm_rc_blob.blob_mem = VIRTGPU_BLOB_MEM_HOST3D;
 	drm_rc_blob.blob_flags = blob_flags;
+	drm_rc_blob.blob_id = cur_blob_id;
 
 	ret = drmIoctl(drv->fd, DRM_IOCTL_VIRTGPU_RESOURCE_CREATE_BLOB, &drm_rc_blob);
 	if (ret < 0) {

@@ -180,6 +180,22 @@ static bool should_avoid_ubwc(void)
 		drv_log("WARNING: waffle detected, disabling UBWC\n");
 		return true;
 	}
+
+	/* The video_decode_accelerator_tests needs to read back the frames
+	 * to verify they are correct.  The frame verification relies on
+	 * computing the MD5 of the video frame.  UBWC results in a different
+	 * MD5.  This turns off UBWC for gtest until a proper frame
+	 * comparison can be made
+	 * Rely on the same mechanism that waffle is using, but this time check
+	 * for a dynamic library function that is present in chrome, but missing
+	 * in gtest.  Cups is not loaded for video tests.
+	 *
+	 * See b/171260705
+	 */
+	if (!dlsym(RTLD_DEFAULT, "cupsFilePrintf")) {
+		drv_log("WARNING: gtest detected, disabling UBWC\n");
+		return true;
+	}
 #endif
 	return false;
 }
