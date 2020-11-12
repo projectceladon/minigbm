@@ -353,6 +353,22 @@ static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t heig
 			modifier = I915_FORMAT_MOD_X_TILED;
 	}
 
+	/*
+	 * Skip I915_FORMAT_MOD_Y_TILED_CCS modifier if compression is disabled
+	 * Pick y tiled modifier if it has been passed in, otherwise use linear
+	 */
+	if (!bo->drv->compression && modifier == I915_FORMAT_MOD_Y_TILED_CCS) {
+		uint32_t i;
+		for (i = 0; modifiers && i < count; i++) {
+			if (modifiers[i] == I915_FORMAT_MOD_Y_TILED)
+				break;
+		}
+		if (i == count)
+			modifier = DRM_FORMAT_MOD_LINEAR;
+		else
+			modifier = I915_FORMAT_MOD_Y_TILED;
+	}
+
 	switch (modifier) {
 	case DRM_FORMAT_MOD_LINEAR:
 		bo->meta.tiling = I915_TILING_NONE;

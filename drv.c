@@ -128,6 +128,10 @@ struct driver *drv_create(int fd)
 	if (!drv)
 		return NULL;
 
+	char *minigbm_debug;
+	minigbm_debug = getenv("MINIGBM_DEBUG");
+	drv->compression = (minigbm_debug == NULL) || (strcmp(minigbm_debug, "nocompression") != 0);
+
 	drv->fd = fd;
 	drv->backend = drv_get_backend(fd);
 

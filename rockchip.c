@@ -128,7 +128,8 @@ static int rockchip_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint
 		 */
 		bo->meta.total_size += w_mbs * h_mbs * 128;
 	} else if (width <= 2560 &&
-		   drv_has_modifier(modifiers, count, DRM_FORMAT_MOD_CHROMEOS_ROCKCHIP_AFBC)) {
+		   drv_has_modifier(modifiers, count, DRM_FORMAT_MOD_CHROMEOS_ROCKCHIP_AFBC) &&
+		   bo->drv->compression) {
 		/* If the caller has decided they can use AFBC, always
 		 * pick that */
 		afbc_bo_from_format(bo, width, height, format);

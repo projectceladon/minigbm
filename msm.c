@@ -250,7 +250,7 @@ static int msm_init(struct driver *drv)
 
 	drv_modify_linear_combinations(drv);
 
-	if (should_avoid_ubwc())
+	if (should_avoid_ubwc() || !drv->compression)
 		return 0;
 
 	metadata.tiling = MSM_UBWC_TILING;
@@ -314,6 +314,9 @@ static int msm_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint32_t 
 
 	uint64_t modifier =
 	    drv_pick_modifier(modifiers, count, modifier_order, ARRAY_SIZE(modifier_order));
+
+	if (!bo->drv->compression && modifier == DRM_FORMAT_MOD_QCOM_COMPRESSED)
+		modifier = DRM_FORMAT_MOD_LINEAR;
 
 	return msm_bo_create_for_modifier(bo, width, height, format, modifier);
 }
