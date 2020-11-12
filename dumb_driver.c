@@ -42,9 +42,11 @@ static int dumb_driver_init(struct driver *drv)
 	return drv_modify_linear_combinations(drv);
 }
 
+INIT_DUMB_DRIVER(evdi)
 INIT_DUMB_DRIVER(komeda)
 INIT_DUMB_DRIVER(marvell)
 INIT_DUMB_DRIVER(meson)
 INIT_DUMB_DRIVER(nouveau)
 INIT_DUMB_DRIVER(radeon)
 INIT_DUMB_DRIVER(synaptics)
+INIT_DUMB_DRIVER(udl)
