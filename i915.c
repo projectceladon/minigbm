@@ -540,7 +540,7 @@ static int i915_bo_import(struct bo *bo, struct drv_import_fd_data *data)
 static void *i915_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t map_flags)
 {
 	int ret;
-	void *addr;
+	void *addr = MAP_FAILED;
 
 	if (bo->meta.format_modifiers[0] == I915_FORMAT_MOD_Y_TILED_CCS)
 		return MAP_FAILED;
@@ -565,13 +565,18 @@ static void *i915_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t 
 		gem_map.size = bo->meta.total_size;
 
 		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_MMAP, &gem_map);
-		if (ret) {
-			drv_log("DRM_IOCTL_I915_GEM_MMAP failed\n");
-			return MAP_FAILED;
-		}
+		/* DRM_IOCTL_I915_GEM_MMAP mmaps the underlying shm
+		 * file and returns a user space address directly, ie,
+		 * doesn't go through mmap. If we try that on a
+		 * dma-buf that doesn't have a shm file, i915.ko
+		 * returns ENXIO.  Fall through to
+		 * DRM_IOCTL_I915_GEM_MMAP_GTT in that case, which
+		 * will mmap on the drm fd instead. */
+		if (ret == 0)
+			addr = (void *)(uintptr_t)gem_map.addr_ptr;
+	}
 
-		addr = (void *)(uintptr_t)gem_map.addr_ptr;
-	} else {
+	if (addr == MAP_FAILED) {
 		struct drm_i915_gem_mmap_gtt gem_map = { 0 };
 
 		gem_map.handle = bo->handles[0].u32;
