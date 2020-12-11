@@ -57,6 +57,7 @@ struct driver {
 	struct drv_array *mappings;
 	struct drv_array *combos;
 	pthread_mutex_t driver_lock;
+	bool compression;
 };
 
 struct backend {
