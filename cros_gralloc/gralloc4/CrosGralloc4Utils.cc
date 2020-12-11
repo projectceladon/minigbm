@@ -318,10 +318,14 @@ int convertToCrosDescriptor(const BufferDescriptorInfo& descriptor,
     outCrosDescriptor->droid_format = static_cast<int32_t>(descriptor.format);
     outCrosDescriptor->droid_usage = descriptor.usage;
     outCrosDescriptor->reserved_region_size = descriptor.reservedSize;
-
+    if (descriptor.layerCount > 1) {
+        drv_log("Failed to convert descriptor. Unsupported layerCount: %d\n",
+                descriptor.layerCount);
+        return -1;
+    }
     if (convertToDrmFormat(descriptor.format, &outCrosDescriptor->drm_format)) {
         std::string pixelFormatString = getPixelFormatString(descriptor.format);
-        drv_log("Failed to convert descriptor. Unsupported fomat %s\n", pixelFormatString.c_str());
+        drv_log("Failed to convert descriptor. Unsupported format %s\n", pixelFormatString.c_str());
         return -1;
     }
     if (convertToBufferUsage(descriptor.usage, &outCrosDescriptor->use_flags)) {

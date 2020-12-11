@@ -60,6 +60,7 @@ extern const struct backend backend_radeon;
 extern const struct backend backend_synaptics;
 extern const struct backend backend_virtio_gpu;
 extern const struct backend backend_udl;
+extern const struct backend backend_vkms;
 
 static const struct backend *drv_get_backend(int fd)
 {
@@ -93,9 +94,9 @@ static const struct backend *drv_get_backend(int fd)
 #ifdef DRV_VC4
 		&backend_vc4,
 #endif
-		&backend_evdi,	    &backend_marvell,	 &backend_meson,
-		&backend_nouveau,   &backend_komeda,	 &backend_radeon,
-		&backend_synaptics, &backend_virtio_gpu, &backend_udl,
+		&backend_evdi,	   &backend_marvell,	&backend_meson,	    &backend_nouveau,
+		&backend_komeda,   &backend_radeon,	&backend_synaptics, &backend_virtio_gpu,
+		&backend_udl,	   &backend_virtio_gpu, &backend_vkms
 	};
 
 	for (i = 0; i < ARRAY_SIZE(backend_list); i++) {
@@ -127,6 +128,10 @@ struct driver *drv_create(int fd)
 
 	if (!drv)
 		return NULL;
+
+	char *minigbm_debug;
+	minigbm_debug = getenv("MINIGBM_DEBUG");
+	drv->compression = (minigbm_debug == NULL) || (strcmp(minigbm_debug, "nocompression") != 0);
 
 	drv->fd = fd;
 	drv->backend = drv_get_backend(fd);

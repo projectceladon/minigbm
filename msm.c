@@ -66,6 +66,24 @@ static uint32_t get_ubwc_meta_size(uint32_t width, uint32_t height, uint32_t til
 	return ALIGN(macrotile_width * macrotile_height, PLANE_SIZE_ALIGN);
 }
 
+static unsigned get_pitch_alignment(struct bo *bo)
+{
+	switch (bo->meta.format) {
+	case DRM_FORMAT_NV12:
+		return VENUS_STRIDE_ALIGN;
+	case DRM_FORMAT_YVU420:
+	case DRM_FORMAT_YVU420_ANDROID:
+		/* TODO other YUV formats? */
+		/* Something (in the video stack?) assumes the U/V planes can use
+		 * half the pitch as the Y plane.. to componsate, double the
+		 * alignment:
+		 */
+		return 2 * DEFAULT_ALIGNMENT;
+	default:
+		return DEFAULT_ALIGNMENT;
+	}
+}
+
 static void msm_calculate_layout(struct bo *bo)
 {
 	uint32_t width, height;
@@ -108,7 +126,7 @@ static void msm_calculate_layout(struct bo *bo)
 	} else {
 		uint32_t stride, alignw, alignh;
 
-		alignw = ALIGN(width, DEFAULT_ALIGNMENT);
+		alignw = ALIGN(width, get_pitch_alignment(bo));
 		/* HAL_PIXEL_FORMAT_YV12 requires that the buffer's height not be aligned.
 			DRM_FORMAT_R8 of height one is used for JPEG camera output, so don't
 			height align that. */
@@ -232,7 +250,7 @@ static int msm_init(struct driver *drv)
 
 	drv_modify_linear_combinations(drv);
 
-	if (should_avoid_ubwc())
+	if (should_avoid_ubwc() || !drv->compression)
 		return 0;
 
 	metadata.tiling = MSM_UBWC_TILING;
@@ -296,6 +314,9 @@ static int msm_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint32_t 
 
 	uint64_t modifier =
 	    drv_pick_modifier(modifiers, count, modifier_order, ARRAY_SIZE(modifier_order));
+
+	if (!bo->drv->compression && modifier == DRM_FORMAT_MOD_QCOM_COMPRESSED)
+		modifier = DRM_FORMAT_MOD_LINEAR;
 
 	return msm_bo_create_for_modifier(bo, width, height, format, modifier);
 }
