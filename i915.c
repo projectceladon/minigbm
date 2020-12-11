@@ -8,7 +8,6 @@
 
 #include <assert.h>
 #include <errno.h>
-#include <i915_drm.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
@@ -17,6 +16,7 @@
 #include <xf86drm.h>
 
 #include "drv_priv.h"
+#include "external/i915_drm.h"
 #include "helpers.h"
 #include "util.h"
 
@@ -49,6 +49,7 @@ struct modifier_support_t {
 struct i915_device {
 	uint32_t gen;
 	int32_t has_llc;
+	int32_t has_hw_protection;
 	struct modifier_support_t modifier;
 };
 
@@ -96,11 +97,15 @@ static uint64_t unset_flags(uint64_t current_flags, uint64_t mask)
 static int i915_add_combinations(struct driver *drv)
 {
 	struct format_metadata metadata;
-	uint64_t render, scanout_and_render, texture_only;
+	uint64_t render, scanout_and_render, texture_only, hw_protected;
+	struct i915_device *i915 = drv->priv;
 
 	scanout_and_render = BO_USE_RENDER_MASK | BO_USE_SCANOUT;
 	render = BO_USE_RENDER_MASK;
 	texture_only = BO_USE_TEXTURE_MASK;
+	// HW protected buffers also need to be scanned out.
+	hw_protected = i915->has_hw_protection ? (BO_USE_PROTECTED | BO_USE_SCANOUT) : 0;
+
 	uint64_t linear_mask =
 	    BO_USE_RENDERSCRIPT | BO_USE_LINEAR | BO_USE_SW_READ_OFTEN | BO_USE_SW_WRITE_OFTEN;
 
@@ -122,7 +127,8 @@ static int i915_add_combinations(struct driver *drv)
 	/* IPU3 camera ISP supports only NV12 output. */
 	drv_modify_combination(drv, DRM_FORMAT_NV12, &metadata,
 			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SCANOUT |
-				   BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER);
+				   BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER |
+				   hw_protected);
 
 	/* Android CTS tests require this. */
 	drv_add_combination(drv, DRM_FORMAT_BGR888, &metadata, BO_USE_SW_MASK);
@@ -154,15 +160,17 @@ static int i915_add_combinations(struct driver *drv)
 	    unset_flags(scanout_and_render, BO_USE_SW_READ_RARELY | BO_USE_SW_WRITE_RARELY);
 /* Support y-tiled NV12 and P010 for libva */
 #ifdef I915_SCANOUT_Y_TILED
-	drv_add_combination(drv, DRM_FORMAT_NV12, &metadata,
-			    BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER | BO_USE_SCANOUT);
+	uint64_t nv12_usage =
+	    BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER | BO_USE_SCANOUT | hw_protected;
+	uint64_t p010_usage = BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER | hw_protected;
 #else
-	drv_add_combination(drv, DRM_FORMAT_NV12, &metadata,
-			    BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER);
+	uint64_t nv12_usage = BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER;
+	uint64_t p010_usage = nv12_usage;
 #endif
+	drv_add_combination(drv, DRM_FORMAT_NV12, &metadata, nv12_usage);
+	drv_add_combination(drv, DRM_FORMAT_P010, &metadata, p010_usage);
+
 	scanout_and_render = unset_flags(scanout_and_render, BO_USE_SCANOUT);
-	drv_add_combination(drv, DRM_FORMAT_P010, &metadata,
-			    BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER);
 
 	drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats), &metadata, render);
 	drv_add_combinations(drv, scanout_render_formats, ARRAY_SIZE(scanout_render_formats),
@@ -187,7 +195,15 @@ static int i915_align_dimensions(struct bo *bo, uint32_t tiling, uint32_t *strid
 		 * horizontal alignment so that row start on a cache line (64
 		 * bytes).
 		 */
+#ifdef LINEAR_ALIGN_256
+		/*
+		 * If we want to import these buffers to amdgpu they need to
+		 * their match LINEAR_ALIGNED requirement of 256 byte alignement.
+		 */
+		horizontal_alignment = 256;
+#else
 		horizontal_alignment = 64;
+#endif
 		vertical_alignment = 4;
 		break;
 
@@ -268,8 +284,10 @@ static int i915_init(struct driver *drv)
 		return -EINVAL;
 	}
 
-	drv->priv = i915;
+	if (i915->gen >= 12)
+		i915->has_hw_protection = 1;
 
+	drv->priv = i915;
 	return i915_add_combinations(drv);
 }
 
@@ -335,6 +353,22 @@ static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t heig
 			modifier = DRM_FORMAT_MOD_LINEAR;
 		else
 			modifier = I915_FORMAT_MOD_X_TILED;
+	}
+
+	/*
+	 * Skip I915_FORMAT_MOD_Y_TILED_CCS modifier if compression is disabled
+	 * Pick y tiled modifier if it has been passed in, otherwise use linear
+	 */
+	if (!bo->drv->compression && modifier == I915_FORMAT_MOD_Y_TILED_CCS) {
+		uint32_t i;
+		for (i = 0; modifiers && i < count; i++) {
+			if (modifiers[i] == I915_FORMAT_MOD_Y_TILED)
+				break;
+		}
+		if (i == count)
+			modifier = DRM_FORMAT_MOD_LINEAR;
+		else
+			modifier = I915_FORMAT_MOD_Y_TILED;
 	}
 
 	switch (modifier) {
@@ -414,18 +448,48 @@ static int i915_bo_create_from_metadata(struct bo *bo)
 {
 	int ret;
 	size_t plane;
-	struct drm_i915_gem_create gem_create = { 0 };
+	uint32_t gem_handle;
 	struct drm_i915_gem_set_tiling gem_set_tiling = { 0 };
+	struct i915_device *i915 = bo->drv->priv;
 
-	gem_create.size = bo->meta.total_size;
-	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_CREATE, &gem_create);
-	if (ret) {
-		drv_log("DRM_IOCTL_I915_GEM_CREATE failed (size=%llu)\n", gem_create.size);
-		return -errno;
+	if (i915->has_hw_protection && (bo->meta.use_flags & BO_USE_PROTECTED)) {
+		struct drm_i915_gem_object_param protected_param = {
+			.param = I915_OBJECT_PARAM | I915_PARAM_PROTECTED_CONTENT,
+			.data = 1,
+		};
+
+		struct drm_i915_gem_create_ext_setparam setparam_protected = {
+			.base = { .name = I915_GEM_CREATE_EXT_SETPARAM },
+			.param = protected_param,
+		};
+
+		struct drm_i915_gem_create_ext create_ext = {
+			.size = bo->meta.total_size,
+			.extensions = (uintptr_t)&setparam_protected,
+		};
+
+		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_CREATE_EXT, &create_ext);
+		if (ret) {
+			drv_log("DRM_IOCTL_I915_GEM_CREATE_EXT failed (size=%llu)\n",
+				create_ext.size);
+			return -errno;
+		}
+
+		gem_handle = create_ext.handle;
+	} else {
+		struct drm_i915_gem_create gem_create = { 0 };
+		gem_create.size = bo->meta.total_size;
+		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_CREATE, &gem_create);
+		if (ret) {
+			drv_log("DRM_IOCTL_I915_GEM_CREATE failed (size=%llu)\n", gem_create.size);
+			return -errno;
+		}
+
+		gem_handle = gem_create.handle;
 	}
 
 	for (plane = 0; plane < bo->meta.num_planes; plane++)
-		bo->handles[plane].u32 = gem_create.handle;
+		bo->handles[plane].u32 = gem_handle;
 
 	gem_set_tiling.handle = bo->handles[0].u32;
 	gem_set_tiling.tiling_mode = bo->meta.tiling;
@@ -476,7 +540,7 @@ static int i915_bo_import(struct bo *bo, struct drv_import_fd_data *data)
 static void *i915_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t map_flags)
 {
 	int ret;
-	void *addr;
+	void *addr = MAP_FAILED;
 
 	if (bo->meta.format_modifiers[0] == I915_FORMAT_MOD_Y_TILED_CCS)
 		return MAP_FAILED;
@@ -501,13 +565,18 @@ static void *i915_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t 
 		gem_map.size = bo->meta.total_size;
 
 		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_MMAP, &gem_map);
-		if (ret) {
-			drv_log("DRM_IOCTL_I915_GEM_MMAP failed\n");
-			return MAP_FAILED;
-		}
+		/* DRM_IOCTL_I915_GEM_MMAP mmaps the underlying shm
+		 * file and returns a user space address directly, ie,
+		 * doesn't go through mmap. If we try that on a
+		 * dma-buf that doesn't have a shm file, i915.ko
+		 * returns ENXIO.  Fall through to
+		 * DRM_IOCTL_I915_GEM_MMAP_GTT in that case, which
+		 * will mmap on the drm fd instead. */
+		if (ret == 0)
+			addr = (void *)(uintptr_t)gem_map.addr_ptr;
+	}
 
-		addr = (void *)(uintptr_t)gem_map.addr_ptr;
-	} else {
+	if (addr == MAP_FAILED) {
 		struct drm_i915_gem_mmap_gtt gem_map = { 0 };
 
 		gem_map.handle = bo->handles[0].u32;
