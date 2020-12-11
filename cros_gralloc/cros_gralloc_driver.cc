@@ -16,6 +16,16 @@
 #include "../helpers.h"
 #include "../util.h"
 
+// Constants taken from pipe_loader_drm.c in Mesa
+
+#define DRM_NUM_NODES 63
+
+// DRM Render nodes start at 128
+#define DRM_RENDER_NODE_START 128
+
+// DRM Card nodes start at 0
+#define DRM_CARD_NODE_START 0
+
 int memfd_create_wrapper(const char *name, unsigned int flags)
 {
 	int fd;
@@ -52,54 +62,57 @@ cros_gralloc_driver::~cros_gralloc_driver()
 	}
 }
 
+static struct driver *init_try_node(int idx, char const *str)
+{
+	int fd;
+	char *node;
+	struct driver *drv;
+
+	if (asprintf(&node, str, DRM_DIR_NAME, idx) < 0)
+		return NULL;
+
+	fd = open(node, O_RDWR, 0);
+	free(node);
+
+	if (fd < 0)
+		return NULL;
+
+	drv = drv_create(fd);
+	if (!drv)
+		close(fd);
+
+	return drv;
+}
+
 int32_t cros_gralloc_driver::init()
 {
 	/*
-	 * Create a driver from rendernode while filtering out
-	 * the specified undesired driver.
+	 * Create a driver from render nodes first, then try card
+	 * nodes.
 	 *
 	 * TODO(gsingh): Enable render nodes on udl/evdi.
 	 */
 
-	int fd;
-	drmVersionPtr version;
-	char const *str = "%s/renderD%d";
-	const char *undesired[2] = { "vgem", nullptr };
-	uint32_t num_nodes = 63;
-	uint32_t min_node = 128;
-	uint32_t max_node = (min_node + num_nodes);
+	char const *render_nodes_fmt = "%s/renderD%d";
+	char const *card_nodes_fmt = "%s/card%d";
+	uint32_t num_nodes = DRM_NUM_NODES;
+	uint32_t min_render_node = DRM_RENDER_NODE_START;
+	uint32_t max_render_node = (min_render_node + num_nodes);
+	uint32_t min_card_node = DRM_CARD_NODE_START;
+	uint32_t max_card_node = (min_card_node + num_nodes);
 
-	for (uint32_t i = 0; i < ARRAY_SIZE(undesired); i++) {
-		for (uint32_t j = min_node; j < max_node; j++) {
-			char *node;
-			if (asprintf(&node, str, DRM_DIR_NAME, j) < 0)
-				continue;
+	// Try render nodes...
+	for (uint32_t i = min_render_node; i < max_render_node; i++) {
+		drv_ = init_try_node(i, render_nodes_fmt);
+		if (drv_)
+			return 0;
+	}
 
-			fd = open(node, O_RDWR | O_CLOEXEC);
-			free(node);
-
-			if (fd < 0)
-				continue;
-
-			version = drmGetVersion(fd);
-			if (!version) {
-				close(fd);
-				continue;
-			}
-
-			if (undesired[i] && !strcmp(version->name, undesired[i])) {
-				close(fd);
-				drmFreeVersion(version);
-				continue;
-			}
-
-			drmFreeVersion(version);
-			drv_ = drv_create(fd);
-			if (drv_)
-				return 0;
-
-			close(fd);
-		}
+	// Try card nodes... for vkms mostly.
+	for (uint32_t i = min_card_node; i < max_card_node; i++) {
+		drv_ = init_try_node(i, card_nodes_fmt);
+		if (drv_)
+			return 0;
 	}
 
 	return -ENODEV;
