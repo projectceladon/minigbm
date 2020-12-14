@@ -141,11 +141,13 @@ static int gralloc0_alloc(alloc_device_t *dev, int w, int h, int format, int usa
 		supported = mod->driver->is_supported(&descriptor);
 	}
 	if (!supported && (usage & GRALLOC_USAGE_HW_VIDEO_ENCODER) &&
-	    !gralloc0_droid_yuv_format(format)) {
-		// Unmask BO_USE_HW_VIDEO_ENCODER in the case of non-yuv formats
-		// because they are not input to a hw encoder but used as an
-		// intermediate format (e.g. camera).
+	    format != HAL_PIXEL_FORMAT_YCbCr_420_888) {
+		// Unmask BO_USE_HW_VIDEO_ENCODER for other formats. They are mostly
+		// intermediate formats not passed directly to the encoder (e.g.
+		// camera). YV12 is passed to the encoder component, but it is converted
+		// to YCbCr_420_888 before being passed to the hw encoder.
 		descriptor.use_flags &= ~BO_USE_HW_VIDEO_ENCODER;
+		drv_log("Retrying format %u allocation without encoder flag", format);
 		supported = mod->driver->is_supported(&descriptor);
 	}
 
