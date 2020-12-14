@@ -4,6 +4,7 @@
  * found in the LICENSE file.
  */
 
+#include "../../helpers.h"
 #include "../../util.h"
 #include "../cros_gralloc_driver.h"
 
@@ -333,7 +334,7 @@ static int gralloc0_perform(struct gralloc_module_t const *module, int op, ...)
 		break;
 	case GRALLOC_DRM_GET_BUFFER_INFO:
 		info = va_arg(args, struct cros_gralloc0_buffer_info *);
-		info->drm_fourcc = hnd->format;
+		info->drm_fourcc = drv_get_standard_fourcc(hnd->format);
 		info->num_fds = hnd->num_planes;
 		info->modifier = hnd->format_modifier;
 		for (uint32_t i = 0; i < hnd->num_planes; i++) {

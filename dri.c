@@ -355,7 +355,7 @@ int dri_bo_import(struct bo *bo, struct drv_import_fd_data *data)
 
 		// clang-format off
 		bo->priv = dri->image_extension->createImageFromDmaBufs2(dri->device, data->width, data->height,
-									 data->format,
+									 drv_get_standard_fourcc(data->format),
 									 data->format_modifiers[0],
 									 data->fds,
 									 bo->meta.num_planes,
@@ -374,7 +374,7 @@ int dri_bo_import(struct bo *bo, struct drv_import_fd_data *data)
 	} else {
 		// clang-format off
 		bo->priv = dri->image_extension->createImageFromFds(dri->device, data->width, data->height,
-								    data->format, data->fds,
+								    drv_get_standard_fourcc(data->format), data->fds,
 								    bo->meta.num_planes,
 								    (int *)data->strides,
 								    (int *)data->offsets, NULL);

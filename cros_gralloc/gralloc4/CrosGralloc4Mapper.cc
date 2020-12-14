@@ -469,12 +469,8 @@ Return<void> CrosGralloc4Mapper::get(cros_gralloc_handle_t crosHandle,
         PixelFormat pixelFormat = static_cast<PixelFormat>(crosHandle->droid_format);
         status = android::gralloc4::encodePixelFormatRequested(pixelFormat, &encodedMetadata);
     } else if (metadataType == android::gralloc4::MetadataType_PixelFormatFourCC) {
-        uint32_t format = crosHandle->format;
-        // Map internal fourcc codes back to standard fourcc codes.
-        if (format == DRM_FORMAT_YVU420_ANDROID) {
-            format = DRM_FORMAT_YVU420;
-        }
-        status = android::gralloc4::encodePixelFormatFourCC(format, &encodedMetadata);
+        status = android::gralloc4::encodePixelFormatFourCC(
+                drv_get_standard_fourcc(crosHandle->format), &encodedMetadata);
     } else if (metadataType == android::gralloc4::MetadataType_PixelFormatModifier) {
         status = android::gralloc4::encodePixelFormatModifier(crosHandle->format_modifier,
                                                               &encodedMetadata);
@@ -643,7 +639,8 @@ Return<void> CrosGralloc4Mapper::getFromBufferDescriptorInfo(
             hidlCb(Error::BAD_VALUE, encodedMetadata);
             return Void();
         }
-        status = android::gralloc4::encodePixelFormatFourCC(drmFormat, &encodedMetadata);
+        status = android::gralloc4::encodePixelFormatFourCC(drv_get_standard_fourcc(drmFormat),
+                                                            &encodedMetadata);
     } else if (metadataType == android::gralloc4::MetadataType_Usage) {
         status = android::gralloc4::encodeUsage(descriptor.usage, &encodedMetadata);
     } else if (metadataType == android::gralloc4::MetadataType_ProtectedContent) {
