@@ -14,9 +14,21 @@ const char* drmFormat2Str(int drm_format)
 {
     static char buf[5];
     char *pDrmFormat = (char*) &drm_format;
-    snprintf(buf, sizeof(buf), "%c%c%c%c", *pDrmFormat, *(pDrmFormat + 1),
-             *(pDrmFormat + 2), *(pDrmFormat + 3));
+    snprintf(buf, sizeof(buf), "%c%c%c%c", *pDrmFormat, *(pDrmFormat + 1), *(pDrmFormat + 2),
+	     *(pDrmFormat + 3));
     return buf;
+}
+
+bool is_flex_format(uint32_t format)
+{
+	switch (format) {
+	case DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED:
+	case DRM_FORMAT_FLEX_YCbCr_420_888:
+		return true;
+	default:
+		return false;
+	}
+	return false;
 }
 #endif
 
