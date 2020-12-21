@@ -417,7 +417,7 @@ static inline void handle_flag(uint64_t *flag, uint64_t check_flag, uint32_t *bi
 	}
 }
 
-static uint32_t use_flags_to_bind(uint64_t use_flags)
+static uint32_t compute_virgl_bind_flags(uint64_t use_flags, uint32_t format)
 {
 	/* In crosvm, VIRGL_BIND_SHARED means minigbm will allocate, not virglrenderer. */
 	uint32_t bind = VIRGL_BIND_SHARED;
@@ -455,6 +455,15 @@ static uint32_t use_flags_to_bind(uint64_t use_flags)
 		    VIRGL_BIND_MINIGBM_HW_VIDEO_DECODER);
 	handle_flag(&use_flags, BO_USE_HW_VIDEO_ENCODER, &bind,
 		    VIRGL_BIND_MINIGBM_HW_VIDEO_ENCODER);
+
+	/*
+	 * HACK: This is for HAL_PIXEL_FORMAT_YV12 buffers allocated by arcvm. None of
+	 * our platforms can display YV12, so we can treat as a SW buffer. Remove once
+	 * this can be intelligently resolved in the guest. Also see gbm_bo_create.
+	 */
+	if (format == DRM_FORMAT_YVU420_ANDROID) {
+		bind |= VIRGL_BIND_LINEAR;
+	}
 
 	if (use_flags) {
 		drv_log("Unhandled bo use flag: %llx\n", (unsigned long long)use_flags);
@@ -502,7 +511,7 @@ static int virtio_virgl_bo_create(struct bo *bo, uint32_t width, uint32_t height
 
 	res_create.target = PIPE_TEXTURE_2D;
 	res_create.format = translate_format(format);
-	res_create.bind = use_flags_to_bind(use_flags);
+	res_create.bind = compute_virgl_bind_flags(use_flags, format);
 	res_create.width = width;
 	res_create.height = height;
 
@@ -708,7 +717,8 @@ static int virtio_gpu_bo_create_blob(struct driver *drv, struct bo *bo)
 	cmd[VIRGL_PIPE_RES_CREATE_WIDTH] = bo->meta.width;
 	cmd[VIRGL_PIPE_RES_CREATE_HEIGHT] = bo->meta.height;
 	cmd[VIRGL_PIPE_RES_CREATE_FORMAT] = translate_format(bo->meta.format);
-	cmd[VIRGL_PIPE_RES_CREATE_BIND] = use_flags_to_bind(bo->meta.use_flags);
+	cmd[VIRGL_PIPE_RES_CREATE_BIND] =
+	    compute_virgl_bind_flags(bo->meta.use_flags, bo->meta.format);
 	cmd[VIRGL_PIPE_RES_CREATE_DEPTH] = 1;
 	cmd[VIRGL_PIPE_RES_CREATE_BLOB_ID] = cur_blob_id;
 
