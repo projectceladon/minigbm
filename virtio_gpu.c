@@ -810,13 +810,21 @@ static int virtio_gpu_bo_invalidate(struct bo *bo, struct mapping *mapping)
 	struct drm_virtgpu_3d_wait waitcmd = { 0 };
 	struct virtio_transfers_params xfer_params;
 	struct virtio_gpu_priv *priv = (struct virtio_gpu_priv *)bo->drv->priv;
+	uint64_t host_write_flags;
 
 	if (!features[feat_3d].enabled)
 		return 0;
 
-	// Invalidate is only necessary if the host writes to the buffer.
-	if ((bo->meta.use_flags & (BO_USE_RENDERING | BO_USE_CAMERA_WRITE |
-				   BO_USE_HW_VIDEO_ENCODER | BO_USE_HW_VIDEO_DECODER)) == 0)
+	// Invalidate is only necessary if the host writes to the buffer. The encoder and
+	// decoder flags don't differentiate between input and output buffers, but we can
+	// use the format to determine whether this buffer could be encoder/decoder output.
+	host_write_flags = BO_USE_RENDERING | BO_USE_CAMERA_WRITE;
+	if (bo->meta.format == DRM_FORMAT_R8) {
+		host_write_flags |= BO_USE_HW_VIDEO_ENCODER;
+	} else {
+		host_write_flags |= BO_USE_HW_VIDEO_DECODER;
+	}
+	if ((bo->meta.use_flags & host_write_flags) == 0)
 		return 0;
 
 	if (features[feat_resource_blob].enabled &&
