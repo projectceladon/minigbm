@@ -36,7 +36,12 @@ static const uint32_t scanout_render_formats[] = { DRM_FORMAT_ABGR2101010, DRM_F
 static const uint32_t render_formats[] = { DRM_FORMAT_ABGR16161616F };
 
 static const uint32_t texture_only_formats[] = { DRM_FORMAT_R8, DRM_FORMAT_NV12, DRM_FORMAT_P010,
+#ifdef USE_GRALLOC1
+                                                 DRM_FORMAT_YVU420, DRM_FORMAT_YVU420_ANDROID,
+                                                 DRM_FORMAT_YUYV };
+#else
 						 DRM_FORMAT_YVU420, DRM_FORMAT_YVU420_ANDROID };
+#endif
 
 struct i915_device {
 	uint32_t gen;
