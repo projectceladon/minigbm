@@ -1007,13 +1007,13 @@ static int virtio_gpu_resource_info(struct bo *bo, uint32_t strides[DRV_MAX_PLAN
 				    uint32_t offsets[DRV_MAX_PLANES])
 {
 	int ret;
-	struct drm_virtgpu_resource_info res_info = { 0 };
+	struct drm_virtgpu_resource_info_cros res_info = { 0 };
 
 	if (!features[feat_3d].enabled)
 		return 0;
 
 	res_info.bo_handle = bo->handles[0].u32;
-	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_VIRTGPU_RESOURCE_INFO, &res_info);
+	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_VIRTGPU_RESOURCE_INFO_CROS, &res_info);
 	if (ret) {
 		drv_log("DRM_IOCTL_VIRTGPU_RESOURCE_INFO failed with %s\n", strerror(errno));
 		return ret;
