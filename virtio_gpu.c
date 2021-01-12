@@ -1013,6 +1013,7 @@ static int virtio_gpu_resource_info(struct bo *bo, uint32_t strides[DRV_MAX_PLAN
 		return 0;
 
 	res_info.bo_handle = bo->handles[0].u32;
+	res_info.type = VIRTGPU_RESOURCE_INFO_TYPE_EXTENDED;
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_VIRTGPU_RESOURCE_INFO_CROS, &res_info);
 	if (ret) {
 		drv_log("DRM_IOCTL_VIRTGPU_RESOURCE_INFO failed with %s\n", strerror(errno));
