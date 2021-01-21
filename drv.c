@@ -58,7 +58,7 @@ extern const struct backend backend_nouveau;
 extern const struct backend backend_komeda;
 extern const struct backend backend_radeon;
 extern const struct backend backend_synaptics;
-extern const struct backend backend_virtio_gpu;
+extern const struct backend backend_virtgpu;
 extern const struct backend backend_udl;
 extern const struct backend backend_vkms;
 
@@ -94,21 +94,13 @@ static const struct backend *drv_get_backend(int fd)
 #ifdef DRV_VC4
 		&backend_vc4,
 #endif
-		&backend_evdi,	   &backend_marvell,	&backend_meson,	    &backend_nouveau,
-		&backend_komeda,   &backend_radeon,	&backend_synaptics, &backend_virtio_gpu,
-		&backend_udl,	   &backend_virtio_gpu, &backend_vkms
+		&backend_evdi,	   &backend_marvell, &backend_meson,	 &backend_nouveau,
+		&backend_komeda,   &backend_radeon,  &backend_synaptics, &backend_virtgpu,
+		&backend_udl,	   &backend_virtgpu, &backend_vkms
 	};
 
 	for (i = 0; i < ARRAY_SIZE(backend_list); i++) {
 		const struct backend *b = backend_list[i];
-		// Exactly one of the main create functions must be defined.
-		assert((b->bo_create != NULL) ^ (b->bo_create_from_metadata != NULL));
-		// Either both or neither must be implemented.
-		assert((b->bo_compute_metadata != NULL) == (b->bo_create_from_metadata != NULL));
-		// Both can't be defined, but it's okay for neither to be (i.e. only bo_create).
-		assert((b->bo_create_with_modifiers == NULL) ||
-		       (b->bo_create_from_metadata == NULL));
-
 		if (!strcmp(drm_version->name, b->name)) {
 			drmFreeVersion(drm_version);
 			return b;

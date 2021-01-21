@@ -27,6 +27,17 @@ struct bo_metadata {
 	uint64_t format_modifier;
 	uint64_t use_flags;
 	size_t total_size;
+
+	/*
+	 * Most of the following metadata is virtgpu cross_domain specific.  However, that backend
+	 * needs to know traditional metadata (strides, offsets) in addition to this backend
+	 * specific metadata.  It's easiest just to stuff all the metadata here rather than
+	 * having two metadata structs.
+	 */
+	uint64_t blob_id;
+	uint32_t map_info;
+	int32_t memory_idx;
+	int32_t physical_device_idx;
 };
 
 struct bo {
