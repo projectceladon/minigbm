@@ -3,12 +3,12 @@
  * Use of this source code is governed by a BSD-style license that can be
  * found in the LICENSE file.
  */
+#include <amdgpu_drm.h>
 #include <ctype.h>
 #include <dirent.h>
-#include <drm/amdgpu_drm.h>
-#include <drm/radeon_drm.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <radeon_drm.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
