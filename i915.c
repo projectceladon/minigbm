@@ -50,30 +50,44 @@ struct i915_device {
 	int32_t has_llc;
 	int32_t has_hw_protection;
 	struct modifier_support_t modifier;
+	int device_id;
+	bool is_adlp;
 };
 
-static uint32_t i915_get_gen(int device_id)
+static void i915_info_from_device_id(struct i915_device *i915)
 {
 	const uint16_t gen3_ids[] = { 0x2582, 0x2592, 0x2772, 0x27A2, 0x27AE,
 				      0x29C2, 0x29B2, 0x29D2, 0xA001, 0xA011 };
 	const uint16_t gen11_ids[] = { 0x4E71, 0x4E61, 0x4E51, 0x4E55, 0x4E57 };
 	const uint16_t gen12_ids[] = { 0x9A40, 0x9A49, 0x9A59, 0x9A60, 0x9A68, 0x9A70,
 				       0x9A78, 0x9AC0, 0x9AC9, 0x9AD9, 0x9AF8 };
+	const uint16_t adlp_ids[] = { 0x46A0, 0x46A1, 0x46A2, 0x46A3, 0x46A6,
+				      0x46A8, 0x46AA, 0x462A, 0x4626, 0x4628,
+				      0x46B0, 0x46B1, 0x46B2, 0x46B3, 0x46C0,
+				      0x46C1, 0x46C2, 0x46C3 };
 	unsigned i;
+	i915->gen = 4;
+	i915->is_adlp = false;
+
 	for (i = 0; i < ARRAY_SIZE(gen3_ids); i++)
-		if (gen3_ids[i] == device_id)
-			return 3;
+		if (gen3_ids[i] == i915->device_id)
+			i915->gen = 3;
+
 	/* Gen 11 */
 	for (i = 0; i < ARRAY_SIZE(gen11_ids); i++)
-		if (gen11_ids[i] == device_id)
-			return 11;
+		if (gen11_ids[i] == i915->device_id)
+			i915->gen = 11;
 
 	/* Gen 12 */
 	for (i = 0; i < ARRAY_SIZE(gen12_ids); i++)
-		if (gen12_ids[i] == device_id)
-			return 12;
+		if (gen12_ids[i] == i915->device_id)
+			i915->gen = 12;
 
-	return 4;
+	for (i = 0; i < ARRAY_SIZE(adlp_ids); i++)
+		if (adlp_ids[i] == i915->device_id) {
+			i915->is_adlp = true;
+			i915->gen = 12;
+		}
 }
 
 static void i915_get_modifier_order(struct i915_device *i915)
@@ -235,6 +249,10 @@ static int i915_align_dimensions(struct bo *bo, uint32_t tiling, uint32_t *strid
 		*stride = horizontal_alignment;
 	}
 
+	/* stride must be power-of-two aligned for ADL-P tiled buffers*/
+	if (i915->is_adlp && (*stride > 1) && (tiling != I915_TILING_NONE))
+		*stride = 1 << (32 - __builtin_clz(*stride -1));
+
 	if (i915->gen <= 3 && *stride > 8192)
 		return -EINVAL;
 
@@ -256,7 +274,6 @@ static void i915_clflush(void *start, size_t size)
 static int i915_init(struct driver *drv)
 {
 	int ret;
-	int device_id;
 	struct i915_device *i915;
 	drm_i915_getparam_t get_param = { 0 };
 
@@ -265,15 +282,16 @@ static int i915_init(struct driver *drv)
 		return -ENOMEM;
 
 	get_param.param = I915_PARAM_CHIPSET_ID;
-	get_param.value = &device_id;
+	get_param.value = &(i915->device_id);
 	ret = drmIoctl(drv->fd, DRM_IOCTL_I915_GETPARAM, &get_param);
 	if (ret) {
 		drv_log("Failed to get I915_PARAM_CHIPSET_ID\n");
 		free(i915);
 		return -EINVAL;
 	}
+	/* must call before i915->gen is used anywhere else */
+	i915_info_from_device_id(i915);
 
-	i915->gen = i915_get_gen(device_id);
 	i915_get_modifier_order(i915);
 
 	memset(&get_param, 0, sizeof(get_param));
