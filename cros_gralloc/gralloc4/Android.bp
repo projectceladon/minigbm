@@ -19,6 +19,8 @@ cc_binary {
     vendor: true,
     init_rc: ["android.hardware.graphics.allocator@4.0-service.minigbm.rc"],
 
+    vintf_fragments: ["android.hardware.graphics.allocator@4.0.xml"],
+
     cflags: [
         "-Wall",
         "-Werror",
@@ -52,6 +54,8 @@ cc_library_shared {
     name: "android.hardware.graphics.mapper@4.0-impl.minigbm",
     relative_install_path: "hw",
     vendor: true,
+
+    vintf_fragments: ["android.hardware.graphics.mapper@4.0.xml"],
 
     cflags: [
         "-Wall",
