@@ -482,7 +482,7 @@ static int amdgpu_create_bo_linear(struct bo *bo, uint32_t width, uint32_t heigh
 	for (plane = 0; plane < bo->meta.num_planes; plane++)
 		bo->handles[plane].u32 = gem_create.out.handle;
 
-	bo->meta.format_modifiers[0] = DRM_FORMAT_MOD_LINEAR;
+	bo->meta.format_modifier = DRM_FORMAT_MOD_LINEAR;
 
 	return 0;
 }
@@ -542,8 +542,8 @@ static int amdgpu_create_bo_with_modifiers(struct bo *bo, uint32_t width, uint32
 
 static int amdgpu_import_bo(struct bo *bo, struct drv_import_fd_data *data)
 {
-	bool dri_tiling = data->format_modifiers[0] != DRM_FORMAT_MOD_LINEAR;
-	if (data->format_modifiers[0] == DRM_FORMAT_MOD_INVALID) {
+	bool dri_tiling = data->format_modifier != DRM_FORMAT_MOD_LINEAR;
+	if (data->format_modifier == DRM_FORMAT_MOD_INVALID) {
 		struct combination *combo;
 		combo = drv_get_combination(bo->drv, data->format, data->use_flags);
 		if (!combo)

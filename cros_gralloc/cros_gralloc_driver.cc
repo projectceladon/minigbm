@@ -244,7 +244,7 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 	hnd->height = drv_bo_get_height(bo);
 	hnd->format = drv_bo_get_format(bo);
 	hnd->tiling = bo->meta.tiling;
-	hnd->format_modifier = drv_bo_get_plane_format_modifier(bo, 0);
+	hnd->format_modifier = drv_bo_get_format_modifier(bo);
 	hnd->use_flags = descriptor->use_flags;
 	bytes_per_pixel = drv_bytes_per_pixel_from_format(hnd->format, 0);
 	hnd->pixel_stride = DIV_ROUND_UP(hnd->strides[0], bytes_per_pixel);
@@ -304,9 +304,7 @@ int32_t cros_gralloc_driver::retain(buffer_handle_t handle)
 		memcpy(data.fds, hnd->fds, sizeof(data.fds));
 		memcpy(data.strides, hnd->strides, sizeof(data.strides));
 		memcpy(data.offsets, hnd->offsets, sizeof(data.offsets));
-		for (uint32_t plane = 0; plane < DRV_MAX_PLANES; plane++) {
-			data.format_modifiers[plane] = hnd->format_modifier;
-		}
+		data.format_modifier = hnd->format_modifier;
 
 		bo = drv_bo_import(drv_, &data);
 		if (!bo)
