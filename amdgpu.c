@@ -354,10 +354,12 @@ static int amdgpu_init(struct driver *drv)
 	/* NV12 format for camera, display, decoding and encoding. */
 	drv_modify_combination(drv, DRM_FORMAT_NV12, &metadata,
 			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SCANOUT |
-				   BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER);
+				   BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER | 
+				       BO_USE_PROTECTED);
 
 	drv_modify_combination(drv, DRM_FORMAT_P010, &metadata,
-			       BO_USE_SCANOUT | BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER);
+			       BO_USE_SCANOUT | BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER |
+			           BO_USE_PROTECTED);
 
 	/* Android CTS tests require this. */
 	drv_add_combination(drv, DRM_FORMAT_BGR888, &metadata, BO_USE_SW_MASK);
@@ -470,6 +472,10 @@ static int amdgpu_create_bo_linear(struct bo *bo, uint32_t width, uint32_t heigh
 	 * very slow. USWC should be faster on the GPU though. */
 	if ((use_flags & BO_USE_SCANOUT) || !(use_flags & BO_USE_SW_READ_OFTEN))
 		gem_create.in.domain_flags |= AMDGPU_GEM_CREATE_CPU_GTT_USWC;
+
+	/* For protected data Buffer needs to be allocated from TMZ */
+	if (use_flags & BO_USE_PROTECTED)
+		gem_create.in.domain_flags |= AMDGPU_GEM_CREATE_ENCRYPTED;
 
 	/* Allocate the buffer with the preferred heap. */
 	ret = drmCommandWriteRead(drv_get_fd(bo->drv), DRM_AMDGPU_GEM_CREATE, &gem_create,
