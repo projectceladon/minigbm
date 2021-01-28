@@ -37,8 +37,7 @@ static const uint32_t texture_only_formats[] = { DRM_FORMAT_R8, DRM_FORMAT_NV12,
 static const uint64_t gen_modifier_order[] = { I915_FORMAT_MOD_Y_TILED, I915_FORMAT_MOD_X_TILED,
 					       DRM_FORMAT_MOD_LINEAR };
 
-static const uint64_t gen11_modifier_order[] = { I915_FORMAT_MOD_Y_TILED_CCS,
-						 I915_FORMAT_MOD_Y_TILED, I915_FORMAT_MOD_X_TILED,
+static const uint64_t gen11_modifier_order[] = { I915_FORMAT_MOD_Y_TILED, I915_FORMAT_MOD_X_TILED,
 						 DRM_FORMAT_MOD_LINEAR };
 
 struct modifier_support_t {
