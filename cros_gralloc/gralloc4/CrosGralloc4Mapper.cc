@@ -457,7 +457,7 @@ Return<void> CrosGralloc4Mapper::get(cros_gralloc_handle_t crosHandle,
     if (metadataType == android::gralloc4::MetadataType_BufferId) {
         status = android::gralloc4::encodeBufferId(crosHandle->id, &encodedMetadata);
     } else if (metadataType == android::gralloc4::MetadataType_Name) {
-        const char* name = (const char*)(&crosHandle->base.data[crosHandle->name_offset]);
+        const char* name = (const char*)(&crosHandle->data[crosHandle->name_offset]);
         status = android::gralloc4::encodeName(name, &encodedMetadata);
     } else if (metadataType == android::gralloc4::MetadataType_Width) {
         status = android::gralloc4::encodeWidth(crosHandle->width, &encodedMetadata);

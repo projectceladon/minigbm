@@ -143,10 +143,20 @@ int32_t create_reserved_region(const std::string &buffer_name, uint64_t reserved
 	return reserved_region_fd;
 }
 
+void cros_gralloc_driver::emplace_buffer(struct bo *bo, struct cros_gralloc_handle *hnd)
+{
+	auto buffer = new cros_gralloc_buffer(hnd->id, bo, hnd, hnd->fds[hnd->num_planes],
+					      hnd->reserved_region_size);
+
+	std::lock_guard<std::mutex> lock(mutex_);
+	buffers_.emplace(hnd->id, buffer);
+	handles_.emplace(hnd, std::make_pair(buffer, 1));
+}
+
 int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descriptor *descriptor,
 				      buffer_handle_t *out_handle)
 {
-	uint32_t id;
+	int ret = 0;
 	size_t num_planes;
 	size_t num_fds;
 	size_t num_ints;
@@ -154,9 +164,7 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 	uint32_t resolved_format;
 	uint32_t bytes_per_pixel;
 	uint64_t use_flags;
-	int32_t reserved_region_fd;
 	char *name;
-
 	struct bo *bo;
 	struct cros_gralloc_handle *hnd;
 
@@ -183,7 +191,7 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 	bo = drv_bo_create(drv_, descriptor->width, descriptor->height, resolved_format, use_flags);
 	if (!bo) {
 		drv_log("Failed to create bo.\n");
-		return -ENOMEM;
+		return -errno;
 	}
 
 	/*
@@ -192,25 +200,15 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 	 * send more than one fd. GL/Vulkan drivers may also have to modified.
 	 */
 	if (drv_num_buffers_per_bo(bo) != 1) {
-		drv_bo_destroy(bo);
 		drv_log("Can only support one buffer per bo.\n");
-		return -EINVAL;
+		goto destroy_bo;
 	}
 
 	num_planes = drv_bo_get_num_planes(bo);
 	num_fds = num_planes;
 
-	if (descriptor->reserved_region_size > 0) {
-		reserved_region_fd =
-		    create_reserved_region(descriptor->name, descriptor->reserved_region_size);
-		if (reserved_region_fd < 0) {
-			drv_bo_destroy(bo);
-			return reserved_region_fd;
-		}
+	if (descriptor->reserved_region_size > 0)
 		num_fds += 1;
-	} else {
-		reserved_region_fd = -1;
-	}
 
 	num_bytes = sizeof(struct cros_gralloc_handle);
 	num_bytes += (descriptor->name.size() + 1);
@@ -220,23 +218,34 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 	 */
 	num_bytes = ALIGN(num_bytes, sizeof(int));
 	num_ints = num_bytes - sizeof(native_handle_t) - num_fds;
-	/*
-	 * Malloc is used as handles are ultimately destroyed via free in
-	 * native_handle_delete().
-	 */
-	hnd = static_cast<struct cros_gralloc_handle *>(malloc(num_bytes));
-	hnd->base.version = sizeof(hnd->base);
-	hnd->base.numFds = num_fds;
-	hnd->base.numInts = num_ints;
+
+	hnd =
+	    reinterpret_cast<struct cros_gralloc_handle *>(native_handle_create(num_fds, num_ints));
+
+	for (size_t i = 0; i < DRV_MAX_FDS; i++)
+		hnd->fds[i] = -1;
+
 	hnd->num_planes = num_planes;
 	for (size_t plane = 0; plane < num_planes; plane++) {
-		hnd->fds[plane] = drv_bo_get_plane_fd(bo, plane);
+		ret = drv_bo_get_plane_fd(bo, plane);
+		if (ret < 0)
+			goto destroy_hnd;
+
+		hnd->fds[plane] = ret;
 		hnd->strides[plane] = drv_bo_get_plane_stride(bo, plane);
 		hnd->offsets[plane] = drv_bo_get_plane_offset(bo, plane);
 		hnd->sizes[plane] = drv_bo_get_plane_size(bo, plane);
 	}
-	hnd->fds[hnd->num_planes] = reserved_region_fd;
+
 	hnd->reserved_region_size = descriptor->reserved_region_size;
+	if (hnd->reserved_region_size > 0) {
+		ret = create_reserved_region(descriptor->name, hnd->reserved_region_size);
+		if (ret < 0)
+			goto destroy_hnd;
+
+		hnd->fds[hnd->num_planes] = ret;
+	}
+
 	static std::atomic<uint32_t> next_buffer_id{ 1 };
 	hnd->id = next_buffer_id++;
 	hnd->width = drv_bo_get_width(bo);
@@ -253,18 +262,21 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 	hnd->total_size = descriptor->reserved_region_size + bo->meta.total_size;
 	hnd->name_offset = handle_data_size;
 
-	name = (char *)(&hnd->base.data[hnd->name_offset]);
+	name = (char *)(&hnd->data[hnd->name_offset]);
 	snprintf(name, descriptor->name.size() + 1, "%s", descriptor->name.c_str());
 
-	id = hnd->id;
-	auto buffer = new cros_gralloc_buffer(id, bo, hnd, hnd->fds[hnd->num_planes],
-					      hnd->reserved_region_size);
+	emplace_buffer(bo, hnd);
 
-	std::lock_guard<std::mutex> lock(mutex_);
-	buffers_.emplace(id, buffer);
-	handles_.emplace(hnd, std::make_pair(buffer, 1));
 	*out_handle = reinterpret_cast<buffer_handle_t>(hnd);
 	return 0;
+
+destroy_hnd:
+	native_handle_close(hnd);
+	native_handle_delete(hnd);
+
+destroy_bo:
+	drv_bo_destroy(bo);
+	return ret;
 }
 
 int32_t cros_gralloc_driver::retain(buffer_handle_t handle)

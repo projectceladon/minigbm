@@ -26,8 +26,8 @@ cros_gralloc_buffer::~cros_gralloc_buffer()
 {
 	drv_bo_destroy(bo_);
 	if (hnd_) {
-		native_handle_close(&hnd_->base);
-		delete hnd_;
+		native_handle_close(hnd_);
+		native_handle_delete(hnd_);
 	}
 	if (reserved_region_addr_) {
 		munmap(reserved_region_addr_, reserved_region_size_);
