@@ -72,6 +72,8 @@ cc_defaults {
         "libsync",
         "liblog",
     ],
+
+    relative_install_path: "hw",
 }
 
 cc_defaults {
