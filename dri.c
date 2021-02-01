@@ -94,17 +94,14 @@ static int import_into_minigbm(struct dri_driver *dri, struct bo *bo)
 	if (dri->image_extension->queryImage(bo->priv, __DRI_IMAGE_ATTRIB_MODIFIER_UPPER,
 					     &modifier_upper) &&
 	    dri->image_extension->queryImage(bo->priv, __DRI_IMAGE_ATTRIB_MODIFIER_LOWER,
-					     &modifier_lower)) {
+					     &modifier_lower))
 		bo->meta.format_modifier =
 		    ((uint64_t)modifier_upper << 32) | (uint32_t)modifier_lower;
-	} else {
+	else
 		bo->meta.format_modifier = DRM_FORMAT_MOD_INVALID;
-	}
 
-	if (!dri->image_extension->queryImage(bo->priv, __DRI_IMAGE_ATTRIB_NUM_PLANES,
-					      &num_planes)) {
+	if (!dri->image_extension->queryImage(bo->priv, __DRI_IMAGE_ATTRIB_NUM_PLANES, &num_planes))
 		return -errno;
-	}
 
 	bo->meta.num_planes = num_planes;
 	for (i = 0; i < num_planes; ++i) {
@@ -314,9 +311,8 @@ int dri_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint32_t height,
 	int ret, dri_format;
 	struct dri_driver *dri = bo->drv->priv;
 
-	if (!dri->image_extension->createImageWithModifiers) {
+	if (!dri->image_extension->createImageWithModifiers)
 		return -ENOENT;
-	}
 
 	dri_format = drm_format_to_dri_format(format);
 

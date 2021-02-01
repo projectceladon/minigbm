@@ -587,7 +587,7 @@ int CrosGralloc4Mapper::getResolvedDrmFormat(PixelFormat pixelFormat, uint64_t b
         std::string pixelFormatString = getPixelFormatString(pixelFormat);
         drv_log("Failed to getResolvedDrmFormat. Failed to convert format %s\n",
                 pixelFormatString.c_str());
-        return -1;
+        return -EINVAL;
     }
 
     uint64_t usage;
@@ -595,7 +595,7 @@ int CrosGralloc4Mapper::getResolvedDrmFormat(PixelFormat pixelFormat, uint64_t b
         std::string usageString = getUsageString(bufferUsage);
         drv_log("Failed to getResolvedDrmFormat. Failed to convert usage %s\n",
                 usageString.c_str());
-        return -1;
+        return -EINVAL;
     }
 
     uint32_t resolvedDrmFormat = mDriver->get_resolved_drm_format(drmFormat, usage);
@@ -603,7 +603,7 @@ int CrosGralloc4Mapper::getResolvedDrmFormat(PixelFormat pixelFormat, uint64_t b
         std::string drmFormatString = get_drm_format_string(drmFormat);
         drv_log("Failed to getResolvedDrmFormat. Failed to resolve drm format %s\n",
                 drmFormatString.c_str());
-        return -1;
+        return -EINVAL;
     }
 
     *outDrmFormat = resolvedDrmFormat;

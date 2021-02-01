@@ -39,9 +39,9 @@ int memfd_create_wrapper(const char *name, unsigned int flags)
 	return -1;
 #endif
 
-	if (fd == -1) {
+	if (fd == -1)
 		drv_log("Failed to create memfd '%s': %s.\n", name, strerror(errno));
-	}
+
 	return fd;
 }
 
@@ -132,9 +132,8 @@ int32_t create_reserved_region(const std::string &buffer_name, uint64_t reserved
 	std::string reserved_region_name = buffer_name + " reserved region";
 
 	int32_t reserved_region_fd = memfd_create_wrapper(reserved_region_name.c_str(), FD_CLOEXEC);
-	if (reserved_region_fd == -1) {
-		return -1;
-	}
+	if (reserved_region_fd == -1)
+		return -errno;
 
 	if (ftruncate(reserved_region_fd, reserved_region_size)) {
 		drv_log("Failed to set reserved region size: %s.\n", strerror(errno));
@@ -521,7 +520,6 @@ void cros_gralloc_driver::for_each_handle(
 {
 	std::lock_guard<std::mutex> lock(mutex_);
 
-	for (const auto &pair : handles_) {
+	for (const auto &pair : handles_)
 		function(pair.first);
-	}
 }

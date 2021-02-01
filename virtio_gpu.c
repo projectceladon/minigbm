@@ -113,9 +113,8 @@ static bool virtio_gpu_bitmask_supports_format(struct virgl_supported_format_mas
 					       uint32_t drm_format)
 {
 	uint32_t virgl_format = translate_format(drm_format);
-	if (!virgl_format) {
+	if (!virgl_format)
 		return false;
-	}
 
 	uint32_t bitmask_index = virgl_format / 32;
 	uint32_t bit_index = virgl_format % 32;
@@ -311,24 +310,20 @@ static bool virtio_gpu_supports_combination_natively(struct driver *drv, uint32_
 {
 	struct virtio_gpu_priv *priv = (struct virtio_gpu_priv *)drv->priv;
 
-	if (priv->caps.max_version == 0) {
+	if (priv->caps.max_version == 0)
 		return true;
-	}
 
 	if ((use_flags & BO_USE_RENDERING) &&
-	    !virtio_gpu_bitmask_supports_format(&priv->caps.v1.render, drm_format)) {
+	    !virtio_gpu_bitmask_supports_format(&priv->caps.v1.render, drm_format))
 		return false;
-	}
 
 	if ((use_flags & BO_USE_TEXTURE) &&
-	    !virtio_gpu_bitmask_supports_format(&priv->caps.v1.sampler, drm_format)) {
+	    !virtio_gpu_bitmask_supports_format(&priv->caps.v1.sampler, drm_format))
 		return false;
-	}
 
 	if ((use_flags & BO_USE_SCANOUT) && priv->caps_is_v2 &&
-	    !virtio_gpu_bitmask_supports_format(&priv->caps.v2.scanout, drm_format)) {
+	    !virtio_gpu_bitmask_supports_format(&priv->caps.v2.scanout, drm_format))
 		return false;
-	}
 
 	return true;
 }
@@ -343,17 +338,14 @@ static bool virtio_gpu_supports_combination_through_emulation(struct driver *drv
 	struct virtio_gpu_priv *priv = (struct virtio_gpu_priv *)drv->priv;
 
 	// Only enable emulation on non-gbm virtio backends.
-	if (priv->host_gbm_enabled) {
+	if (priv->host_gbm_enabled)
 		return false;
-	}
 
-	if (use_flags & (BO_USE_RENDERING | BO_USE_SCANOUT)) {
+	if (use_flags & (BO_USE_RENDERING | BO_USE_SCANOUT))
 		return false;
-	}
 
-	if (!virtio_gpu_supports_combination_natively(drv, DRM_FORMAT_R8, use_flags)) {
+	if (!virtio_gpu_supports_combination_natively(drv, DRM_FORMAT_R8, use_flags))
 		return false;
-	}
 
 	return drm_format == DRM_FORMAT_NV12 || drm_format == DRM_FORMAT_NV21 ||
 	       drm_format == DRM_FORMAT_YVU420 || drm_format == DRM_FORMAT_YVU420_ANDROID;
@@ -392,9 +384,8 @@ static void virtio_gpu_add_combinations(struct driver *drv, const uint32_t *drm_
 {
 	uint32_t i;
 
-	for (i = 0; i < num_formats; i++) {
+	for (i = 0; i < num_formats; i++)
 		virtio_gpu_add_combination(drv, drm_formats[i], metadata, use_flags);
-	}
 }
 
 static int virtio_dumb_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint32_t format,
@@ -461,13 +452,11 @@ static uint32_t compute_virgl_bind_flags(uint64_t use_flags, uint32_t format)
 	 * our platforms can display YV12, so we can treat as a SW buffer. Remove once
 	 * this can be intelligently resolved in the guest. Also see gbm_bo_create.
 	 */
-	if (format == DRM_FORMAT_YVU420_ANDROID) {
+	if (format == DRM_FORMAT_YVU420_ANDROID)
 		bind |= VIRGL_BIND_LINEAR;
-	}
 
-	if (use_flags) {
+	if (use_flags)
 		drv_log("Unhandled bo use flag: %llx\n", (unsigned long long)use_flags);
-	}
 
 	return bind;
 }
@@ -577,9 +566,8 @@ static int virtio_gpu_get_caps(struct driver *drv, union virgl_caps *caps, int *
 		cap_args.size = sizeof(struct virgl_caps_v1);
 
 		ret = drmIoctl(drv->fd, DRM_IOCTL_VIRTGPU_GET_CAPS, &cap_args);
-		if (ret) {
+		if (ret)
 			drv_log("DRM_IOCTL_VIRTGPU_GET_CAPS failed with %s\n", strerror(errno));
-		}
 	}
 
 	return ret;
@@ -599,9 +587,8 @@ static void virtio_gpu_init_features_and_caps(struct driver *drv)
 			drv_log("DRM_IOCTL_VIRTGPU_GET_PARAM failed with %s\n", strerror(errno));
 	}
 
-	if (features[feat_3d].enabled) {
+	if (features[feat_3d].enabled)
 		virtio_gpu_get_caps(drv, &priv->caps, &priv->caps_is_v2);
-	}
 
 	// Multi-planar formats are currently only supported in virglrenderer through gbm.
 	priv->host_gbm_enabled =
@@ -819,11 +806,11 @@ static int virtio_gpu_bo_invalidate(struct bo *bo, struct mapping *mapping)
 	// decoder flags don't differentiate between input and output buffers, but we can
 	// use the format to determine whether this buffer could be encoder/decoder output.
 	host_write_flags = BO_USE_RENDERING | BO_USE_CAMERA_WRITE;
-	if (bo->meta.format == DRM_FORMAT_R8) {
+	if (bo->meta.format == DRM_FORMAT_R8)
 		host_write_flags |= BO_USE_HW_VIDEO_ENCODER;
-	} else {
+	else
 		host_write_flags |= BO_USE_HW_VIDEO_DECODER;
-	}
+
 	if ((bo->meta.use_flags & host_write_flags) == 0)
 		return 0;
 
@@ -853,9 +840,8 @@ static int virtio_gpu_bo_invalidate(struct bo *bo, struct mapping *mapping)
 		// to avoid doing this for resources which don't rely on that transfer code,
 		// which is resources with the BO_USE_RENDERING flag set.
 		// TODO(b/145993887): Send also stride when the patches are landed
-		if (priv->host_gbm_enabled) {
+		if (priv->host_gbm_enabled)
 			xfer.level = bo->meta.strides[0];
-		}
 	}
 
 	if (virtio_gpu_supports_combination_natively(bo->drv, bo->meta.format,
@@ -933,9 +919,8 @@ static int virtio_gpu_bo_flush(struct bo *bo, struct mapping *mapping)
 	// Unfortunately, the kernel doesn't actually pass the guest layer_stride and
 	// guest stride to the host (compare virtio_gpu.h and virtgpu_drm.h). We can use
 	// the level to work around this.
-	if (priv->host_gbm_enabled) {
+	if (priv->host_gbm_enabled)
 		xfer.level = bo->meta.strides[0];
-	}
 
 	if (virtio_gpu_supports_combination_natively(bo->drv, bo->meta.format,
 						     bo->meta.use_flags)) {

@@ -62,7 +62,7 @@ static int fd_node_num(int fd)
 
 	dri_node_size = readlink(fd_path, dri_node, sizeof(dri_node));
 	if (dri_node_size < 0)
-		return -1;
+		return -errno;
 	dri_node[dri_node_size] = '\0';
 	return dri_node_num(dri_node);
 }
@@ -223,7 +223,7 @@ PUBLIC int gbm_get_default_device_fd(void)
 
 	dir = opendir("/dev/dri");
 	if (!dir)
-		return -1;
+		return -errno;
 
 	fd = -1;
 	while ((dir_ent = readdir(dir))) {
@@ -307,7 +307,7 @@ PUBLIC int gbm_detect_device_info_path(unsigned int detect_flags, const char *de
 		 info->dri_node_num + 128);
 	fd = open(rendernode_name, O_RDWR | O_CLOEXEC | O_NOCTTY | O_NONBLOCK);
 	if (fd < 0)
-		return -1;
+		return -errno;
 	ret = detect_device_info(detect_flags, fd, info);
 	close(fd);
 	return ret;

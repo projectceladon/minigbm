@@ -128,9 +128,8 @@ int32_t cros_gralloc_buffer::invalidate()
 		return -EINVAL;
 	}
 
-	if (lock_data_[0]) {
+	if (lock_data_[0])
 		return drv_bo_invalidate(bo_, lock_data_[0]);
-	}
 
 	return 0;
 }
@@ -142,9 +141,8 @@ int32_t cros_gralloc_buffer::flush()
 		return -EINVAL;
 	}
 
-	if (lock_data_[0]) {
+	if (lock_data_[0])
 		return drv_bo_flush(bo_, lock_data_[0]);
-	}
 
 	return 0;
 }

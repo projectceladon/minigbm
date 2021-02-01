@@ -137,7 +137,7 @@ static int rockchip_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint
 		if (!drv_has_modifier(modifiers, count, DRM_FORMAT_MOD_LINEAR)) {
 			errno = EINVAL;
 			drv_log("no usable modifier found\n");
-			return -1;
+			return -errno;
 		}
 
 		uint32_t stride;

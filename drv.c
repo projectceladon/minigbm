@@ -438,9 +438,8 @@ void *drv_bo_map(struct bo *bo, const struct rectangle *rect, uint32_t map_flags
 	/* No CPU access for protected buffers. */
 	assert(!(bo->meta.use_flags & BO_USE_PROTECTED));
 
-	if (bo->is_test_buffer) {
+	if (bo->is_test_buffer)
 		return MAP_FAILED;
-	}
 
 	mapping.rect = *rect;
 	mapping.refcount = 1;
@@ -603,9 +602,8 @@ int drv_bo_get_plane_fd(struct bo *bo, size_t plane)
 	int ret, fd;
 	assert(plane < bo->meta.num_planes);
 
-	if (bo->is_test_buffer) {
+	if (bo->is_test_buffer)
 		return -EINVAL;
-	}
 
 	ret = drmPrimeHandleToFD(bo->drv->fd, bo->handles[plane].u32, DRM_CLOEXEC | DRM_RDWR, &fd);
 
@@ -662,9 +660,8 @@ uint32_t drv_num_buffers_per_bo(struct bo *bo)
 	uint32_t count = 0;
 	size_t plane, p;
 
-	if (bo->is_test_buffer) {
+	if (bo->is_test_buffer)
 		return 0;
-	}
 
 	for (plane = 0; plane < bo->meta.num_planes; plane++) {
 		for (p = 0; p < plane; p++)

@@ -10,12 +10,12 @@
 extern "C" {
 #endif
 
-#define GBM_DEV_TYPE_FLAG_DISCRETE (1u << 0) /* Discrete GPU. Separate chip, dedicated VRAM. */
-#define GBM_DEV_TYPE_FLAG_DISPLAY (1u << 1) /* Device capable of display. */
-#define GBM_DEV_TYPE_FLAG_3D (1u << 2) /* Device capable or 3D rendering. */
-#define GBM_DEV_TYPE_FLAG_ARMSOC (1u << 3) /* Device on ARM SOC. */
-#define GBM_DEV_TYPE_FLAG_USB (1u << 4) /* USB device, udl, evdi. */
-#define GBM_DEV_TYPE_FLAG_BLOCKED (1u << 5) /* Unsuitable device e.g. vgem, udl, evdi. */
+#define GBM_DEV_TYPE_FLAG_DISCRETE (1u << 0)	 /* Discrete GPU. Separate chip, dedicated VRAM. */
+#define GBM_DEV_TYPE_FLAG_DISPLAY (1u << 1)	 /* Device capable of display. */
+#define GBM_DEV_TYPE_FLAG_3D (1u << 2)		 /* Device capable or 3D rendering. */
+#define GBM_DEV_TYPE_FLAG_ARMSOC (1u << 3)	 /* Device on ARM SOC. */
+#define GBM_DEV_TYPE_FLAG_USB (1u << 4)		 /* USB device, udl, evdi. */
+#define GBM_DEV_TYPE_FLAG_BLOCKED (1u << 5)	 /* Unsuitable device e.g. vgem, udl, evdi. */
 #define GBM_DEV_TYPE_FLAG_INTERNAL_LCD (1u << 6) /* Device is driving internal LCD. */
 
 struct gbm_device_info {

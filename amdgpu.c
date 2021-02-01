@@ -337,11 +337,9 @@ static int amdgpu_init(struct driver *drv)
 		return -ENODEV;
 	}
 
-	if (sdma_init(priv, drv_get_fd(drv))) {
+	/* Continue on failure, as we can still succesfully map things without SDMA. */
+	if (sdma_init(priv, drv_get_fd(drv)))
 		drv_log("SDMA init failed\n");
-
-		/* Continue, as we can still succesfully map things without SDMA. */
-	}
 
 	metadata.tiling = TILE_TYPE_LINEAR;
 	metadata.priority = 1;
@@ -650,9 +648,9 @@ fail:
 
 static int amdgpu_unmap_bo(struct bo *bo, struct vma *vma)
 {
-	if (bo->priv)
+	if (bo->priv) {
 		return dri_bo_unmap(bo, vma);
-	else {
+	} else {
 		int r = munmap(vma->addr, vma->length);
 		if (r)
 			return r;
