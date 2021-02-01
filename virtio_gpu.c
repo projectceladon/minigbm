@@ -592,6 +592,7 @@ static void virtio_gpu_init_features_and_caps(struct driver *drv)
 
 	// Multi-planar formats are currently only supported in virglrenderer through gbm.
 	priv->host_gbm_enabled =
+	    features[feat_3d].enabled &&
 	    virtio_gpu_supports_combination_natively(drv, DRM_FORMAT_NV12, BO_USE_TEXTURE);
 }
 
