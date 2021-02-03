@@ -296,11 +296,10 @@ static int msm_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t he
 	 * Though we use only one plane, we need to set handle for
 	 * all planes to pass kernel checks
 	 */
-	for (i = 0; i < bo->meta.num_planes; i++) {
+	for (i = 0; i < bo->meta.num_planes; i++)
 		bo->handles[i].u32 = req.handle;
-		bo->meta.format_modifiers[i] = modifier;
-	}
 
+	bo->meta.format_modifier = modifier;
 	return 0;
 }
 

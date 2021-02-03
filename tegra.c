@@ -253,7 +253,7 @@ static int tegra_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint3
 
 		/* Encode blocklinear parameters for EGLImage creation. */
 		bo->meta.tiling = (kind & 0xff) | ((block_height_log2 & 0xf) << 8);
-		bo->meta.format_modifiers[0] = fourcc_mod_code(NV, bo->meta.tiling);
+		bo->meta.format_modifier = fourcc_mod_code(NV, bo->meta.tiling);
 	}
 
 	return 0;
@@ -288,7 +288,7 @@ static int tegra_bo_import(struct bo *bo, struct drv_import_fd_data *data)
 		assert(0);
 	}
 
-	bo->meta.format_modifiers[0] = fourcc_mod_code(NV, bo->meta.tiling);
+	bo->meta.format_modifier = fourcc_mod_code(NV, bo->meta.tiling);
 	return 0;
 }
 
