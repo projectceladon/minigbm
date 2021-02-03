@@ -53,9 +53,10 @@ const static uint32_t render_target_formats[] = {
 	DRM_FORMAT_ARGB2101010, DRM_FORMAT_XBGR2101010, DRM_FORMAT_XRGB2101010,
 };
 
-const static uint32_t texture_source_formats[] = { DRM_FORMAT_GR88,	      DRM_FORMAT_R8,
-						   DRM_FORMAT_NV21,	      DRM_FORMAT_NV12,
-						   DRM_FORMAT_YVU420_ANDROID, DRM_FORMAT_YVU420 };
+const static uint32_t texture_source_formats[] = {
+	DRM_FORMAT_GR88,	   DRM_FORMAT_R8,     DRM_FORMAT_NV21, DRM_FORMAT_NV12,
+	DRM_FORMAT_YVU420_ANDROID, DRM_FORMAT_YVU420, DRM_FORMAT_P010
+};
 
 static int query_dev_info(int fd, struct drm_amdgpu_info_device *dev_info)
 {
@@ -336,11 +337,9 @@ static int amdgpu_init(struct driver *drv)
 		return -ENODEV;
 	}
 
-	if (sdma_init(priv, drv_get_fd(drv))) {
+	/* Continue on failure, as we can still succesfully map things without SDMA. */
+	if (sdma_init(priv, drv_get_fd(drv)))
 		drv_log("SDMA init failed\n");
-
-		/* Continue, as we can still succesfully map things without SDMA. */
-	}
 
 	metadata.tiling = TILE_TYPE_LINEAR;
 	metadata.priority = 1;
@@ -356,6 +355,9 @@ static int amdgpu_init(struct driver *drv)
 	drv_modify_combination(drv, DRM_FORMAT_NV12, &metadata,
 			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SCANOUT |
 				   BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER);
+
+	drv_modify_combination(drv, DRM_FORMAT_P010, &metadata,
+			       BO_USE_SCANOUT | BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER);
 
 	/* Android CTS tests require this. */
 	drv_add_combination(drv, DRM_FORMAT_BGR888, &metadata, BO_USE_SW_MASK);
@@ -478,7 +480,7 @@ static int amdgpu_create_bo_linear(struct bo *bo, uint32_t width, uint32_t heigh
 	for (plane = 0; plane < bo->meta.num_planes; plane++)
 		bo->handles[plane].u32 = gem_create.out.handle;
 
-	bo->meta.format_modifiers[0] = DRM_FORMAT_MOD_LINEAR;
+	bo->meta.format_modifier = DRM_FORMAT_MOD_LINEAR;
 
 	return 0;
 }
@@ -538,8 +540,8 @@ static int amdgpu_create_bo_with_modifiers(struct bo *bo, uint32_t width, uint32
 
 static int amdgpu_import_bo(struct bo *bo, struct drv_import_fd_data *data)
 {
-	bool dri_tiling = data->format_modifiers[0] != DRM_FORMAT_MOD_LINEAR;
-	if (data->format_modifiers[0] == DRM_FORMAT_MOD_INVALID) {
+	bool dri_tiling = data->format_modifier != DRM_FORMAT_MOD_LINEAR;
+	if (data->format_modifier == DRM_FORMAT_MOD_INVALID) {
 		struct combination *combo;
 		combo = drv_get_combination(bo->drv, data->format, data->use_flags);
 		if (!combo)
@@ -646,9 +648,9 @@ fail:
 
 static int amdgpu_unmap_bo(struct bo *bo, struct vma *vma)
 {
-	if (bo->priv)
+	if (bo->priv) {
 		return dri_bo_unmap(bo, vma);
-	else {
+	} else {
 		int r = munmap(vma->addr, vma->length);
 		if (r)
 			return r;

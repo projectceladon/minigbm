@@ -50,6 +50,7 @@ class cros_gralloc_driver
 	cros_gralloc_driver(cros_gralloc_driver const &);
 	cros_gralloc_driver operator=(cros_gralloc_driver const &);
 	cros_gralloc_buffer *get_buffer(cros_gralloc_handle_t hnd);
+	void emplace_buffer(struct bo *bo, struct cros_gralloc_handle *hnd);
 
 	struct driver *drv_;
 	std::mutex mutex_;
