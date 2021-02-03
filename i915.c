@@ -384,7 +384,7 @@ static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t heig
 		break;
 	}
 
-	bo->meta.format_modifiers[0] = modifier;
+	bo->meta.format_modifier = modifier;
 
 	if (format == DRM_FORMAT_YVU420_ANDROID) {
 		/*
@@ -542,7 +542,7 @@ static void *i915_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t 
 	int ret;
 	void *addr = MAP_FAILED;
 
-	if (bo->meta.format_modifiers[0] == I915_FORMAT_MOD_Y_TILED_CCS)
+	if (bo->meta.format_modifier == I915_FORMAT_MOD_Y_TILED_CCS)
 		return MAP_FAILED;
 
 	if (bo->meta.tiling == I915_TILING_NONE) {
