@@ -85,7 +85,7 @@ struct drv_import_fd_data {
 	int fds[DRV_MAX_PLANES];
 	uint32_t strides[DRV_MAX_PLANES];
 	uint32_t offsets[DRV_MAX_PLANES];
-	uint64_t format_modifiers[DRV_MAX_PLANES];
+	uint64_t format_modifier;
 	uint32_t width;
 	uint32_t height;
 	uint32_t format;
@@ -166,7 +166,7 @@ uint32_t drv_bo_get_plane_size(struct bo *bo, size_t plane);
 
 uint32_t drv_bo_get_plane_stride(struct bo *bo, size_t plane);
 
-uint64_t drv_bo_get_plane_format_modifier(struct bo *bo, size_t plane);
+uint64_t drv_bo_get_format_modifier(struct bo *bo);
 
 uint32_t drv_bo_get_format(struct bo *bo);
 

@@ -69,7 +69,7 @@ static int afbc_bo_from_format(struct bo *bo, uint32_t width, uint32_t height, u
 
 	bo->meta.total_size = total_size;
 
-	bo->meta.format_modifiers[0] = DRM_FORMAT_MOD_CHROMEOS_ROCKCHIP_AFBC;
+	bo->meta.format_modifier = DRM_FORMAT_MOD_CHROMEOS_ROCKCHIP_AFBC;
 
 	return 0;
 }
@@ -137,7 +137,7 @@ static int rockchip_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint
 		if (!drv_has_modifier(modifiers, count, DRM_FORMAT_MOD_LINEAR)) {
 			errno = EINVAL;
 			drv_log("no usable modifier found\n");
-			return -1;
+			return -errno;
 		}
 
 		uint32_t stride;
@@ -187,7 +187,7 @@ static void *rockchip_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint3
 
 	/* We can only map buffers created with SW access flags, which should
 	 * have no modifiers (ie, not AFBC). */
-	if (bo->meta.format_modifiers[0] == DRM_FORMAT_MOD_CHROMEOS_ROCKCHIP_AFBC)
+	if (bo->meta.format_modifier == DRM_FORMAT_MOD_CHROMEOS_ROCKCHIP_AFBC)
 		return MAP_FAILED;
 
 	gem_map.handle = bo->handles[0].u32;
