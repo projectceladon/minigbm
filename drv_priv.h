@@ -24,7 +24,7 @@ struct bo_metadata {
 	uint32_t offsets[DRV_MAX_PLANES];
 	uint32_t sizes[DRV_MAX_PLANES];
 	uint32_t strides[DRV_MAX_PLANES];
-	uint64_t format_modifiers[DRV_MAX_PLANES];
+	uint64_t format_modifier;
 	uint64_t use_flags;
 	size_t total_size;
 };

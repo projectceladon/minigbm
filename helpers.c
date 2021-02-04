@@ -639,3 +639,11 @@ bool drv_has_modifier(const uint64_t *list, uint32_t count, uint64_t modifier)
 
 	return false;
 }
+
+/*
+ * Map internal fourcc codes back to standard fourcc codes.
+ */
+uint32_t drv_get_standard_fourcc(uint32_t fourcc_internal)
+{
+	return (fourcc_internal == DRM_FORMAT_YVU420_ANDROID) ? DRM_FORMAT_YVU420 : fourcc_internal;
+}
