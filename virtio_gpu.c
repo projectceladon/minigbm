@@ -641,6 +641,8 @@ static int virtio_gpu_init(struct driver *drv)
 	virtio_gpu_add_combination(drv, DRM_FORMAT_BGR888, &LINEAR_METADATA, BO_USE_SW_MASK);
 	virtio_gpu_add_combination(drv, DRM_FORMAT_ABGR16161616F, &LINEAR_METADATA,
 				   BO_USE_SW_MASK | BO_USE_TEXTURE_MASK);
+	virtio_gpu_add_combination(drv, DRM_FORMAT_P010, &LINEAR_METADATA,
+				   BO_USE_SW_MASK | BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE);
 
 	drv_modify_combination(drv, DRM_FORMAT_NV12, &LINEAR_METADATA,
 			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER |
