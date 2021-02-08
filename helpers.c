@@ -648,3 +648,20 @@ uint32_t drv_get_standard_fourcc(uint32_t fourcc_internal)
 {
 	return (fourcc_internal == DRM_FORMAT_YVU420_ANDROID) ? DRM_FORMAT_YVU420 : fourcc_internal;
 }
+
+uint32_t drv_resolve_format_helper(struct driver *drv, uint32_t format, uint64_t use_flags)
+{
+	switch (format) {
+	case DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED:
+		/* Common camera implementation defined format. */
+		if (use_flags & (BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE))
+			return DRM_FORMAT_NV12;
+		/* A common hack: See b/28671744 */
+		return DRM_FORMAT_XBGR8888;
+	case DRM_FORMAT_FLEX_YCbCr_420_888:
+		/* Common flexible video format. */
+		return DRM_FORMAT_NV12;
+	default:
+		return format;
+	}
+}
