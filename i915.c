@@ -37,8 +37,7 @@ static const uint32_t texture_only_formats[] = { DRM_FORMAT_R8, DRM_FORMAT_NV12,
 static const uint64_t gen_modifier_order[] = { I915_FORMAT_MOD_Y_TILED, I915_FORMAT_MOD_X_TILED,
 					       DRM_FORMAT_MOD_LINEAR };
 
-static const uint64_t gen11_modifier_order[] = { I915_FORMAT_MOD_Y_TILED_CCS,
-						 I915_FORMAT_MOD_Y_TILED, I915_FORMAT_MOD_X_TILED,
+static const uint64_t gen11_modifier_order[] = { I915_FORMAT_MOD_Y_TILED, I915_FORMAT_MOD_X_TILED,
 						 DRM_FORMAT_MOD_LINEAR };
 
 struct modifier_support_t {
@@ -633,31 +632,6 @@ static int i915_bo_flush(struct bo *bo, struct mapping *mapping)
 	return 0;
 }
 
-static uint32_t i915_resolve_format(struct driver *drv, uint32_t format, uint64_t use_flags)
-{
-	switch (format) {
-	case DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED:
-		/* KBL camera subsystem requires NV12. */
-		if (use_flags & (BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE))
-			return DRM_FORMAT_NV12;
-		/*HACK: See b/28671744 */
-		return DRM_FORMAT_XBGR8888;
-	case DRM_FORMAT_FLEX_YCbCr_420_888:
-		/*
-		 * KBL camera subsystem requires NV12. Our other use cases
-		 * don't care:
-		 * - Hardware video supports NV12,
-		 * - USB Camera HALv3 supports NV12,
-		 * - USB Camera HALv1 doesn't use this format.
-		 * Moreover, NV12 is preferred for video, due to overlay
-		 * support on SKL+.
-		 */
-		return DRM_FORMAT_NV12;
-	default:
-		return format;
-	}
-}
-
 const struct backend backend_i915 = {
 	.name = "i915",
 	.init = i915_init,
@@ -670,7 +644,7 @@ const struct backend backend_i915 = {
 	.bo_unmap = drv_bo_munmap,
 	.bo_invalidate = i915_bo_invalidate,
 	.bo_flush = i915_bo_flush,
-	.resolve_format = i915_resolve_format,
+	.resolve_format = drv_resolve_format_helper,
 };
 
 #endif
