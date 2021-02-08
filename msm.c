@@ -351,22 +351,6 @@ static void *msm_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t m
 		    req.offset);
 }
 
-static uint32_t msm_resolve_format(struct driver *drv, uint32_t format, uint64_t use_flags)
-{
-	switch (format) {
-	case DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED:
-		/* Camera subsystem requires NV12. */
-		if (use_flags & (BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE))
-			return DRM_FORMAT_NV12;
-		/*HACK: See b/28671744 */
-		return DRM_FORMAT_XBGR8888;
-	case DRM_FORMAT_FLEX_YCbCr_420_888:
-		return DRM_FORMAT_NV12;
-	default:
-		return format;
-	}
-}
-
 const struct backend backend_msm = {
 	.name = "msm",
 	.init = msm_init,
@@ -376,6 +360,6 @@ const struct backend backend_msm = {
 	.bo_import = drv_prime_bo_import,
 	.bo_map = msm_bo_map,
 	.bo_unmap = drv_bo_munmap,
-	.resolve_format = msm_resolve_format,
+	.resolve_format = drv_resolve_format_helper,
 };
 #endif /* DRV_MSM */
