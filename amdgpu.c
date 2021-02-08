@@ -699,22 +699,6 @@ static int amdgpu_bo_invalidate(struct bo *bo, struct mapping *mapping)
 	return 0;
 }
 
-static uint32_t amdgpu_resolve_format(struct driver *drv, uint32_t format, uint64_t use_flags)
-{
-	switch (format) {
-	case DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED:
-		/* Camera subsystem requires NV12. */
-		if (use_flags & (BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE))
-			return DRM_FORMAT_NV12;
-		/*HACK: See b/28671744 */
-		return DRM_FORMAT_XBGR8888;
-	case DRM_FORMAT_FLEX_YCbCr_420_888:
-		return DRM_FORMAT_NV12;
-	default:
-		return format;
-	}
-}
-
 const struct backend backend_amdgpu = {
 	.name = "amdgpu",
 	.init = amdgpu_init,
@@ -726,7 +710,7 @@ const struct backend backend_amdgpu = {
 	.bo_map = amdgpu_map_bo,
 	.bo_unmap = amdgpu_unmap_bo,
 	.bo_invalidate = amdgpu_bo_invalidate,
-	.resolve_format = amdgpu_resolve_format,
+	.resolve_format = drv_resolve_format_helper,
 	.num_planes_from_modifier = dri_num_planes_from_modifier,
 };
 
