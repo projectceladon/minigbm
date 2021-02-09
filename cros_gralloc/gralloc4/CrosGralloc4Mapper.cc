@@ -31,11 +31,60 @@ using android::hardware::graphics::common::V1_2::PixelFormat;
 using android::hardware::graphics::mapper::V4_0::Error;
 using android::hardware::graphics::mapper::V4_0::IMapper;
 
-CrosGralloc4Mapper::CrosGralloc4Mapper() : mDriver(std::make_unique<cros_gralloc_driver>()) {
-    if (mDriver->init()) {
-        drv_log("Failed to initialize driver.\n");
-        mDriver = nullptr;
+namespace {
+
+// Provides a single instance of cros_gralloc_driver to all active instances of
+// CrosGralloc4Mapper in a single process while destroying the cros_gralloc_driver
+// when there are no active instances of CrosGralloc4Mapper.
+class DriverProvider {
+  public:
+    static DriverProvider* Get() {
+        static DriverProvider* instance = new DriverProvider();
+        return instance;
     }
+
+    cros_gralloc_driver* GetAndReferenceDriver() {
+        std::lock_guard<std::mutex> lock(mMutex);
+        if (!mDriver) {
+            mDriver = std::make_unique<cros_gralloc_driver>();
+            if (mDriver->init()) {
+                drv_log("Failed to initialize driver.\n");
+                mDriver.reset();
+                return nullptr;
+            }
+        }
+
+        ++mReferenceCount;
+        return mDriver.get();
+    }
+
+    void UnreferenceDriver() {
+        std::lock_guard<std::mutex> lock(mMutex);
+
+        --mReferenceCount;
+
+        if (mReferenceCount == 0) {
+            mDriver.reset();
+        }
+    }
+
+  private:
+    DriverProvider() = default;
+
+    std::mutex mMutex;
+    std::unique_ptr<cros_gralloc_driver> mDriver;
+    std::size_t mReferenceCount = 0;
+};
+
+}  // namespace
+
+CrosGralloc4Mapper::CrosGralloc4Mapper() {
+    mDriver = DriverProvider::Get()->GetAndReferenceDriver();
+}
+
+CrosGralloc4Mapper::~CrosGralloc4Mapper() {
+    mDriver = nullptr;
+    DriverProvider::Get()->UnreferenceDriver();
 }
 
 Return<void> CrosGralloc4Mapper::createDescriptor(const BufferDescriptorInfo& description,
