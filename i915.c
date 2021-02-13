@@ -34,8 +34,8 @@ static const uint32_t render_formats[] = { DRM_FORMAT_ABGR16161616F };
 static const uint32_t texture_only_formats[] = { DRM_FORMAT_R8, DRM_FORMAT_NV12, DRM_FORMAT_P010,
 						 DRM_FORMAT_YVU420, DRM_FORMAT_YVU420_ANDROID };
 
-static const uint64_t gen_modifier_order[] = { I915_FORMAT_MOD_Y_TILED, I915_FORMAT_MOD_X_TILED,
-					       DRM_FORMAT_MOD_LINEAR };
+static const uint64_t gen_modifier_order[] = { I915_FORMAT_MOD_Y_TILED_CCS, I915_FORMAT_MOD_Y_TILED,
+					       I915_FORMAT_MOD_X_TILED, DRM_FORMAT_MOD_LINEAR };
 
 static const uint64_t gen11_modifier_order[] = { I915_FORMAT_MOD_Y_TILED, I915_FORMAT_MOD_X_TILED,
 						 DRM_FORMAT_MOD_LINEAR };

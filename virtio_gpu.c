@@ -95,6 +95,8 @@ static uint32_t translate_format(uint32_t drm_fourcc)
 		return VIRGL_FORMAT_B5G6R5_UNORM;
 	case DRM_FORMAT_R8:
 		return VIRGL_FORMAT_R8_UNORM;
+	case DRM_FORMAT_R16:
+		return VIRGL_FORMAT_R16_UNORM;
 	case DRM_FORMAT_RG88:
 		return VIRGL_FORMAT_R8G8_UNORM;
 	case DRM_FORMAT_NV12:
@@ -105,6 +107,7 @@ static uint32_t translate_format(uint32_t drm_fourcc)
 	case DRM_FORMAT_YVU420_ANDROID:
 		return VIRGL_FORMAT_YV12;
 	default:
+		drv_log("Unhandled format:%d\n", drm_fourcc);
 		return 0;
 	}
 }
@@ -590,9 +593,13 @@ static void virtio_gpu_init_features_and_caps(struct driver *drv)
 	if (features[feat_3d].enabled)
 		virtio_gpu_get_caps(drv, &priv->caps, &priv->caps_is_v2);
 
-	// Multi-planar formats are currently only supported in virglrenderer through gbm.
 	priv->host_gbm_enabled =
+	    // 2D mode does not create resources on the host so it does not enable host gbm.
 	    features[feat_3d].enabled &&
+	    // Gfxstream does not enable host gbm. Virglrenderer sets caps while Gfxstream does not
+	    // so filter out if we are running with Gfxstream.
+	    priv->caps.max_version > 0 &&
+	    // Virglrenderer only supports multi-planar formats through host gbm.
 	    virtio_gpu_supports_combination_natively(drv, DRM_FORMAT_NV12, BO_USE_TEXTURE);
 }
 
