@@ -18,7 +18,7 @@
 #include "virtgpu.h"
 
 #define PARAM(x)                                                                                   \
-	(struct virtgpu_param)                                                                             \
+	(struct virtgpu_param)                                                                     \
 	{                                                                                          \
 		x, #x, 0                                                                           \
 	}

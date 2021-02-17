@@ -554,12 +554,13 @@ static void virgl_init_params_and_caps(struct driver *drv)
 		// We use two criteria to determine whether host minigbm is used on the host for
 		// swapchain allocations.
 		//
-		// (1) Host minigbmgbm is only available via virglrenderer, and only virglrenderer
+		// (1) Host minigbm is only available via virglrenderer, and only virglrenderer
 		//     advertises capabilities.
 		// (2) Only host minigbm doesn't emulate YUV formats.  Checking this is a bit of a
 		//     proxy, but it works.
-		priv->host_gbm_enabled = priv->caps.max_version > 0 &&
-			virgl_supports_combination_natively(drv, DRM_FORMAT_NV12, BO_USE_TEXTURE);
+		priv->host_gbm_enabled =
+		    priv->caps.max_version > 0 &&
+		    virgl_supports_combination_natively(drv, DRM_FORMAT_NV12, BO_USE_TEXTURE);
 	}
 }
 
@@ -981,17 +982,15 @@ static int virgl_resource_info(struct bo *bo, uint32_t strides[DRV_MAX_PLANES],
 	return 0;
 }
 
-const struct backend virtgpu_virgl = {
-	.name = "virtgpu_virgl",
-	.init = virgl_init,
-	.close = virgl_close,
-	.bo_create = virgl_bo_create,
-	.bo_destroy = virgl_bo_destroy,
-	.bo_import = drv_prime_bo_import,
-	.bo_map = virgl_bo_map,
-	.bo_unmap = drv_bo_munmap,
-	.bo_invalidate = virgl_bo_invalidate,
-	.bo_flush = virgl_bo_flush,
-	.resolve_format = virgl_resolve_format,
-	.resource_info = virgl_resource_info
-};
+const struct backend virtgpu_virgl = { .name = "virtgpu_virgl",
+				       .init = virgl_init,
+				       .close = virgl_close,
+				       .bo_create = virgl_bo_create,
+				       .bo_destroy = virgl_bo_destroy,
+				       .bo_import = drv_prime_bo_import,
+				       .bo_map = virgl_bo_map,
+				       .bo_unmap = drv_bo_munmap,
+				       .bo_invalidate = virgl_bo_invalidate,
+				       .bo_flush = virgl_bo_flush,
+				       .resolve_format = virgl_resolve_format,
+				       .resource_info = virgl_resource_info };
