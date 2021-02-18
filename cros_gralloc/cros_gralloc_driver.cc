@@ -217,7 +217,7 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 	 * native_handle_clone() copies data based on hnd->base.numInts.
 	 */
 	num_bytes = ALIGN(num_bytes, sizeof(int));
-	num_ints = num_bytes - sizeof(native_handle_t) - num_fds;
+	num_ints = ((num_bytes - sizeof(native_handle_t)) / sizeof(int)) - num_fds;
 
 	hnd =
 	    reinterpret_cast<struct cros_gralloc_handle *>(native_handle_create(num_fds, num_ints));
