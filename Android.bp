@@ -146,13 +146,18 @@ cc_library {
     ],
 }
 
-cc_library_static {
-    name: "libminigbm_cros_gralloc",
+cc_defaults {
+    name: "libminigbm_cros_gralloc_defaults",
     defaults: ["minigbm_cros_gralloc_defaults"],
     shared_libs: ["liblog"],
     static_libs: ["libdrm"],
 
     export_include_dirs: ["."],
+}
+
+cc_library_static {
+    name: "libminigbm_cros_gralloc",
+    defaults: ["libminigbm_cros_gralloc_defaults"],
 }
 
 cc_library_shared {
