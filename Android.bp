@@ -188,3 +188,18 @@ cc_library_shared {
     cflags: ["-DDRV_MESON"],
     srcs: ["cros_gralloc/gralloc0/gralloc0.cc"],
 }
+
+cc_library_shared {
+    name: "gralloc.minigbm_msm",
+    defaults: ["minigbm_cros_gralloc_defaults"],
+    cflags: ["-DDRV_MSM"],
+    srcs: [
+        "cros_gralloc/gralloc0/gralloc0.cc",
+    ],
+}
+
+cc_library_static {
+    name: "libminigbm_cros_gralloc_msm",
+    defaults: ["libminigbm_cros_gralloc_defaults"],
+    cflags: ["-DDRV_MSM"],
+}
