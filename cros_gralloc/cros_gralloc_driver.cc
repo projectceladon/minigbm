@@ -170,14 +170,6 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 
 	resolved_format = drv_resolve_format(drv_, descriptor->drm_format, descriptor->use_flags);
 	use_flags = descriptor->use_flags;
-	/*
-	 * TODO(b/79682290): ARC++ assumes NV12 is always linear and doesn't
-	 * send modifiers across Wayland protocol, so we or in the
-	 * BO_USE_LINEAR flag here. We need to fix ARC++ to allocate and work
-	 * with tiled buffers.
-	 */
-	if (resolved_format == DRM_FORMAT_NV12)
-		use_flags |= BO_USE_LINEAR;
 
 	/*
 	 * This unmask is a backup in the case DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED is resolved
