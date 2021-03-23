@@ -43,9 +43,6 @@ extern const struct backend backend_msm;
 #ifdef DRV_ROCKCHIP
 extern const struct backend backend_rockchip;
 #endif
-#ifdef DRV_TEGRA
-extern const struct backend backend_tegra;
-#endif
 #ifdef DRV_VC4
 extern const struct backend backend_vc4;
 #endif
