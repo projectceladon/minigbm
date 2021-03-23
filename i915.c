@@ -293,14 +293,32 @@ static int i915_init(struct driver *drv)
 	return i915_add_combinations(drv);
 }
 
+/*
+ * Returns true if the height of a buffer of the given format should be aligned
+ * to the largest coded unit (LCU) assuming that it will be used for video. This
+ * is based on gmmlib's GmmIsYUVFormatLCUAligned().
+ */
+static bool i915_format_needs_LCU_alignment(uint32_t format, size_t plane, const struct i915_device* i915)
+{
+	switch (format) {
+	case DRM_FORMAT_NV12:
+	case DRM_FORMAT_P010:
+	case DRM_FORMAT_P016:
+		return (i915->gen == 11 || i915->gen == 12) && plane == 1;
+	}
+	return false;
+}
+
 static int i915_bo_from_format(struct bo *bo, uint32_t width, uint32_t height, uint32_t format)
 {
 	uint32_t offset;
 	size_t plane;
 	int ret, pagesize;
+	struct i915_device *i915 = bo->drv->priv;
 
 	offset = 0;
 	pagesize = getpagesize();
+
 	for (plane = 0; plane < drv_num_planes_from_format(format); plane++) {
 		uint32_t stride = drv_stride_from_format(format, width, plane);
 		uint32_t plane_height = drv_height_from_format(format, height, plane);
@@ -311,6 +329,15 @@ static int i915_bo_from_format(struct bo *bo, uint32_t width, uint32_t height, u
 		ret = i915_align_dimensions(bo, bo->meta.tiling, &stride, &plane_height);
 		if (ret)
 			return ret;
+
+		if (i915_format_needs_LCU_alignment(format, plane, i915)) {
+			/*
+			 * Align the height of the V plane for certain formats to the
+			 * largest coded unit (assuming that this BO may be used for video)
+			 * to be consistent with gmmlib.
+			 */
+			plane_height = ALIGN(plane_height, 64);
+		}
 
 		bo->meta.strides[plane] = stride;
 		bo->meta.sizes[plane] = stride * plane_height;
