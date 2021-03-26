@@ -198,12 +198,21 @@ static uint32_t i915_get_gen(int device_id)
         const uint16_t gen12_ids[] = { 0x9A40, 0x9A49, 0x9A59, 0x9A60, 0x9A68,
                                        0x9A70, 0x9A78, 0xFF20, 0x4905, 0x4906,
                                        0x4907, 0x4f80, 0x0201, 0xFF25 };
+	const uint16_t dg2_ids[] = { 0x4F80, 0x4F81, 0x4F82, 0x4F83, 0x4F84,
+		                     0x4F85, 0x4F86, 0x4F87, 0x4F88,
+                                     0x5690, 0x5691, 0x5692, 0x5695, 0x5696,
+                                     0x5697, 0x5698, 0x56a0, 0x56a1, 0x56a2,
+                                     0x56a3, 0x56a4, 0x56a5, 0x56a6, 0x56a7,
+                                     0x56a8, 0x56a9 };
 	unsigned i;
 	for (i = 0; i < ARRAY_SIZE(gen3_ids); i++)
 		if (gen3_ids[i] == device_id)
 			return 3;
 	for (i = 0; i < ARRAY_SIZE(gen12_ids); i++)
 		if (gen12_ids[i] == device_id)
+			return 12;
+	for (i = 0; i < ARRAY_SIZE(dg2_ids); i++)
+		if (dg2_ids[i] == device_id)
 			return 12;
 
 	return 4;
