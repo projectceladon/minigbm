@@ -229,8 +229,8 @@ static int msm_init(struct driver *drv)
 	 * compressed in this case because the UBWC flags/meta data can be out of
 	 * sync with pixel data while the GPU is writing a frame out to memory.
 	 */
-	uint64_t sw_flags = (BO_USE_RENDERSCRIPT | BO_USE_SW_MASK |
-			     BO_USE_LINEAR | BO_USE_FRONT_RENDERING);
+	uint64_t sw_flags =
+	    (BO_USE_RENDERSCRIPT | BO_USE_SW_MASK | BO_USE_LINEAR | BO_USE_FRONT_RENDERING);
 
 	drv_add_combinations(drv, render_target_formats, ARRAY_SIZE(render_target_formats),
 			     &LINEAR_METADATA, render_use_flags);

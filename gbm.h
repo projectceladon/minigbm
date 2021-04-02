@@ -429,6 +429,9 @@ union gbm_bo_handle
 gbm_bo_get_handle_for_plane(struct gbm_bo *bo, size_t plane);
 
 int
+gbm_bo_get_fd_for_plane(struct gbm_bo *bo, int plane);
+
+int
 gbm_bo_write(struct gbm_bo *bo, const void *buf, size_t count);
 
 void
