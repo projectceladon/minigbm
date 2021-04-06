@@ -72,7 +72,7 @@ union gbm_bo_handle {
 /** Format of the allocated buffer */
 enum gbm_bo_format {
    /** RGB with 8 bits per channel in a 32 bit value */
-   GBM_BO_FORMAT_XRGB8888, 
+   GBM_BO_FORMAT_XRGB8888,
    /** ARGB with 8 bits per channel in a 32 bit value */
    GBM_BO_FORMAT_ARGB8888
 };
@@ -178,6 +178,8 @@ enum gbm_bo_format {
 #define GBM_FORMAT_NV21		__gbm_fourcc_code('N', 'V', '2', '1') /* 2x2 subsampled Cb:Cr plane */
 #define GBM_FORMAT_NV16		__gbm_fourcc_code('N', 'V', '1', '6') /* 2x1 subsampled Cr:Cb plane */
 #define GBM_FORMAT_NV61		__gbm_fourcc_code('N', 'V', '6', '1') /* 2x1 subsampled Cb:Cr plane */
+
+#define GBM_FORMAT_P010		__gbm_fourcc_code('P', '0', '1', '0') /* 2x2 subsampled Cr:Cb plane */
 
 /*
  * 3 plane YCbCr

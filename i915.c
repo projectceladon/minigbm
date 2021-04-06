@@ -159,12 +159,13 @@ static int i915_add_combinations(struct driver *drv)
 	    unset_flags(scanout_and_render, BO_USE_SW_READ_RARELY | BO_USE_SW_WRITE_RARELY);
 /* Support y-tiled NV12 and P010 for libva */
 #ifdef I915_SCANOUT_Y_TILED
-	uint64_t nv12_usage =
+	const uint64_t nv12_usage =
 	    BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER | BO_USE_SCANOUT | hw_protected;
-	uint64_t p010_usage = BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER | hw_protected;
+	const uint64_t p010_usage = BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER | hw_protected |
+				    (i915->gen >= 11 ? BO_USE_SCANOUT : 0);
 #else
-	uint64_t nv12_usage = BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER;
-	uint64_t p010_usage = nv12_usage;
+	const uint64_t nv12_usage = BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER;
+	const uint64_t p010_usage = nv12_usage;
 #endif
 	drv_add_combination(drv, DRM_FORMAT_NV12, &metadata, nv12_usage);
 	drv_add_combination(drv, DRM_FORMAT_P010, &metadata, p010_usage);
