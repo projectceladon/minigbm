@@ -95,7 +95,6 @@ static uint64_t unset_flags(uint64_t current_flags, uint64_t mask)
 
 static int i915_add_combinations(struct driver *drv)
 {
-	struct format_metadata metadata;
 	uint64_t render, scanout_and_render, texture_only, hw_protected;
 	struct i915_device *i915 = drv->priv;
 
@@ -108,52 +107,58 @@ static int i915_add_combinations(struct driver *drv)
 	uint64_t linear_mask =
 	    BO_USE_RENDERSCRIPT | BO_USE_LINEAR | BO_USE_SW_READ_OFTEN | BO_USE_SW_WRITE_OFTEN;
 
-	metadata.tiling = I915_TILING_NONE;
-	metadata.priority = 1;
-	metadata.modifier = DRM_FORMAT_MOD_LINEAR;
+	struct format_metadata metadata_linear = {
+		.tiling = I915_TILING_NONE,
+		.priority = 1,
+		.modifier = DRM_FORMAT_MOD_LINEAR
+	};
 
 	drv_add_combinations(drv, scanout_render_formats, ARRAY_SIZE(scanout_render_formats),
-			     &metadata, scanout_and_render);
+			     &metadata_linear, scanout_and_render);
 
-	drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats), &metadata, render);
+	drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats), &metadata_linear, render);
 
-	drv_add_combinations(drv, texture_only_formats, ARRAY_SIZE(texture_only_formats), &metadata,
+	drv_add_combinations(drv, texture_only_formats, ARRAY_SIZE(texture_only_formats), &metadata_linear,
 			     texture_only);
 
 	drv_modify_linear_combinations(drv);
 
 	/* NV12 format for camera, display, decoding and encoding. */
 	/* IPU3 camera ISP supports only NV12 output. */
-	drv_modify_combination(drv, DRM_FORMAT_NV12, &metadata,
+	drv_modify_combination(drv, DRM_FORMAT_NV12, &metadata_linear,
 			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SCANOUT |
 				   BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER |
 				   hw_protected);
 
 	/* Android CTS tests require this. */
-	drv_add_combination(drv, DRM_FORMAT_BGR888, &metadata, BO_USE_SW_MASK);
+	drv_add_combination(drv, DRM_FORMAT_BGR888, &metadata_linear, BO_USE_SW_MASK);
 
 	/*
 	 * R8 format is used for Android's HAL_PIXEL_FORMAT_BLOB and is used for JPEG snapshots
 	 * from camera and input/output from hardware decoder/encoder.
 	 */
-	drv_modify_combination(drv, DRM_FORMAT_R8, &metadata,
+	drv_modify_combination(drv, DRM_FORMAT_R8, &metadata_linear,
 			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER |
 				   BO_USE_HW_VIDEO_ENCODER);
 
 	render = unset_flags(render, linear_mask);
 	scanout_and_render = unset_flags(scanout_and_render, linear_mask);
 
-	metadata.tiling = I915_TILING_X;
-	metadata.priority = 2;
-	metadata.modifier = I915_FORMAT_MOD_X_TILED;
+	struct format_metadata metadata_x_tiled = {
+		.tiling = I915_TILING_X,
+		.priority = 2,
+		.modifier = I915_FORMAT_MOD_X_TILED
+	};
 
-	drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats), &metadata, render);
+	drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats), &metadata_x_tiled, render);
 	drv_add_combinations(drv, scanout_render_formats, ARRAY_SIZE(scanout_render_formats),
-			     &metadata, scanout_and_render);
+			     &metadata_x_tiled, scanout_and_render);
 
-	metadata.tiling = I915_TILING_Y;
-	metadata.priority = 3;
-	metadata.modifier = I915_FORMAT_MOD_Y_TILED;
+	struct format_metadata metadata_y_tiled = {
+		.tiling = I915_TILING_Y,
+		.priority = 3,
+		.modifier = I915_FORMAT_MOD_Y_TILED
+	};
 
 	scanout_and_render =
 	    unset_flags(scanout_and_render, BO_USE_SW_READ_RARELY | BO_USE_SW_WRITE_RARELY);
@@ -167,14 +172,14 @@ static int i915_add_combinations(struct driver *drv)
 	const uint64_t nv12_usage = BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER;
 	const uint64_t p010_usage = nv12_usage;
 #endif
-	drv_add_combination(drv, DRM_FORMAT_NV12, &metadata, nv12_usage);
-	drv_add_combination(drv, DRM_FORMAT_P010, &metadata, p010_usage);
+	drv_add_combination(drv, DRM_FORMAT_NV12, &metadata_y_tiled, nv12_usage);
+	drv_add_combination(drv, DRM_FORMAT_P010, &metadata_y_tiled, p010_usage);
 
 	scanout_and_render = unset_flags(scanout_and_render, BO_USE_SCANOUT);
 
-	drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats), &metadata, render);
+	drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats), &metadata_y_tiled, render);
 	drv_add_combinations(drv, scanout_render_formats, ARRAY_SIZE(scanout_render_formats),
-			     &metadata, scanout_and_render);
+			     &metadata_y_tiled, scanout_and_render);
 	return 0;
 }
 
