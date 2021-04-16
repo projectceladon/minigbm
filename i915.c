@@ -143,8 +143,7 @@ static int i915_add_combinations(struct driver *drv)
 				   BO_USE_HW_VIDEO_ENCODER);
 
 	const uint64_t render_not_linear = unset_flags(render, linear_mask);
-	const uint64_t scanout_and_render_not_linear =
-	    unset_flags(scanout_and_render, linear_mask);
+	const uint64_t scanout_and_render_not_linear = render_not_linear | BO_USE_SCANOUT;
 
 	struct format_metadata metadata_x_tiled = {
 		.tiling = I915_TILING_X,
@@ -175,12 +174,12 @@ static int i915_add_combinations(struct driver *drv)
 	drv_add_combination(drv, DRM_FORMAT_NV12, &metadata_y_tiled, nv12_usage);
 	drv_add_combination(drv, DRM_FORMAT_P010, &metadata_y_tiled, p010_usage);
 
-	const uint64_t render_not_linear_nor_sw_read_write =
-	    unset_flags(scanout_and_render_not_linear, BO_USE_SCANOUT);
-
 	drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats), &metadata_y_tiled, render_not_linear);
+
+	// Y-tiled scanout isn't available on old platforms so we add
+	// |scanout_render_formats| without that USE flag.
 	drv_add_combinations(drv, scanout_render_formats, ARRAY_SIZE(scanout_render_formats),
-			     &metadata_y_tiled, render_not_linear_nor_sw_read_write);
+			     &metadata_y_tiled, render_not_linear);
 	return 0;
 }
 
