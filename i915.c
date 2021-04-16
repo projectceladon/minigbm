@@ -104,10 +104,9 @@ static int i915_add_combinations(struct driver *drv)
 	const uint64_t hw_protected =
 	    i915->has_hw_protection ? (BO_USE_PROTECTED | BO_USE_SCANOUT) : 0;
 
-	// TODO(mcasas): Consider adding BO_USE_SW_READ_RARELY | BO_USE_SW_WRITE_RARELY
-	// as well.
-	const uint64_t linear_mask =
-	    BO_USE_RENDERSCRIPT | BO_USE_LINEAR | BO_USE_SW_READ_OFTEN | BO_USE_SW_WRITE_OFTEN;
+	const uint64_t linear_mask = BO_USE_RENDERSCRIPT | BO_USE_LINEAR | BO_USE_SW_READ_OFTEN |
+				     BO_USE_SW_WRITE_OFTEN | BO_USE_SW_READ_RARELY |
+				     BO_USE_SW_WRITE_RARELY;
 
 	struct format_metadata metadata_linear = {
 		.tiling = I915_TILING_NONE,
@@ -177,8 +176,7 @@ static int i915_add_combinations(struct driver *drv)
 	drv_add_combination(drv, DRM_FORMAT_P010, &metadata_y_tiled, p010_usage);
 
 	const uint64_t render_not_linear_nor_sw_read_write =
-	    unset_flags(scanout_and_render_not_linear,
-			BO_USE_SW_READ_RARELY | BO_USE_SW_WRITE_RARELY | BO_USE_SCANOUT);
+	    unset_flags(scanout_and_render_not_linear, BO_USE_SCANOUT);
 
 	drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats), &metadata_y_tiled, render_not_linear);
 	drv_add_combinations(drv, scanout_render_formats, ARRAY_SIZE(scanout_render_formats),
