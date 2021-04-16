@@ -95,16 +95,18 @@ static uint64_t unset_flags(uint64_t current_flags, uint64_t mask)
 
 static int i915_add_combinations(struct driver *drv)
 {
-	uint64_t render, scanout_and_render, texture_only, hw_protected;
 	struct i915_device *i915 = drv->priv;
 
-	scanout_and_render = BO_USE_RENDER_MASK | BO_USE_SCANOUT;
-	render = BO_USE_RENDER_MASK;
-	texture_only = BO_USE_TEXTURE_MASK;
+	const uint64_t scanout_and_render = BO_USE_RENDER_MASK | BO_USE_SCANOUT;
+	const uint64_t render = BO_USE_RENDER_MASK;
+	const uint64_t texture_only = BO_USE_TEXTURE_MASK;
 	// HW protected buffers also need to be scanned out.
-	hw_protected = i915->has_hw_protection ? (BO_USE_PROTECTED | BO_USE_SCANOUT) : 0;
+	const uint64_t hw_protected =
+	    i915->has_hw_protection ? (BO_USE_PROTECTED | BO_USE_SCANOUT) : 0;
 
-	uint64_t linear_mask =
+	// TODO(mcasas): Consider adding BO_USE_SW_READ_RARELY | BO_USE_SW_WRITE_RARELY
+	// as well.
+	const uint64_t linear_mask =
 	    BO_USE_RENDERSCRIPT | BO_USE_LINEAR | BO_USE_SW_READ_OFTEN | BO_USE_SW_WRITE_OFTEN;
 
 	struct format_metadata metadata_linear = {
@@ -141,8 +143,9 @@ static int i915_add_combinations(struct driver *drv)
 			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER |
 				   BO_USE_HW_VIDEO_ENCODER);
 
-	render = unset_flags(render, linear_mask);
-	scanout_and_render = unset_flags(scanout_and_render, linear_mask);
+	const uint64_t render_not_linear = unset_flags(render, linear_mask);
+	const uint64_t scanout_and_render_not_linear =
+	    unset_flags(scanout_and_render, linear_mask);
 
 	struct format_metadata metadata_x_tiled = {
 		.tiling = I915_TILING_X,
@@ -150,9 +153,9 @@ static int i915_add_combinations(struct driver *drv)
 		.modifier = I915_FORMAT_MOD_X_TILED
 	};
 
-	drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats), &metadata_x_tiled, render);
+	drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats), &metadata_x_tiled, render_not_linear);
 	drv_add_combinations(drv, scanout_render_formats, ARRAY_SIZE(scanout_render_formats),
-			     &metadata_x_tiled, scanout_and_render);
+			     &metadata_x_tiled, scanout_and_render_not_linear);
 
 	struct format_metadata metadata_y_tiled = {
 		.tiling = I915_TILING_Y,
@@ -160,8 +163,6 @@ static int i915_add_combinations(struct driver *drv)
 		.modifier = I915_FORMAT_MOD_Y_TILED
 	};
 
-	scanout_and_render =
-	    unset_flags(scanout_and_render, BO_USE_SW_READ_RARELY | BO_USE_SW_WRITE_RARELY);
 /* Support y-tiled NV12 and P010 for libva */
 #ifdef I915_SCANOUT_Y_TILED
 	const uint64_t nv12_usage =
@@ -175,11 +176,13 @@ static int i915_add_combinations(struct driver *drv)
 	drv_add_combination(drv, DRM_FORMAT_NV12, &metadata_y_tiled, nv12_usage);
 	drv_add_combination(drv, DRM_FORMAT_P010, &metadata_y_tiled, p010_usage);
 
-	scanout_and_render = unset_flags(scanout_and_render, BO_USE_SCANOUT);
+	const uint64_t render_not_linear_nor_sw_read_write =
+	    unset_flags(scanout_and_render_not_linear,
+			BO_USE_SW_READ_RARELY | BO_USE_SW_WRITE_RARELY | BO_USE_SCANOUT);
 
-	drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats), &metadata_y_tiled, render);
+	drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats), &metadata_y_tiled, render_not_linear);
 	drv_add_combinations(drv, scanout_render_formats, ARRAY_SIZE(scanout_render_formats),
-			     &metadata_y_tiled, scanout_and_render);
+			     &metadata_y_tiled, render_not_linear_nor_sw_read_write);
 	return 0;
 }
 
