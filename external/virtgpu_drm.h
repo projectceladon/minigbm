@@ -82,6 +82,9 @@ struct drm_virtgpu_execbuffer {
 #define VIRTGPU_PARAM_CROSS_DEVICE 5 /* Cross virtio-device resource sharing  */
 #define VIRTGPU_PARAM_CONTEXT_INIT 6 /* DRM_VIRTGPU_CONTEXT_INIT */
 #define VIRTGPU_PARAM_SUPPORTED_CAPSET_IDs 7 /* Bitmask of supported capability set ids */
+#define VIRTGPU_PARAM_CREATE_GUEST_HANDLE 8 /* Host OS handle can be created from guest memory. */
+#define VIRTGPU_PARAM_RESOURCE_SYNC 9 /* Synchronization resources */
+#define VIRTGPU_PARAM_GUEST_VRAM 10 /* All guest allocations happen via virtgpu dedicated heap. */
 
 struct drm_virtgpu_getparam {
 	__u64 param;
@@ -186,6 +189,8 @@ struct drm_virtgpu_resource_create_blob {
 #define VIRTGPU_BLOB_FLAG_USE_MAPPABLE     0x0001
 #define VIRTGPU_BLOB_FLAG_USE_SHAREABLE    0x0002
 #define VIRTGPU_BLOB_FLAG_USE_CROSS_DEVICE 0x0004
+#define VIRTGPU_BLOB_FLAG_CREATE_GUEST_HANDLE 0x0008
+#define VIRTGPU_BLOB_FLAG_CREATE_GUEST_CONTIG 0x0010
 	/* zero is invalid blob_mem */
 	__u32 blob_mem;
 	__u32 blob_flags;

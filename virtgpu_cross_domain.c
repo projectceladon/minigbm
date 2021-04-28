@@ -227,6 +227,13 @@ static int cross_domain_init(struct driver *drv)
 	if ((params[param_supported_capset_ids].value & (1 << CAPSET_CROSS_DOMAIN)) == 0)
 		return -ENOTSUP;
 
+	if (!params[param_resource_blob].value)
+		return -ENOTSUP;
+
+	/// Need zero copy memory
+	if (!params[param_host_visible].value && !params[param_create_guest_handle].value)
+		return -ENOTSUP;
+
 	/*
 	 * crosvm never reports the fake capset.  This is just an extra check to make sure we
 	 * don't use the cross-domain context by accident.  Developers may remove this for
@@ -343,8 +350,18 @@ static int cross_domain_bo_create(struct bo *bo, uint32_t width, uint32_t height
 	if (params[param_cross_device].value && (use_flags & BO_USE_NON_GPU_HW))
 		blob_flags |= VIRTGPU_BLOB_FLAG_USE_CROSS_DEVICE;
 
+	/// It may be possible to have host3d blobs and handles from guest memory at the same time.
+	/// But for the immediate use cases, we will either have one or the other.  For now, just
+	/// prefer guest memory since adding that feature is more involved (requires --udmabuf
+	/// flag to crosvm), so developers would likely test that.
+	if (params[param_create_guest_handle].value) {
+		drm_rc_blob.blob_mem = VIRTGPU_BLOB_MEM_GUEST;
+		blob_flags |= VIRTGPU_BLOB_FLAG_CREATE_GUEST_HANDLE;
+	} else if (params[param_host_visible].value) {
+		drm_rc_blob.blob_mem = VIRTGPU_BLOB_MEM_HOST3D;
+	}
+
 	drm_rc_blob.size = bo->meta.total_size;
-	drm_rc_blob.blob_mem = VIRTGPU_BLOB_MEM_HOST3D;
 	drm_rc_blob.blob_flags = blob_flags;
 	drm_rc_blob.blob_id = bo->meta.blob_id;
 
