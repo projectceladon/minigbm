@@ -48,9 +48,9 @@ struct amdgpu_linear_vma_priv {
 };
 
 const static uint32_t render_target_formats[] = {
-	DRM_FORMAT_ABGR8888,	DRM_FORMAT_ARGB8888,	DRM_FORMAT_RGB565,
-	DRM_FORMAT_XBGR8888,	DRM_FORMAT_XRGB8888,	DRM_FORMAT_ABGR2101010,
-	DRM_FORMAT_ARGB2101010, DRM_FORMAT_XBGR2101010, DRM_FORMAT_XRGB2101010,
+	DRM_FORMAT_ABGR8888,	  DRM_FORMAT_ARGB8888,	  DRM_FORMAT_RGB565,
+	DRM_FORMAT_XBGR8888,	  DRM_FORMAT_XRGB8888,	  DRM_FORMAT_ABGR2101010,
+	DRM_FORMAT_ARGB2101010,	  DRM_FORMAT_XBGR2101010, DRM_FORMAT_XRGB2101010,
 	DRM_FORMAT_ABGR16161616F,
 };
 
@@ -355,12 +355,12 @@ static int amdgpu_init(struct driver *drv)
 	/* NV12 format for camera, display, decoding and encoding. */
 	drv_modify_combination(drv, DRM_FORMAT_NV12, &metadata,
 			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SCANOUT |
-				   BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER | 
-				       BO_USE_PROTECTED);
+				   BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER |
+				   BO_USE_PROTECTED);
 
 	drv_modify_combination(drv, DRM_FORMAT_P010, &metadata,
 			       BO_USE_SCANOUT | BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER |
-			           BO_USE_PROTECTED);
+				   BO_USE_PROTECTED);
 
 	/* Android CTS tests require this. */
 	drv_add_combination(drv, DRM_FORMAT_BGR888, &metadata, BO_USE_SW_MASK);

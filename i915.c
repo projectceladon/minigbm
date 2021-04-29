@@ -108,19 +108,18 @@ static int i915_add_combinations(struct driver *drv)
 				     BO_USE_SW_WRITE_OFTEN | BO_USE_SW_READ_RARELY |
 				     BO_USE_SW_WRITE_RARELY;
 
-	struct format_metadata metadata_linear = {
-		.tiling = I915_TILING_NONE,
-		.priority = 1,
-		.modifier = DRM_FORMAT_MOD_LINEAR
-	};
+	struct format_metadata metadata_linear = { .tiling = I915_TILING_NONE,
+						   .priority = 1,
+						   .modifier = DRM_FORMAT_MOD_LINEAR };
 
 	drv_add_combinations(drv, scanout_render_formats, ARRAY_SIZE(scanout_render_formats),
 			     &metadata_linear, scanout_and_render);
 
-	drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats), &metadata_linear, render);
+	drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats), &metadata_linear,
+			     render);
 
-	drv_add_combinations(drv, texture_only_formats, ARRAY_SIZE(texture_only_formats), &metadata_linear,
-			     texture_only);
+	drv_add_combinations(drv, texture_only_formats, ARRAY_SIZE(texture_only_formats),
+			     &metadata_linear, texture_only);
 
 	drv_modify_linear_combinations(drv);
 
@@ -145,21 +144,18 @@ static int i915_add_combinations(struct driver *drv)
 	const uint64_t render_not_linear = unset_flags(render, linear_mask);
 	const uint64_t scanout_and_render_not_linear = render_not_linear | BO_USE_SCANOUT;
 
-	struct format_metadata metadata_x_tiled = {
-		.tiling = I915_TILING_X,
-		.priority = 2,
-		.modifier = I915_FORMAT_MOD_X_TILED
-	};
+	struct format_metadata metadata_x_tiled = { .tiling = I915_TILING_X,
+						    .priority = 2,
+						    .modifier = I915_FORMAT_MOD_X_TILED };
 
-	drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats), &metadata_x_tiled, render_not_linear);
+	drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats), &metadata_x_tiled,
+			     render_not_linear);
 	drv_add_combinations(drv, scanout_render_formats, ARRAY_SIZE(scanout_render_formats),
 			     &metadata_x_tiled, scanout_and_render_not_linear);
 
-	struct format_metadata metadata_y_tiled = {
-		.tiling = I915_TILING_Y,
-		.priority = 3,
-		.modifier = I915_FORMAT_MOD_Y_TILED
-	};
+	struct format_metadata metadata_y_tiled = { .tiling = I915_TILING_Y,
+						    .priority = 3,
+						    .modifier = I915_FORMAT_MOD_Y_TILED };
 
 /* Support y-tiled NV12 and P010 for libva */
 #ifdef I915_SCANOUT_Y_TILED
@@ -174,7 +170,8 @@ static int i915_add_combinations(struct driver *drv)
 	drv_add_combination(drv, DRM_FORMAT_NV12, &metadata_y_tiled, nv12_usage);
 	drv_add_combination(drv, DRM_FORMAT_P010, &metadata_y_tiled, p010_usage);
 
-	drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats), &metadata_y_tiled, render_not_linear);
+	drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats), &metadata_y_tiled,
+			     render_not_linear);
 
 	// Y-tiled scanout isn't available on old platforms so we add
 	// |scanout_render_formats| without that USE flag.
