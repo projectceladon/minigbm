@@ -279,6 +279,7 @@ static int gralloc0_perform(struct gralloc_module_t const *module, int op, ...)
 	uint32_t *out_width, *out_height, *out_stride;
 	uint32_t strides[DRV_MAX_PLANES] = { 0, 0, 0, 0 };
 	uint32_t offsets[DRV_MAX_PLANES] = { 0, 0, 0, 0 };
+	uint64_t format_modifier = 0;
 	struct cros_gralloc0_buffer_info *info;
 	auto mod = (struct gralloc0_module const *)module;
 
@@ -306,7 +307,7 @@ static int gralloc0_perform(struct gralloc_module_t const *module, int op, ...)
 	switch (op) {
 	case GRALLOC_DRM_GET_STRIDE:
 		out_stride = va_arg(args, uint32_t *);
-		ret = mod->driver->resource_info(handle, strides, offsets);
+		ret = mod->driver->resource_info(handle, strides, offsets, &format_modifier);
 		if (ret)
 			break;
 
@@ -336,11 +337,20 @@ static int gralloc0_perform(struct gralloc_module_t const *module, int op, ...)
 		info = va_arg(args, struct cros_gralloc0_buffer_info *);
 		info->drm_fourcc = drv_get_standard_fourcc(hnd->format);
 		info->num_fds = hnd->num_planes;
-		info->modifier = hnd->format_modifier;
+		ret = mod->driver->resource_info(handle, strides, offsets, &format_modifier);
+		if (ret)
+			break;
+
+		info->modifier = format_modifier ? format_modifier : hnd->format_modifier;
 		for (uint32_t i = 0; i < hnd->num_planes; i++) {
 			info->fds[i] = hnd->fds[i];
-			info->offset[i] = hnd->offsets[i];
-			info->stride[i] = hnd->strides[i];
+			if (strides[i]) {
+				info->stride[i] = strides[i];
+				info->offset[i] = offsets[i];
+			} else {
+				info->stride[i] = hnd->strides[i];
+				info->offset[i] = hnd->offsets[i];
+			}
 		}
 		break;
 	default:
@@ -407,6 +417,7 @@ static int gralloc0_lock_async_ycbcr(struct gralloc_module_t const *module, buff
 	uint32_t map_flags;
 	uint32_t strides[DRV_MAX_PLANES] = { 0, 0, 0, 0 };
 	uint32_t offsets[DRV_MAX_PLANES] = { 0, 0, 0, 0 };
+	uint64_t format_modifier = 0;
 	uint8_t *addr[DRV_MAX_PLANES] = { nullptr, nullptr, nullptr, nullptr };
 	auto mod = (struct gralloc0_module const *)module;
 	struct rectangle rect = { .x = static_cast<uint32_t>(l),
@@ -437,7 +448,7 @@ static int gralloc0_lock_async_ycbcr(struct gralloc_module_t const *module, buff
 		return ret;
 
 	if (!map_flags) {
-		ret = mod->driver->resource_info(handle, strides, offsets);
+		ret = mod->driver->resource_info(handle, strides, offsets, &format_modifier);
 		if (ret)
 			return ret;
 

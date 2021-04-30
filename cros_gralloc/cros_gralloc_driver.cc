@@ -465,7 +465,8 @@ int32_t cros_gralloc_driver::get_backing_store(buffer_handle_t handle, uint64_t 
 }
 
 int32_t cros_gralloc_driver::resource_info(buffer_handle_t handle, uint32_t strides[DRV_MAX_PLANES],
-					   uint32_t offsets[DRV_MAX_PLANES])
+					   uint32_t offsets[DRV_MAX_PLANES],
+					   uint64_t *format_modifier)
 {
 	std::lock_guard<std::mutex> lock(mutex_);
 
@@ -481,7 +482,7 @@ int32_t cros_gralloc_driver::resource_info(buffer_handle_t handle, uint32_t stri
 		return -EINVAL;
 	}
 
-	return buffer->resource_info(strides, offsets);
+	return buffer->resource_info(strides, offsets, format_modifier);
 }
 
 int32_t cros_gralloc_driver::get_reserved_region(buffer_handle_t handle,

@@ -952,7 +952,7 @@ static uint32_t virgl_resolve_format(struct driver *drv, uint32_t format, uint64
 	}
 }
 static int virgl_resource_info(struct bo *bo, uint32_t strides[DRV_MAX_PLANES],
-			       uint32_t offsets[DRV_MAX_PLANES])
+			       uint32_t offsets[DRV_MAX_PLANES], uint64_t *format_modifier)
 {
 	int ret;
 	struct drm_virtgpu_resource_info_cros res_info = { 0 };
@@ -978,6 +978,7 @@ static int virgl_resource_info(struct bo *bo, uint32_t strides[DRV_MAX_PLANES],
 			offsets[plane] = res_info.offsets[plane];
 		}
 	}
+	*format_modifier = res_info.format_modifier;
 
 	return 0;
 }
