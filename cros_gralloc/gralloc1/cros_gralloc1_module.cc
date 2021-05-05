@@ -453,17 +453,6 @@ int32_t CrosGralloc1::release(buffer_handle_t bufferHandle)
 		return GRALLOC1_ERROR_BAD_HANDLE;
 	}
 
-	ret = native_handle_close(bufferHandle);
-	if (ret) {
-		drv_log("Failed to close handle, bad handle.\n");
-		return GRALLOC1_ERROR_BAD_HANDLE;
-	}
-
-	ret = native_handle_delete((native_handle_t*)bufferHandle);
-	if (ret) {
-		drv_log("Failed to delete handle, bad handle.\n");
-		return GRALLOC1_ERROR_BAD_HANDLE;
-	}
 
 	return GRALLOC1_ERROR_NONE;
 }
