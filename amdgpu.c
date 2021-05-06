@@ -496,6 +496,7 @@ static int amdgpu_create_bo(struct bo *bo, uint32_t width, uint32_t height, uint
 			    uint64_t use_flags)
 {
 	struct combination *combo;
+	struct amdgpu_priv *priv = bo->drv->priv;
 
 	combo = drv_get_combination(bo->drv, format, use_flags);
 	if (!combo)
@@ -515,7 +516,7 @@ static int amdgpu_create_bo(struct bo *bo, uint32_t width, uint32_t height, uint
 			needs_alignment = true;
 #endif
 		// See b/122049612
-		if (use_flags & (BO_USE_SCANOUT))
+		if (use_flags & (BO_USE_SCANOUT) && priv->dev_info.family == AMDGPU_FAMILY_CZ)
 			needs_alignment = true;
 
 		if (needs_alignment) {
