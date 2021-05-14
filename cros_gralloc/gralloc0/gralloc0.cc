@@ -42,6 +42,22 @@ enum {
 	GRALLOC_DRM_GET_DIMENSIONS,
 	GRALLOC_DRM_GET_BACKING_STORE,
 	GRALLOC_DRM_GET_BUFFER_INFO,
+	GRALLOC_DRM_GET_USAGE,
+};
+
+/* This enumeration corresponds to the GRALLOC_DRM_GET_USAGE query op, which
+ * defines a set of bit flags used by the client to query vendor usage bits.
+ *
+ * Here is the common flow:
+ * 1) EGL/Vulkan calls GRALLOC_DRM_GET_USAGE to append one or multiple vendor
+ *    usage bits to the existing usage and sets onto the ANativeWindow.
+ * 2) Some implicit GL draw cmd or the explicit vkCreateSwapchainKHR kicks off
+ *    the next dequeueBuffer on the ANativeWindow with the combined usage.
+ * 3) dequeueBuffer then asks gralloc hal for an allocation/re-allocation, and
+ *    calls into the below `gralloc0_alloc(...)` api.
+ */
+enum {
+	GRALLOC_DRM_GET_USAGE_FRONT_RENDERING_BIT = 0x00000001,
 };
 // clang-format on
 
@@ -49,6 +65,11 @@ enum {
 // passthrough gives the low 32-bits of the BufferUsage flags to gralloc0 in their
 // entirety, so we can detect the video decoder flag passed by IAllocator clients.
 #define BUFFER_USAGE_VIDEO_DECODER (1 << 22)
+
+// Reserve the GRALLOC_USAGE_PRIVATE_0 bit for buffers used for front rendering.
+// minigbm backend later decides to use BO_USE_FRONT_RENDERING or BO_USE_LINEAR
+// upon buffer allocaton.
+#define BUFFER_USAGE_FRONT_RENDERING GRALLOC_USAGE_PRIVATE_0
 
 static uint64_t gralloc0_convert_usage(int usage)
 {
@@ -97,6 +118,8 @@ static uint64_t gralloc0_convert_usage(int usage)
 		use_flags |= BO_USE_RENDERSCRIPT;
 	if (usage & BUFFER_USAGE_VIDEO_DECODER)
 		use_flags |= BO_USE_HW_VIDEO_DECODER;
+	if (usage & BUFFER_USAGE_FRONT_RENDERING)
+		use_flags |= BO_USE_FRONT_RENDERING;
 
 	return use_flags;
 }
@@ -149,6 +172,11 @@ static int gralloc0_alloc(alloc_device_t *dev, int w, int h, int format, int usa
 		// to YCbCr_420_888 before being passed to the hw encoder.
 		descriptor.use_flags &= ~BO_USE_HW_VIDEO_ENCODER;
 		drv_log("Retrying format %u allocation without encoder flag", format);
+		supported = mod->driver->is_supported(&descriptor);
+	}
+	if (!supported && (usage & BUFFER_USAGE_FRONT_RENDERING)) {
+		descriptor.use_flags &= ~BO_USE_FRONT_RENDERING;
+		descriptor.use_flags |= BO_USE_LINEAR;
 		supported = mod->driver->is_supported(&descriptor);
 	}
 
@@ -276,12 +304,18 @@ static int gralloc0_perform(struct gralloc_module_t const *module, int op, ...)
 	int32_t *out_format, ret;
 	uint64_t *out_store;
 	buffer_handle_t handle;
+	cros_gralloc_handle_t hnd;
 	uint32_t *out_width, *out_height, *out_stride;
 	uint32_t strides[DRV_MAX_PLANES] = { 0, 0, 0, 0 };
 	uint32_t offsets[DRV_MAX_PLANES] = { 0, 0, 0, 0 };
 	uint64_t format_modifier = 0;
 	struct cros_gralloc0_buffer_info *info;
 	auto mod = (struct gralloc0_module const *)module;
+	uint32_t req_usage;
+	uint32_t gralloc_usage = 0;
+	uint32_t *out_gralloc_usage;
+
+	va_start(args, op);
 
 	switch (op) {
 	case GRALLOC_DRM_GET_STRIDE:
@@ -289,21 +323,23 @@ static int gralloc0_perform(struct gralloc_module_t const *module, int op, ...)
 	case GRALLOC_DRM_GET_DIMENSIONS:
 	case GRALLOC_DRM_GET_BACKING_STORE:
 	case GRALLOC_DRM_GET_BUFFER_INFO:
+		/* retrieve handles for ops with buffer_handle_t */
+		handle = va_arg(args, buffer_handle_t);
+		hnd = cros_gralloc_convert_handle(handle);
+		if (!hnd) {
+			va_end(args);
+			drv_log("Invalid handle.\n");
+			return -EINVAL;
+		}
+		break;
+	case GRALLOC_DRM_GET_USAGE:
 		break;
 	default:
+		va_end(args);
 		return -EINVAL;
 	}
-
-	va_start(args, op);
 
 	ret = 0;
-	handle = va_arg(args, buffer_handle_t);
-	auto hnd = cros_gralloc_convert_handle(handle);
-	if (!hnd) {
-		drv_log("Invalid handle.\n");
-		return -EINVAL;
-	}
-
 	switch (op) {
 	case GRALLOC_DRM_GET_STRIDE:
 		out_stride = va_arg(args, uint32_t *);
@@ -352,6 +388,13 @@ static int gralloc0_perform(struct gralloc_module_t const *module, int op, ...)
 				info->offset[i] = hnd->offsets[i];
 			}
 		}
+		break;
+	case GRALLOC_DRM_GET_USAGE:
+		req_usage = va_arg(args, uint32_t);
+		out_gralloc_usage = va_arg(args, uint32_t *);
+		if (req_usage & GRALLOC_DRM_GET_USAGE_FRONT_RENDERING_BIT)
+			gralloc_usage |= BUFFER_USAGE_FRONT_RENDERING;
+		*out_gralloc_usage = gralloc_usage;
 		break;
 	default:
 		ret = -EINVAL;
