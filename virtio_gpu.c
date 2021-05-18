@@ -591,6 +591,10 @@ static int virtio_gpu_init(struct driver *drv)
 		virtio_gpu_add_combinations(drv, render_target_formats,
 					    ARRAY_SIZE(render_target_formats), &LINEAR_METADATA,
 					    BO_USE_RENDER_MASK | BO_USE_SCANOUT);
+#ifdef USE_GRALLOC1
+		drv_modify_combination(drv, DRM_FORMAT_ABGR8888, &LINEAR_METADATA,
+					    BO_USE_CAMERA_WRITE | BO_USE_CAMERA_READ);
+#endif
 		virtio_gpu_add_combinations(drv, texture_source_formats,
 					    ARRAY_SIZE(texture_source_formats), &LINEAR_METADATA,
 					    BO_USE_TEXTURE_MASK);
