@@ -364,13 +364,20 @@ int32_t CrosGralloc1::importBuffer(const buffer_handle_t rawHandle, buffer_handl
 		*outBuffer = NULL;
 		return GRALLOC1_ERROR_BAD_HANDLE;
 	}
-	auto error = driver->retain(rawHandle);
+	buffer_handle_t buffer_handle = native_handle_clone(rawHandle);
+	if (!buffer_handle) {
+		*outBuffer = NULL;
+		return GRALLOC1_ERROR_NO_RESOURCES;
+	}
+	auto error = retain(buffer_handle);
 	if (error != GRALLOC1_ERROR_NONE) {
+		native_handle_close(buffer_handle);
+		native_handle_delete((native_handle_t*)buffer_handle);
 		*outBuffer = NULL;
 		return error;
 	}
 
-	*outBuffer = rawHandle;
+	*outBuffer = buffer_handle;
 	return GRALLOC1_ERROR_NONE;
 }
 
@@ -446,6 +453,17 @@ int32_t CrosGralloc1::release(buffer_handle_t bufferHandle)
 		return GRALLOC1_ERROR_BAD_HANDLE;
 	}
 
+	ret = native_handle_close(bufferHandle);
+	if (ret) {
+		drv_log("Failed to close handle, bad handle.\n");
+		return GRALLOC1_ERROR_BAD_HANDLE;
+	}
+
+	ret = native_handle_delete((native_handle_t*)bufferHandle);
+	if (ret) {
+		drv_log("Failed to delete handle, bad handle.\n");
+		return GRALLOC1_ERROR_BAD_HANDLE;
+	}
 
 	return GRALLOC1_ERROR_NONE;
 }
