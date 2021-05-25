@@ -169,9 +169,6 @@ static int detect_device_info(unsigned int detect_flags, int fd, struct gbm_devi
 	} else if (strncmp("nouveau", version->name, version->name_len) == 0) {
 		info->dev_type_flags |=
 		    GBM_DEV_TYPE_FLAG_DISPLAY | GBM_DEV_TYPE_FLAG_3D | GBM_DEV_TYPE_FLAG_DISCRETE;
-	} else if (strncmp("tegra", version->name, version->name_len) == 0) {
-		info->dev_type_flags |=
-		    GBM_DEV_TYPE_FLAG_DISPLAY | GBM_DEV_TYPE_FLAG_3D | GBM_DEV_TYPE_FLAG_ARMSOC;
 	} else if (strncmp("msm", version->name, version->name_len) == 0) {
 		info->dev_type_flags |=
 		    GBM_DEV_TYPE_FLAG_DISPLAY | GBM_DEV_TYPE_FLAG_3D | GBM_DEV_TYPE_FLAG_ARMSOC;

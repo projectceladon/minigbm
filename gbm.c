@@ -328,6 +328,11 @@ PUBLIC union gbm_bo_handle gbm_bo_get_handle_for_plane(struct gbm_bo *bo, size_t
 	return (union gbm_bo_handle)drv_bo_get_plane_handle(bo->bo, (size_t)plane).u64;
 }
 
+PUBLIC int gbm_bo_get_fd_for_plane(struct gbm_bo *bo, int plane)
+{
+	return drv_bo_get_plane_fd(bo->bo, plane);
+}
+
 PUBLIC uint32_t gbm_bo_get_offset(struct gbm_bo *bo, size_t plane)
 {
 	return drv_bo_get_plane_offset(bo->bo, (size_t)plane);
