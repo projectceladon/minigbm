@@ -223,7 +223,14 @@ static int msm_init(struct driver *drv)
 	struct format_metadata metadata;
 	uint64_t render_use_flags = BO_USE_RENDER_MASK | BO_USE_SCANOUT;
 	uint64_t texture_use_flags = BO_USE_TEXTURE_MASK | BO_USE_HW_VIDEO_DECODER;
-	uint64_t sw_flags = (BO_USE_RENDERSCRIPT | BO_USE_SW_MASK | BO_USE_LINEAR);
+	/*
+	 * NOTE: we actually could use tiled in the BO_USE_FRONT_RENDERING case,
+	 * if we had a modifier for tiled-but-not-compressed.  But we *cannot* use
+	 * compressed in this case because the UBWC flags/meta data can be out of
+	 * sync with pixel data while the GPU is writing a frame out to memory.
+	 */
+	uint64_t sw_flags =
+	    (BO_USE_RENDERSCRIPT | BO_USE_SW_MASK | BO_USE_LINEAR | BO_USE_FRONT_RENDERING);
 
 	drv_add_combinations(drv, render_target_formats, ARRAY_SIZE(render_target_formats),
 			     &LINEAR_METADATA, render_use_flags);
@@ -267,8 +274,7 @@ static int msm_init(struct driver *drv)
 				  &metadata, texture_use_flags);
 
 	drv_modify_combination(drv, DRM_FORMAT_NV12, &metadata,
-			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SCANOUT |
-				   BO_USE_HW_VIDEO_ENCODER);
+			       BO_USE_SCANOUT | BO_USE_HW_VIDEO_ENCODER);
 
 	return 0;
 }

@@ -275,7 +275,7 @@ static uint32_t mediatek_resolve_format(struct driver *drv, uint32_t format, uin
 		/*HACK: See b/28671744 */
 		return DRM_FORMAT_XBGR8888;
 	case DRM_FORMAT_FLEX_YCbCr_420_888:
-#ifdef MTK_MT8183
+#if defined(MTK_MT8183) || defined(MTK_MT8192)
 		// TODO(hiroh): Switch to use NV12 for video decoder on MT8173 as well.
 		if (use_flags & (BO_USE_HW_VIDEO_DECODER)) {
 			return DRM_FORMAT_NV12;
