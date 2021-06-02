@@ -23,11 +23,10 @@ package {
     default_applicable_licenses: ["external_minigbm_license"],
 }
 
-cc_binary {
-    name: "android.hardware.graphics.allocator@4.0-service.minigbm",
+cc_defaults {
+    name: "service_minigbm_defaults",
     relative_install_path: "hw",
     vendor: true,
-    init_rc: ["android.hardware.graphics.allocator@4.0-service.minigbm.rc"],
 
     vintf_fragments: ["android.hardware.graphics.allocator@4.0.xml"],
 
@@ -50,7 +49,6 @@ cc_binary {
 
     static_libs: [
         "libdrm",
-        "libminigbm_cros_gralloc",
     ],
 
     srcs: [
@@ -60,8 +58,26 @@ cc_binary {
     ],
 }
 
-cc_library_shared {
-    name: "android.hardware.graphics.mapper@4.0-impl.minigbm",
+cc_binary {
+    name: "android.hardware.graphics.allocator@4.0-service.minigbm",
+    init_rc: ["android.hardware.graphics.allocator@4.0-service.minigbm.rc"],
+    defaults: ["service_minigbm_defaults"],
+    static_libs: [
+        "libminigbm_cros_gralloc",
+    ],
+}
+
+cc_binary {
+    name: "android.hardware.graphics.allocator@4.0-service.minigbm_msm",
+    init_rc: ["android.hardware.graphics.allocator@4.0-service.minigbm_msm.rc"],
+    defaults: ["service_minigbm_defaults"],
+    static_libs: [
+        "libminigbm_cros_gralloc_msm",
+    ],
+}
+
+cc_defaults {
+    name: "impl_minigbm_defaults",
     relative_install_path: "hw",
     vendor: true,
 
@@ -85,11 +101,30 @@ cc_library_shared {
 
     static_libs: [
         "libdrm",
-        "libminigbm_cros_gralloc",
     ],
 
     srcs: [
         "CrosGralloc4Mapper.cc",
         "CrosGralloc4Utils.cc",
     ],
+}
+
+cc_library_shared {
+    name: "android.hardware.graphics.mapper@4.0-impl.minigbm",
+    defaults: ["impl_minigbm_defaults"],
+
+    static_libs: [
+        "libminigbm_cros_gralloc",
+    ],
+
+}
+
+cc_library_shared {
+    name: "android.hardware.graphics.mapper@4.0-impl.minigbm_msm",
+    defaults: ["impl_minigbm_defaults"],
+
+    static_libs: [
+        "libminigbm_cros_gralloc_msm",
+    ],
+
 }
