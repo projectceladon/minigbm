@@ -378,6 +378,7 @@ static int gralloc0_perform(struct gralloc_module_t const *module, int op, ...)
 		break;
 	case GRALLOC_DRM_GET_BUFFER_INFO:
 		info = va_arg(args, struct cros_gralloc0_buffer_info *);
+		memset(info, 0, sizeof(*info));
 		info->drm_fourcc = drv_get_standard_fourcc(hnd->format);
 		info->num_fds = hnd->num_planes;
 		ret = mod->driver->resource_info(handle, strides, offsets, &format_modifier);
