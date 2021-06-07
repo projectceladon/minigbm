@@ -37,9 +37,6 @@ static const uint32_t texture_only_formats[] = { DRM_FORMAT_R8, DRM_FORMAT_NV12,
 static const uint64_t gen_modifier_order[] = { I915_FORMAT_MOD_Y_TILED_CCS, I915_FORMAT_MOD_Y_TILED,
 					       I915_FORMAT_MOD_X_TILED, DRM_FORMAT_MOD_LINEAR };
 
-static const uint64_t gen11_modifier_order[] = { I915_FORMAT_MOD_Y_TILED, I915_FORMAT_MOD_X_TILED,
-						 DRM_FORMAT_MOD_LINEAR };
-
 struct modifier_support_t {
 	const uint64_t *order;
 	uint32_t count;
@@ -92,13 +89,8 @@ static void i915_info_from_device_id(struct i915_device *i915)
 
 static void i915_get_modifier_order(struct i915_device *i915)
 {
-	if (i915->gen == 11) {
-		i915->modifier.order = gen11_modifier_order;
-		i915->modifier.count = ARRAY_SIZE(gen11_modifier_order);
-	} else {
-		i915->modifier.order = gen_modifier_order;
-		i915->modifier.count = ARRAY_SIZE(gen_modifier_order);
-	}
+	i915->modifier.order = gen_modifier_order;
+	i915->modifier.count = ARRAY_SIZE(gen_modifier_order);
 }
 
 static uint64_t unset_flags(uint64_t current_flags, uint64_t mask)
