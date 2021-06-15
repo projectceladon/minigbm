@@ -609,6 +609,8 @@ static int virgl_init(struct driver *drv)
 	virgl_add_combination(drv, DRM_FORMAT_BGR888, &LINEAR_METADATA, BO_USE_SW_MASK);
 	virgl_add_combination(drv, DRM_FORMAT_ABGR16161616F, &LINEAR_METADATA,
 				   BO_USE_SW_MASK | BO_USE_TEXTURE_MASK);
+	virgl_add_combination(drv, DRM_FORMAT_ABGR2101010, &LINEAR_METADATA,
+			      BO_USE_SW_MASK | BO_USE_TEXTURE_MASK);
 	virgl_add_combination(drv, DRM_FORMAT_P010, &LINEAR_METADATA,
 				   BO_USE_SW_MASK | BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE);
 

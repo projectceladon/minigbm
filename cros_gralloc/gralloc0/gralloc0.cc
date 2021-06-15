@@ -264,9 +264,10 @@ static int gralloc0_register_buffer(struct gralloc_module_t const *module, buffe
 	auto const_module = reinterpret_cast<const struct gralloc0_module *>(module);
 	auto mod = const_cast<struct gralloc0_module *>(const_module);
 
-	if (!mod->initialized)
+	if (!mod->initialized) {
 		if (gralloc0_init(mod, false))
 			return -ENODEV;
+	}
 
 	return mod->driver->retain(handle);
 }
@@ -310,10 +311,16 @@ static int gralloc0_perform(struct gralloc_module_t const *module, int op, ...)
 	uint32_t offsets[DRV_MAX_PLANES] = { 0, 0, 0, 0 };
 	uint64_t format_modifier = 0;
 	struct cros_gralloc0_buffer_info *info;
-	auto mod = (struct gralloc0_module const *)module;
+	auto const_module = reinterpret_cast<const struct gralloc0_module *>(module);
+	auto mod = const_cast<struct gralloc0_module *>(const_module);
 	uint32_t req_usage;
 	uint32_t gralloc_usage = 0;
 	uint32_t *out_gralloc_usage;
+
+	if (!mod->initialized) {
+		if (gralloc0_init(mod, false))
+			return -ENODEV;
+	}
 
 	va_start(args, op);
 
@@ -371,6 +378,7 @@ static int gralloc0_perform(struct gralloc_module_t const *module, int op, ...)
 		break;
 	case GRALLOC_DRM_GET_BUFFER_INFO:
 		info = va_arg(args, struct cros_gralloc0_buffer_info *);
+		memset(info, 0, sizeof(*info));
 		info->drm_fourcc = drv_get_standard_fourcc(hnd->format);
 		info->num_fds = hnd->num_planes;
 		ret = mod->driver->resource_info(handle, strides, offsets, &format_modifier);
@@ -417,11 +425,17 @@ static int gralloc0_lock_async(struct gralloc_module_t const *module, buffer_han
 	int32_t ret;
 	uint32_t map_flags;
 	uint8_t *addr[DRV_MAX_PLANES];
-	auto mod = (struct gralloc0_module const *)module;
+	auto const_module = reinterpret_cast<const struct gralloc0_module *>(module);
+	auto mod = const_cast<struct gralloc0_module *>(const_module);
 	struct rectangle rect = { .x = static_cast<uint32_t>(l),
 				  .y = static_cast<uint32_t>(t),
 				  .width = static_cast<uint32_t>(w),
 				  .height = static_cast<uint32_t>(h) };
+
+	if (!mod->initialized) {
+		if (gralloc0_init(mod, false))
+			return -ENODEV;
+	}
 
 	auto hnd = cros_gralloc_convert_handle(handle);
 	if (!hnd) {
@@ -462,11 +476,17 @@ static int gralloc0_lock_async_ycbcr(struct gralloc_module_t const *module, buff
 	uint32_t offsets[DRV_MAX_PLANES] = { 0, 0, 0, 0 };
 	uint64_t format_modifier = 0;
 	uint8_t *addr[DRV_MAX_PLANES] = { nullptr, nullptr, nullptr, nullptr };
-	auto mod = (struct gralloc0_module const *)module;
+	auto const_module = reinterpret_cast<const struct gralloc0_module *>(module);
+	auto mod = const_cast<struct gralloc0_module *>(const_module);
 	struct rectangle rect = { .x = static_cast<uint32_t>(l),
 				  .y = static_cast<uint32_t>(t),
 				  .width = static_cast<uint32_t>(w),
 				  .height = static_cast<uint32_t>(h) };
+
+	if (!mod->initialized) {
+		if (gralloc0_init(mod, false))
+			return -ENODEV;
+	}
 
 	auto hnd = cros_gralloc_convert_handle(handle);
 	if (!hnd) {
