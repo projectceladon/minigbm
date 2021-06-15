@@ -394,6 +394,10 @@ static int amdgpu_init(struct driver *drv)
 	use_flags &= ~BO_USE_RENDERSCRIPT;
 	use_flags &= ~BO_USE_SW_WRITE_OFTEN;
 	use_flags &= ~BO_USE_SW_READ_OFTEN;
+#if __ANDROID__
+	use_flags &= ~BO_USE_SW_WRITE_RARELY;
+	use_flags &= ~BO_USE_SW_READ_RARELY;
+#endif
 	use_flags &= ~BO_USE_LINEAR;
 
 	metadata.tiling = TILE_TYPE_DRI;
