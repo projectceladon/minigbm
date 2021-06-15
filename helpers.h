@@ -16,6 +16,10 @@ extern "C" {
 #include "drv.h"
 #include "helpers_array.h"
 
+#ifndef PAGE_SIZE
+#define PAGE_SIZE 0x1000
+#endif
+
 uint32_t drv_height_from_format(uint32_t format, uint32_t height, size_t plane);
 uint32_t drv_vertical_subsampling_from_format(uint32_t format, size_t plane);
 uint32_t drv_size_from_format(uint32_t format, uint32_t stride, uint32_t height, size_t plane);
