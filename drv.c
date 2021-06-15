@@ -43,9 +43,6 @@ extern const struct backend backend_msm;
 #ifdef DRV_ROCKCHIP
 extern const struct backend backend_rockchip;
 #endif
-#ifdef DRV_TEGRA
-extern const struct backend backend_tegra;
-#endif
 #ifdef DRV_VC4
 extern const struct backend backend_vc4;
 #endif
@@ -58,7 +55,7 @@ extern const struct backend backend_nouveau;
 extern const struct backend backend_komeda;
 extern const struct backend backend_radeon;
 extern const struct backend backend_synaptics;
-extern const struct backend backend_virtio_gpu;
+extern const struct backend backend_virtgpu;
 extern const struct backend backend_udl;
 extern const struct backend backend_vkms;
 
@@ -94,21 +91,13 @@ static const struct backend *drv_get_backend(int fd)
 #ifdef DRV_VC4
 		&backend_vc4,
 #endif
-		&backend_evdi,	   &backend_marvell,	&backend_meson,	    &backend_nouveau,
-		&backend_komeda,   &backend_radeon,	&backend_synaptics, &backend_virtio_gpu,
-		&backend_udl,	   &backend_virtio_gpu, &backend_vkms
+		&backend_evdi,	   &backend_marvell, &backend_meson,	 &backend_nouveau,
+		&backend_komeda,   &backend_radeon,  &backend_synaptics, &backend_virtgpu,
+		&backend_udl,	   &backend_virtgpu, &backend_vkms
 	};
 
 	for (i = 0; i < ARRAY_SIZE(backend_list); i++) {
 		const struct backend *b = backend_list[i];
-		// Exactly one of the main create functions must be defined.
-		assert((b->bo_create != NULL) ^ (b->bo_create_from_metadata != NULL));
-		// Either both or neither must be implemented.
-		assert((b->bo_compute_metadata != NULL) == (b->bo_create_from_metadata != NULL));
-		// Both can't be defined, but it's okay for neither to be (i.e. only bo_create).
-		assert((b->bo_create_with_modifiers == NULL) ||
-		       (b->bo_create_from_metadata == NULL));
-
 		if (!strcmp(drm_version->name, b->name)) {
 			drmFreeVersion(drm_version);
 			return b;
@@ -694,15 +683,16 @@ void drv_log_prefix(const char *prefix, const char *file, int line, const char *
 }
 
 int drv_resource_info(struct bo *bo, uint32_t strides[DRV_MAX_PLANES],
-		      uint32_t offsets[DRV_MAX_PLANES])
+		      uint32_t offsets[DRV_MAX_PLANES], uint64_t *format_modifier)
 {
 	for (uint32_t plane = 0; plane < bo->meta.num_planes; plane++) {
 		strides[plane] = bo->meta.strides[plane];
 		offsets[plane] = bo->meta.offsets[plane];
 	}
+	*format_modifier = bo->meta.format_modifier;
 
 	if (bo->drv->backend->resource_info)
-		return bo->drv->backend->resource_info(bo, strides, offsets);
+		return bo->drv->backend->resource_info(bo, strides, offsets, format_modifier);
 
 	return 0;
 }
