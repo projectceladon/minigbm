@@ -66,6 +66,11 @@ enum {
 // entirety, so we can detect the video decoder flag passed by IAllocator clients.
 #define BUFFER_USAGE_VIDEO_DECODER (1 << 22)
 
+// Gralloc0 doesn't define the BufferUsage::GPU_DATA_BUFFER flag. Define here to
+// align accordingly since AHardwareBuffer and Vulkan interop requires gralloc
+// to support allocating with AHARDWAREBUFFER_USAGE_GPU_DATA_BUFFER.
+#define BUFFER_USAGE_GPU_DATA_BUFFER (1 << 24)
+
 // Reserve the GRALLOC_USAGE_PRIVATE_0 bit for buffers used for front rendering.
 // minigbm backend later decides to use BO_USE_FRONT_RENDERING or BO_USE_LINEAR
 // upon buffer allocaton.
@@ -120,6 +125,8 @@ static uint64_t gralloc0_convert_usage(int usage)
 		use_flags |= BO_USE_HW_VIDEO_DECODER;
 	if (usage & BUFFER_USAGE_FRONT_RENDERING)
 		use_flags |= BO_USE_FRONT_RENDERING;
+	if (usage & BUFFER_USAGE_GPU_DATA_BUFFER)
+		use_flags |= BO_USE_GPU_DATA_BUFFER;
 
 	return use_flags;
 }

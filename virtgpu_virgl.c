@@ -391,6 +391,7 @@ static uint32_t compute_virgl_bind_flags(uint64_t use_flags, uint32_t format)
 	handle_flag(&use_flags, BO_USE_SCANOUT, &bind, VIRGL_BIND_SCANOUT);
 	handle_flag(&use_flags, BO_USE_CURSOR, &bind, VIRGL_BIND_CURSOR);
 	handle_flag(&use_flags, BO_USE_LINEAR, &bind, VIRGL_BIND_LINEAR);
+	handle_flag(&use_flags, BO_USE_GPU_DATA_BUFFER, &bind, VIRGL_BIND_LINEAR);
 
 	if (use_flags & BO_USE_PROTECTED) {
 		handle_flag(&use_flags, BO_USE_PROTECTED, &bind, VIRGL_BIND_MINIGBM_PROTECTED);
@@ -618,7 +619,7 @@ static int virgl_init(struct driver *drv)
 				   BO_USE_HW_VIDEO_ENCODER);
 	drv_modify_combination(drv, DRM_FORMAT_R8, &LINEAR_METADATA,
 			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER |
-				   BO_USE_HW_VIDEO_ENCODER);
+				   BO_USE_HW_VIDEO_ENCODER | BO_USE_GPU_DATA_BUFFER);
 
 	if (!priv->host_gbm_enabled) {
 		drv_modify_combination(drv, DRM_FORMAT_ABGR8888, &LINEAR_METADATA,
@@ -713,9 +714,10 @@ static bool should_use_blob(struct driver *drv, uint32_t format, uint64_t use_fl
 	if (!priv->host_gbm_enabled)
 		return false;
 
-	// Use regular resources if only the GPU needs efficient access
-	if (!(use_flags &
-	      (BO_USE_SW_READ_OFTEN | BO_USE_SW_WRITE_OFTEN | BO_USE_LINEAR | BO_USE_NON_GPU_HW)))
+	// Use regular resources if only the GPU needs efficient access. Blob resource is a better
+	// fit for BO_USE_GPU_DATA_BUFFER which is mapped to VIRGL_BIND_LINEAR.
+	if (!(use_flags & (BO_USE_SW_READ_OFTEN | BO_USE_SW_WRITE_OFTEN | BO_USE_LINEAR |
+			   BO_USE_NON_GPU_HW | BO_USE_GPU_DATA_BUFFER)))
 		return false;
 
 	switch (format) {
