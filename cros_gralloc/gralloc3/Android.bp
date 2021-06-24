@@ -22,33 +22,8 @@ package {
     default_applicable_licenses: ["external_minigbm_license"],
 }
 
-cc_binary {
-    name: "android.hardware.graphics.allocator@3.0-service.minigbm",
-    relative_install_path: "hw",
-    vendor: true,
-    init_rc: ["android.hardware.graphics.allocator@3.0-service.minigbm.rc"],
-
-    cflags: [
-        "-Wall",
-        "-Werror",
-    ],
-
-    shared_libs: [
-        "android.hardware.graphics.allocator@3.0",
-        "android.hardware.graphics.mapper@3.0",
-        "libbase",
-        "libcutils",
-        "libhidlbase",
-        "liblog",
-        "libsync",
-        "libutils",
-    ],
-
-    static_libs: [
-        "libdrm",
-        "libminigbm_cros_gralloc",
-    ],
-
+filegroup {
+    name: "minigbm_gralloc3_allocator_files",
     srcs: [
         "CrosGralloc3Allocator.cc",
         "CrosGralloc3AllocatorService.cc",
@@ -56,33 +31,46 @@ cc_binary {
     ],
 }
 
-cc_library_shared {
-    name: "android.hardware.graphics.mapper@3.0-impl.minigbm",
-    relative_install_path: "hw",
-    vendor: true,
-
-    cflags: [
-        "-Wall",
-        "-Werror",
-    ],
-
-    shared_libs: [
-        "android.hardware.graphics.mapper@3.0",
-        "libbase",
-        "libcutils",
-        "libhidlbase",
-        "liblog",
-        "libsync",
-        "libutils",
-    ],
-
-    static_libs: [
-        "libdrm",
-        "libminigbm_cros_gralloc",
-    ],
-
+filegroup {
+    name: "minigbm_gralloc3_mapper_files",
     srcs: [
         "CrosGralloc3Mapper.cc",
         "CrosGralloc3Utils.cc",
     ],
+}
+
+cc_defaults {
+    name: "minigbm_gralloc3_common_defaults",
+    defaults: ["minigbm_cros_gralloc_defaults"],
+
+    shared_libs: [
+        "android.hardware.graphics.mapper@3.0",
+        "libgralloctypes",
+        "libhidlbase",
+        "libbase",
+        "libutils",
+    ],
+
+    cflags: ["-Wno-sign-compare"],
+}
+
+cc_defaults {
+    name: "minigbm_gralloc3_allocator_defaults",
+    defaults: ["minigbm_gralloc3_common_defaults"],
+
+    shared_libs: ["android.hardware.graphics.allocator@3.0"],
+    srcs: [":minigbm_gralloc3_allocator_files"],
+}
+
+cc_binary {
+    name: "android.hardware.graphics.allocator@3.0-service.minigbm",
+    defaults: ["minigbm_gralloc3_allocator_defaults"],
+    init_rc: ["android.hardware.graphics.allocator@3.0-service.minigbm.rc"],
+}
+
+cc_library_shared {
+    name: "android.hardware.graphics.mapper@3.0-impl.minigbm",
+    defaults: ["minigbm_gralloc3_common_defaults"],
+
+    srcs: [":minigbm_gralloc3_mapper_files"],
 }
