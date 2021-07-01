@@ -15,7 +15,7 @@
 struct gralloc0_module {
 	gralloc_module_t base;
 	std::unique_ptr<alloc_device_t> alloc;
-	std::unique_ptr<cros_gralloc_driver> driver;
+	cros_gralloc_driver *driver;
 	bool initialized;
 	std::mutex initialization_mutex;
 };
@@ -224,11 +224,9 @@ static int gralloc0_init(struct gralloc0_module *mod, bool initialize_alloc)
 	if (mod->initialized)
 		return 0;
 
-	mod->driver = std::make_unique<cros_gralloc_driver>();
-	if (mod->driver->init()) {
-		drv_log("Failed to initialize driver.\n");
+	mod->driver = cros_gralloc_driver::get_instance();
+	if (!mod->driver)
 		return -ENODEV;
-	}
 
 	if (initialize_alloc) {
 		mod->alloc = std::make_unique<alloc_device_t>();
