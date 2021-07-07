@@ -71,11 +71,6 @@ enum {
 // to support allocating with AHARDWAREBUFFER_USAGE_GPU_DATA_BUFFER.
 #define BUFFER_USAGE_GPU_DATA_BUFFER (1 << 24)
 
-// Reserve the GRALLOC_USAGE_PRIVATE_0 bit for buffers used for front rendering.
-// minigbm backend later decides to use BO_USE_FRONT_RENDERING or BO_USE_LINEAR
-// upon buffer allocaton.
-#define BUFFER_USAGE_FRONT_RENDERING GRALLOC_USAGE_PRIVATE_0
-
 static uint64_t gralloc0_convert_usage(int usage)
 {
 	uint64_t use_flags = BO_USE_NONE;
