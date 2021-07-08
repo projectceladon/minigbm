@@ -394,6 +394,7 @@ static uint32_t compute_virgl_bind_flags(uint64_t use_flags, uint32_t format)
 	handle_flag(&use_flags, BO_USE_CURSOR, &bind, VIRGL_BIND_CURSOR);
 	handle_flag(&use_flags, BO_USE_LINEAR, &bind, VIRGL_BIND_LINEAR);
 	handle_flag(&use_flags, BO_USE_GPU_DATA_BUFFER, &bind, VIRGL_BIND_LINEAR);
+	handle_flag(&use_flags, BO_USE_FRONT_RENDERING, &bind, VIRGL_BIND_LINEAR);
 
 	if (use_flags & BO_USE_PROTECTED) {
 		handle_flag(&use_flags, BO_USE_PROTECTED, &bind, VIRGL_BIND_MINIGBM_PROTECTED);
