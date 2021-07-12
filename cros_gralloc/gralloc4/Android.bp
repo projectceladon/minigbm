@@ -53,6 +53,7 @@ cc_defaults {
     ],
 
     cflags: ["-Wno-sign-compare"],
+    relative_install_path: "hw",
 }
 
 cc_defaults {
@@ -66,6 +67,7 @@ cc_defaults {
 cc_binary {
     name: "android.hardware.graphics.allocator@4.0-service.minigbm",
     defaults: ["minigbm_gralloc4_allocator_defaults"],
+    shared_libs: ["libminigbm_gralloc"],
     vintf_fragments: ["android.hardware.graphics.allocator@4.0.xml"],
     init_rc: ["android.hardware.graphics.allocator@4.0-service.minigbm.rc"],
 }
@@ -73,25 +75,23 @@ cc_binary {
 cc_binary {
     name: "android.hardware.graphics.allocator@4.0-service.minigbm_msm",
     defaults: ["minigbm_gralloc4_allocator_defaults"],
+    shared_libs: ["libminigbm_gralloc_msm"],
     vintf_fragments: ["android.hardware.graphics.allocator@4.0.xml"],
     init_rc: ["android.hardware.graphics.allocator@4.0-service.minigbm_msm.rc"],
-
-    cflags: ["-DDRV_MSM"],
 }
 
 cc_library_shared {
     name: "android.hardware.graphics.mapper@4.0-impl.minigbm",
     defaults: ["minigbm_gralloc4_common_defaults"],
+    shared_libs: ["libminigbm_gralloc"],
     vintf_fragments: ["android.hardware.graphics.mapper@4.0.xml"],
-
     srcs: [":minigbm_gralloc4_mapper_files"],
 }
 
 cc_library_shared {
     name: "android.hardware.graphics.mapper@4.0-impl.minigbm_msm",
     defaults: ["minigbm_gralloc4_common_defaults"],
+    shared_libs: ["libminigbm_gralloc_msm"],
     vintf_fragments: ["android.hardware.graphics.mapper@4.0.xml"],
-
-    cflags: ["-DDRV_MSM"],
     srcs: [":minigbm_gralloc4_mapper_files"],
 }
