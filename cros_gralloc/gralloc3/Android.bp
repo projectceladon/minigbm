@@ -52,6 +52,7 @@ cc_defaults {
     ],
 
     cflags: ["-Wno-sign-compare"],
+    relative_install_path: "hw",
 }
 
 cc_defaults {
@@ -65,12 +66,14 @@ cc_defaults {
 cc_binary {
     name: "android.hardware.graphics.allocator@3.0-service.minigbm",
     defaults: ["minigbm_gralloc3_allocator_defaults"],
+    shared_libs: ["libminigbm_gralloc"],
     init_rc: ["android.hardware.graphics.allocator@3.0-service.minigbm.rc"],
 }
 
 cc_library_shared {
     name: "android.hardware.graphics.mapper@3.0-impl.minigbm",
     defaults: ["minigbm_gralloc3_common_defaults"],
+    shared_libs: ["libminigbm_gralloc"],
 
     srcs: [":minigbm_gralloc3_mapper_files"],
 }
