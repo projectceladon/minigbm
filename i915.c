@@ -37,9 +37,6 @@ static const uint32_t texture_only_formats[] = { DRM_FORMAT_R8, DRM_FORMAT_NV12,
 static const uint64_t gen_modifier_order[] = { I915_FORMAT_MOD_Y_TILED_CCS, I915_FORMAT_MOD_Y_TILED,
 					       I915_FORMAT_MOD_X_TILED, DRM_FORMAT_MOD_LINEAR };
 
-static const uint64_t gen11_modifier_order[] = { I915_FORMAT_MOD_Y_TILED, I915_FORMAT_MOD_X_TILED,
-						 DRM_FORMAT_MOD_LINEAR };
-
 struct modifier_support_t {
 	const uint64_t *order;
 	uint32_t count;
@@ -61,10 +58,9 @@ static void i915_info_from_device_id(struct i915_device *i915)
 	const uint16_t gen11_ids[] = { 0x4E71, 0x4E61, 0x4E51, 0x4E55, 0x4E57 };
 	const uint16_t gen12_ids[] = { 0x9A40, 0x9A49, 0x9A59, 0x9A60, 0x9A68, 0x9A70,
 				       0x9A78, 0x9AC0, 0x9AC9, 0x9AD9, 0x9AF8 };
-	const uint16_t adlp_ids[] = { 0x46A0, 0x46A1, 0x46A2, 0x46A3, 0x46A6,
-				      0x46A8, 0x46AA, 0x462A, 0x4626, 0x4628,
-				      0x46B0, 0x46B1, 0x46B2, 0x46B3, 0x46C0,
-				      0x46C1, 0x46C2, 0x46C3 };
+	const uint16_t adlp_ids[] = { 0x46A0, 0x46A1, 0x46A2, 0x46A3, 0x46A6, 0x46A8,
+				      0x46AA, 0x462A, 0x4626, 0x4628, 0x46B0, 0x46B1,
+				      0x46B2, 0x46B3, 0x46C0, 0x46C1, 0x46C2, 0x46C3 };
 	unsigned i;
 	i915->gen = 4;
 	i915->is_adlp = false;
@@ -92,13 +88,8 @@ static void i915_info_from_device_id(struct i915_device *i915)
 
 static void i915_get_modifier_order(struct i915_device *i915)
 {
-	if (i915->gen == 11) {
-		i915->modifier.order = gen11_modifier_order;
-		i915->modifier.count = ARRAY_SIZE(gen11_modifier_order);
-	} else {
-		i915->modifier.order = gen_modifier_order;
-		i915->modifier.count = ARRAY_SIZE(gen_modifier_order);
-	}
+	i915->modifier.order = gen_modifier_order;
+	i915->modifier.count = ARRAY_SIZE(gen_modifier_order);
 }
 
 static uint64_t unset_flags(uint64_t current_flags, uint64_t mask)
@@ -251,7 +242,7 @@ static int i915_align_dimensions(struct bo *bo, uint32_t tiling, uint32_t *strid
 
 	/* stride must be power-of-two aligned for ADL-P tiled buffers*/
 	if (i915->is_adlp && (*stride > 1) && (tiling != I915_TILING_NONE))
-		*stride = 1 << (32 - __builtin_clz(*stride -1));
+		*stride = 1 << (32 - __builtin_clz(*stride - 1));
 
 	if (i915->gen <= 3 && *stride > 8192)
 		return -EINVAL;
@@ -316,7 +307,8 @@ static int i915_init(struct driver *drv)
  * to the largest coded unit (LCU) assuming that it will be used for video. This
  * is based on gmmlib's GmmIsYUVFormatLCUAligned().
  */
-static bool i915_format_needs_LCU_alignment(uint32_t format, size_t plane, const struct i915_device* i915)
+static bool i915_format_needs_LCU_alignment(uint32_t format, size_t plane,
+					    const struct i915_device *i915)
 {
 	switch (format) {
 	case DRM_FORMAT_NV12:

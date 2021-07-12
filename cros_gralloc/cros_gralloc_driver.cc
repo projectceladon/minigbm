@@ -45,21 +45,16 @@ int memfd_create_wrapper(const char *name, unsigned int flags)
 	return fd;
 }
 
-cros_gralloc_driver::cros_gralloc_driver() : drv_(nullptr)
+cros_gralloc_driver *cros_gralloc_driver::get_instance()
 {
-}
+	static cros_gralloc_driver s_instance;
 
-cros_gralloc_driver::~cros_gralloc_driver()
-{
-	buffers_.clear();
-	handles_.clear();
-
-	if (drv_) {
-		int fd = drv_get_fd(drv_);
-		drv_destroy(drv_);
-		drv_ = nullptr;
-		close(fd);
+	if (!s_instance.is_initialized()) {
+		drv_log("Failed to initialize driver.\n");
+		return nullptr;
 	}
+
+	return &s_instance;
 }
 
 static struct driver *init_try_node(int idx, char const *str)
@@ -84,7 +79,7 @@ static struct driver *init_try_node(int idx, char const *str)
 	return drv;
 }
 
-int32_t cros_gralloc_driver::init()
+cros_gralloc_driver::cros_gralloc_driver()
 {
 	/*
 	 * Create a driver from render nodes first, then try card
@@ -105,17 +100,33 @@ int32_t cros_gralloc_driver::init()
 	for (uint32_t i = min_render_node; i < max_render_node; i++) {
 		drv_ = init_try_node(i, render_nodes_fmt);
 		if (drv_)
-			return 0;
+			return;
 	}
 
 	// Try card nodes... for vkms mostly.
 	for (uint32_t i = min_card_node; i < max_card_node; i++) {
 		drv_ = init_try_node(i, card_nodes_fmt);
 		if (drv_)
-			return 0;
+			return;
 	}
+}
 
-	return -ENODEV;
+cros_gralloc_driver::~cros_gralloc_driver()
+{
+	buffers_.clear();
+	handles_.clear();
+
+	if (drv_) {
+		int fd = drv_get_fd(drv_);
+		drv_destroy(drv_);
+		drv_ = nullptr;
+		close(fd);
+	}
+}
+
+bool cros_gralloc_driver::is_initialized()
+{
+	return drv_ != nullptr;
 }
 
 bool cros_gralloc_driver::is_supported(const struct cros_gralloc_buffer_descriptor *descriptor)

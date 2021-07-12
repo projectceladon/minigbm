@@ -23,13 +23,6 @@ using android::hardware::graphics::mapper::V3_0::Error;
 using android::hardware::graphics::mapper::V3_0::IMapper;
 using android::hardware::graphics::mapper::V3_0::YCbCrLayout;
 
-CrosGralloc3Mapper::CrosGralloc3Mapper() : mDriver(std::make_unique<cros_gralloc_driver>()) {
-    if (mDriver->init()) {
-        drv_log("Failed to initialize driver.\n");
-        mDriver = nullptr;
-    }
-}
-
 Return<void> CrosGralloc3Mapper::createDescriptor(const BufferDescriptorInfo& description,
                                                   createDescriptor_cb hidlCb) {
     hidl_vec<uint32_t> descriptor;

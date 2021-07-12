@@ -11,7 +11,7 @@
 
 class CrosGralloc3Allocator : public android::hardware::graphics::allocator::V3_0::IAllocator {
   public:
-    CrosGralloc3Allocator();
+    CrosGralloc3Allocator() = default;
 
     android::hardware::Return<void> allocate(
             const android::hardware::hidl_vec<uint32_t>& descriptor, uint32_t count,
@@ -25,5 +25,5 @@ class CrosGralloc3Allocator : public android::hardware::graphics::allocator::V3_
                     description,
             uint32_t* outStride, android::hardware::hidl_handle* outHandle);
 
-    std::unique_ptr<cros_gralloc_driver> mDriver;
+    cros_gralloc_driver* mDriver = cros_gralloc_driver::get_instance();
 };
