@@ -24,6 +24,11 @@ using android::hardware::graphics::mapper::V3_0::Error;
 using BufferDescriptorInfo =
         android::hardware::graphics::mapper::V3_0::IMapper::BufferDescriptorInfo;
 
+Error CrosGralloc3Allocator::init() {
+    mDriver = cros_gralloc_driver::get_instance();
+    return mDriver ? Error::NONE : Error::NO_RESOURCES;
+}
+
 Error CrosGralloc3Allocator::allocate(const BufferDescriptorInfo& descriptor, uint32_t* outStride,
                                       hidl_handle* outHandle) {
     if (!mDriver) {
