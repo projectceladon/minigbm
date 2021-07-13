@@ -196,8 +196,12 @@ int dri_init(struct driver *drv, const char *dri_so_path, const char *driver_suf
 	const __DRIextension *loader_extensions[] = { NULL };
 
 	struct dri_driver *dri = drv->priv;
+	char *node_name = drmGetRenderDeviceNameFromFd(drv_get_fd(drv));
+	if (!node_name)
+		return -ENODEV;
 
-	dri->fd = open(drmGetRenderDeviceNameFromFd(drv_get_fd(drv)), O_RDWR);
+	dri->fd = open(node_name, O_RDWR);
+	free(node_name);
 	if (dri->fd < 0)
 		return -ENODEV;
 
