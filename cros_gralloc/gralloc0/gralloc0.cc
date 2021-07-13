@@ -15,7 +15,7 @@
 struct gralloc0_module {
 	gralloc_module_t base;
 	std::unique_ptr<alloc_device_t> alloc;
-	std::unique_ptr<cros_gralloc_driver> driver;
+	cros_gralloc_driver *driver;
 	bool initialized;
 	std::mutex initialization_mutex;
 };
@@ -65,6 +65,11 @@ enum {
 // passthrough gives the low 32-bits of the BufferUsage flags to gralloc0 in their
 // entirety, so we can detect the video decoder flag passed by IAllocator clients.
 #define BUFFER_USAGE_VIDEO_DECODER (1 << 22)
+
+// Gralloc0 doesn't define the BufferUsage::GPU_DATA_BUFFER flag. Define here to
+// align accordingly since AHardwareBuffer and Vulkan interop requires gralloc
+// to support allocating with AHARDWAREBUFFER_USAGE_GPU_DATA_BUFFER.
+#define BUFFER_USAGE_GPU_DATA_BUFFER (1 << 24)
 
 // Reserve the GRALLOC_USAGE_PRIVATE_0 bit for buffers used for front rendering.
 // minigbm backend later decides to use BO_USE_FRONT_RENDERING or BO_USE_LINEAR
@@ -120,6 +125,8 @@ static uint64_t gralloc0_convert_usage(int usage)
 		use_flags |= BO_USE_HW_VIDEO_DECODER;
 	if (usage & BUFFER_USAGE_FRONT_RENDERING)
 		use_flags |= BO_USE_FRONT_RENDERING;
+	if (usage & BUFFER_USAGE_GPU_DATA_BUFFER)
+		use_flags |= BO_USE_GPU_DATA_BUFFER;
 
 	return use_flags;
 }
@@ -217,11 +224,9 @@ static int gralloc0_init(struct gralloc0_module *mod, bool initialize_alloc)
 	if (mod->initialized)
 		return 0;
 
-	mod->driver = std::make_unique<cros_gralloc_driver>();
-	if (mod->driver->init()) {
-		drv_log("Failed to initialize driver.\n");
+	mod->driver = cros_gralloc_driver::get_instance();
+	if (!mod->driver)
 		return -ENODEV;
-	}
 
 	if (initialize_alloc) {
 		mod->alloc = std::make_unique<alloc_device_t>();
