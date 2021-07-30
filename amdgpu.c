@@ -443,9 +443,9 @@ static int amdgpu_create_bo_linear(struct bo *bo, uint32_t width, uint32_t heigh
 	 * For multiplane formats, align the stride to 512 to ensure that subsample strides are 256
 	 * aligned. This uses more memory than necessary since the first plane only needs to be
 	 * 256 aligned, but it's acceptable for a short-term fix. It's probably safe for other gpu
-	 * families, but let's restrict it to Raven for now (b/171013552).
+	 * families, but let's restrict it to Raven and Stoney for now (b/171013552, b/190484589).
 	 * */
-	if (priv->dev_info.family == AMDGPU_FAMILY_RV && num_planes > 1)
+	if (priv->dev_info.family <= AMDGPU_FAMILY_RV && num_planes > 1)
 		stride = ALIGN(stride, 512);
 	else
 		stride = ALIGN(stride, 256);
