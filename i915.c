@@ -492,25 +492,20 @@ static int i915_bo_create_from_metadata(struct bo *bo)
 	struct i915_device *i915 = bo->drv->priv;
 
 	if (i915->has_hw_protection && (bo->meta.use_flags & BO_USE_PROTECTED)) {
-		struct drm_i915_gem_object_param protected_param = {
-			.param = I915_OBJECT_PARAM | I915_PARAM_PROTECTED_CONTENT,
-			.data = 1,
-		};
-
-		struct drm_i915_gem_create_ext_setparam setparam_protected = {
-			.base = { .name = I915_GEM_CREATE_EXT_SETPARAM },
-			.param = protected_param,
+		struct drm_i915_gem_create_ext_protected_content protected_content = {
+			.base = { .name = I915_GEM_CREATE_EXT_PROTECTED_CONTENT },
+			.flags = 0,
 		};
 
 		struct drm_i915_gem_create_ext create_ext = {
 			.size = bo->meta.total_size,
-			.extensions = (uintptr_t)&setparam_protected,
+			.extensions = (uintptr_t)&protected_content,
 		};
 
 		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_CREATE_EXT, &create_ext);
 		if (ret) {
-			drv_log("DRM_IOCTL_I915_GEM_CREATE_EXT failed (size=%llu)\n",
-				create_ext.size);
+			drv_log("DRM_IOCTL_I915_GEM_CREATE_EXT failed (size=%llu) (ret=%d) \n",
+				create_ext.size, ret);
 			return -errno;
 		}
 
