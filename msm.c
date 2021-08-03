@@ -252,6 +252,15 @@ static int msm_init(struct driver *drv)
 			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER |
 				   BO_USE_HW_VIDEO_ENCODER);
 
+	/*
+	 * Android also frequently requests YV12 formats for some camera implementations
+	 * (including the external provider implmenetation). So mark it as well as valid
+	 * for camera display and encoding.
+	 */
+	drv_modify_combination(drv, DRM_FORMAT_YVU420_ANDROID, &LINEAR_METADATA,
+			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SCANOUT |
+				   BO_USE_HW_VIDEO_ENCODER);
+
 	/* Android CTS tests require this. */
 	drv_add_combination(drv, DRM_FORMAT_BGR888, &LINEAR_METADATA, BO_USE_SW_MASK);
 
