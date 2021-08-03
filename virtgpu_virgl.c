@@ -666,8 +666,10 @@ static int virgl_bo_create_blob(struct driver *drv, struct bo *bo)
 	uint32_t blob_flags = VIRTGPU_BLOB_FLAG_USE_SHAREABLE;
 	if (bo->meta.use_flags & BO_USE_SW_MASK)
 		blob_flags |= VIRTGPU_BLOB_FLAG_USE_MAPPABLE;
-	if (bo->meta.use_flags & BO_USE_NON_GPU_HW)
-		blob_flags |= VIRTGPU_BLOB_FLAG_USE_CROSS_DEVICE;
+
+	// For now, all blob use cases are cross device. When we add wider
+	// support for blobs, we can revisit making this unconditional.
+	blob_flags |= VIRTGPU_BLOB_FLAG_USE_CROSS_DEVICE;
 
 	cur_blob_id = atomic_fetch_add(&priv->next_blob_id, 1);
 	stride = drv_stride_from_format(bo->meta.format, bo->meta.width, 0);
