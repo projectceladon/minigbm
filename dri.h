@@ -38,4 +38,6 @@ void *dri_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t map_flag
 int dri_bo_unmap(struct bo *bo, struct vma *vma);
 size_t dri_num_planes_from_modifier(struct driver *drv, uint32_t format, uint64_t modifier);
 
+bool dri_query_modifiers(struct driver *drv, uint32_t format, int max, uint64_t *modifiers,
+			 int *count);
 #endif

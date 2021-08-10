@@ -460,4 +460,15 @@ size_t dri_num_planes_from_modifier(struct driver *drv, uint32_t format, uint64_
 	return planes;
 }
 
+bool dri_query_modifiers(struct driver *drv, uint32_t format, int max, uint64_t *modifiers,
+			 int *count)
+{
+	struct dri_driver *dri = drv->priv;
+	if (!dri->image_extension->queryDmaBufModifiers)
+		return false;
+
+	return dri->image_extension->queryDmaBufModifiers(dri->device, format, max, modifiers, NULL,
+							  count);
+}
+
 #endif
