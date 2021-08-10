@@ -726,10 +726,10 @@ static bool should_use_blob(struct driver *drv, uint32_t format, uint64_t use_fl
 		return false;
 
 	switch (format) {
-	case DRM_FORMAT_YVU420_ANDROID:
 	case DRM_FORMAT_R8:
 		// Formats with strictly defined strides are supported
 		return true;
+	case DRM_FORMAT_YVU420_ANDROID:
 	case DRM_FORMAT_NV12:
 		// Knowing buffer metadata at buffer creation isn't yet supported, so buffers
 		// can't be properly mapped into the guest.
