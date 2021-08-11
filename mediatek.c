@@ -286,6 +286,13 @@ static uint32_t mediatek_resolve_format(struct driver *drv, uint32_t format, uin
 			return DRM_FORMAT_NV12;
 		}
 		return DRM_FORMAT_YVU420;
+	case DRM_FORMAT_BGR888:
+		if(use_flags & (BO_USE_RENDERING | BO_USE_TEXTURE)) {
+			/* Some Android app required these flags for DRM_FORMAT_BGR888
+			 * and Chrome does not support DRM_FORMAT_BGR888, so remap the
+			 * DRM_FORMAT_BGR888 to DRM_FORMAT_XBGR8888 to solve this issue*/
+			return DRM_FORMAT_XBGR8888;
+		}
 	default:
 		return format;
 	}
