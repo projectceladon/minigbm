@@ -107,7 +107,7 @@ static int cross_domain_submit_cmd(struct driver *drv, uint32_t *cmd, uint32_t c
 	exec.command = (uint64_t)&cmd[0];
 	exec.size = cmd_size;
 	if (wait) {
-		exec.flags = VIRTGPU_EXECBUF_FENCE_CONTEXT;
+		exec.flags = VIRTGPU_EXECBUF_RING_IDX;
 		exec.bo_handles = (uint64_t)&priv->ring_handle;
 		exec.num_bo_handles = 1;
 	}
@@ -185,11 +185,11 @@ static int cross_domain_metadata_query(struct driver *drv, struct bo_metadata *m
 	memcpy(&metadata->offsets, &addr[4], 4 * sizeof(uint32_t));
 	memcpy(&metadata->format_modifier, &addr[8], sizeof(uint64_t));
 	memcpy(&metadata->total_size, &addr[10], sizeof(uint64_t));
-	memcpy(&metadata->blob_id, &addr[12], sizeof(uint64_t));
+	memcpy(&metadata->blob_id, &addr[12], sizeof(uint32_t));
 
-	metadata->map_info = addr[14];
-	metadata->memory_idx = addr[16];
-	metadata->physical_device_idx = addr[17];
+	metadata->map_info = addr[13];
+	metadata->memory_idx = addr[14];
+	metadata->physical_device_idx = addr[15];
 
 	remaining_size = metadata->total_size;
 	for (plane = 0; plane < metadata->num_planes; plane++) {
@@ -269,7 +269,7 @@ static int cross_domain_init(struct driver *drv)
 	// queries.
 	ctx_set_params[0].param = VIRTGPU_CONTEXT_PARAM_CAPSET_ID;
 	ctx_set_params[0].value = CAPSET_CROSS_DOMAIN;
-	ctx_set_params[1].param = VIRTGPU_CONTEXT_PARAM_NUM_FENCE_CONTEXTS;
+	ctx_set_params[1].param = VIRTGPU_CONTEXT_PARAM_NUM_RINGS;
 	ctx_set_params[1].value = 1;
 
 	init.ctx_set_params = (unsigned long long)&ctx_set_params[0];
@@ -363,7 +363,7 @@ static int cross_domain_bo_create(struct bo *bo, uint32_t width, uint32_t height
 
 	drm_rc_blob.size = bo->meta.total_size;
 	drm_rc_blob.blob_flags = blob_flags;
-	drm_rc_blob.blob_id = bo->meta.blob_id;
+	drm_rc_blob.blob_id = (uint64_t)bo->meta.blob_id;
 
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_VIRTGPU_RESOURCE_CREATE_BLOB, &drm_rc_blob);
 	if (ret < 0) {

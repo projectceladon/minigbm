@@ -34,7 +34,7 @@ struct bo_metadata {
 	 * specific metadata.  It's easiest just to stuff all the metadata here rather than
 	 * having two metadata structs.
 	 */
-	uint64_t blob_id;
+	uint32_t blob_id;
 	uint32_t map_info;
 	int32_t memory_idx;
 	int32_t physical_device_idx;
