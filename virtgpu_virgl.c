@@ -990,15 +990,16 @@ static int virgl_resource_info(struct bo *bo, uint32_t strides[DRV_MAX_PLANES],
 		return ret;
 	}
 
-	for (uint32_t plane = 0; plane < bo->meta.num_planes; plane++) {
+	for (uint32_t plane = 0; plane < DRV_MAX_PLANES; plane++) {
 		/*
 		 * Currently, kernel v4.14 (Betty) doesn't have the extended resource info
 		 * ioctl.
 		 */
-		if (res_info.strides[plane]) {
-			strides[plane] = res_info.strides[plane];
-			offsets[plane] = res_info.offsets[plane];
-		}
+		if (!res_info.strides[plane])
+			break;
+
+		strides[plane] = res_info.strides[plane];
+		offsets[plane] = res_info.offsets[plane];
 	}
 	*format_modifier = res_info.format_modifier;
 

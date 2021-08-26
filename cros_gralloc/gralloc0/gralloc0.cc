@@ -294,20 +294,20 @@ static int gralloc0_perform(struct gralloc_module_t const *module, int op, ...)
 		memset(info, 0, sizeof(*info));
 		info->drm_fourcc = drv_get_standard_fourcc(hnd->format);
 		info->num_fds = hnd->num_planes;
+		for (uint32_t i = 0; i < info->num_fds; i++)
+			info->fds[i] = hnd->fds[i];
+
 		ret = mod->driver->resource_info(handle, strides, offsets, &format_modifier);
 		if (ret)
 			break;
 
 		info->modifier = format_modifier ? format_modifier : hnd->format_modifier;
-		for (uint32_t i = 0; i < hnd->num_planes; i++) {
-			info->fds[i] = hnd->fds[i];
-			if (strides[i]) {
-				info->stride[i] = strides[i];
-				info->offset[i] = offsets[i];
-			} else {
-				info->stride[i] = hnd->strides[i];
-				info->offset[i] = hnd->offsets[i];
-			}
+		for (uint32_t i = 0; i < DRV_MAX_PLANES; i++) {
+			if (!strides[i])
+				break;
+
+			info->stride[i] = strides[i];
+			info->offset[i] = offsets[i];
 		}
 		break;
 	case GRALLOC_DRM_GET_USAGE:
