@@ -80,6 +80,23 @@ cc_binary {
     init_rc: ["android.hardware.graphics.allocator@4.0-service.minigbm_msm.rc"],
 }
 
+cc_binary {
+    name: "android.hardware.graphics.allocator@4.0-service.minigbm_intel",
+    defaults: ["minigbm_gralloc4_allocator_defaults"],
+    shared_libs: ["libminigbm_gralloc_intel"],
+    vintf_fragments: ["android.hardware.graphics.allocator@4.0.xml"],
+    init_rc: ["android.hardware.graphics.allocator@4.0-service.minigbm_intel.rc"],
+    enabled: false,
+    arch: {
+        x86: {
+            enabled: true,
+        },
+        x86_64: {
+            enabled: true,
+        },
+    },
+}
+
 cc_library_shared {
     name: "android.hardware.graphics.mapper@4.0-impl.minigbm",
     defaults: ["minigbm_gralloc4_common_defaults"],
@@ -94,4 +111,21 @@ cc_library_shared {
     shared_libs: ["libminigbm_gralloc_msm"],
     vintf_fragments: ["android.hardware.graphics.mapper@4.0.xml"],
     srcs: [":minigbm_gralloc4_mapper_files"],
+}
+
+cc_library_shared {
+    name: "android.hardware.graphics.mapper@4.0-impl.minigbm_intel",
+    defaults: ["minigbm_gralloc4_common_defaults"],
+    shared_libs: ["libminigbm_gralloc_intel"],
+    vintf_fragments: ["android.hardware.graphics.mapper@4.0.xml"],
+    srcs: [":minigbm_gralloc4_mapper_files"],
+    enabled: false,
+    arch: {
+        x86: {
+            enabled: true,
+        },
+        x86_64: {
+            enabled: true,
+        },
+    },
 }
