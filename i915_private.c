@@ -102,7 +102,7 @@ int i915_private_add_combinations(struct driver *drv)
 	metadata.priority = 3;
 	metadata.modifier = I915_FORMAT_MOD_Y_TILED;
 	drv_add_combinations(drv, private_source_formats, ARRAY_SIZE(private_source_formats),
-			     &metadata, texture_flags | BO_USE_CAMERA_MASK);
+			     &metadata, texture_flags | BO_USE_NON_GPU_HW);
 
 	texture_flags &= ~BO_USE_RENDERSCRIPT;
 	texture_flags &= ~BO_USE_SW_WRITE_OFTEN;
