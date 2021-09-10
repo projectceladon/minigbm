@@ -471,6 +471,8 @@ gralloc1_function_pointer_t CrosGralloc1::doGetFunction(int32_t intDescriptor)
                 return asFP<GRALLOC1_PFN_SET_PROTECTIONINFO>(setProtectionInfoHook);
         case GRALLOC1_FUNCTION_GET_MODIFIER:
                 return asFP<GRALLOC1_PFN_GET_MODIFIER>(getModifierHook);
+        case GRALLOC1_FUNCTION_GET_BUFFER_INFO:
+               return asFP<GRALLOC1_PFN_GET_BUFFER_INFO>(getBufferInfoHook);
 	case GRALLOC1_FUNCTION_INVALID:
 		ALOGE("Invalid function descriptor");
 		return nullptr;
@@ -1041,6 +1043,36 @@ int CrosGralloc1::HookGrallocClose(hw_device_t * dev)
     }    
 	return 0;
 } // namespace android
+
+int32_t CrosGralloc1::getBufferInfo(buffer_handle_t buffer, cros_gralloc_buffer_info *outInfo)
+{
+    auto hnd = cros_gralloc_convert_handle(buffer);
+
+    if (!hnd || !outInfo)
+        return -EINVAL;
+
+    // resolve format for i915, for general, please try call drv_resolve_format
+    switch (hnd->format) {
+	    case DRM_FORMAT_NV12_Y_TILED_INTEL:
+	    case DRM_FORMAT_FLEX_YCbCr_420_888:
+	    case DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED:
+		    outInfo->drm_fourcc = DRM_FORMAT_NV12;
+		    break;
+	    case DRM_FORMAT_YVU420_ANDROID:
+		    outInfo->drm_fourcc = DRM_FORMAT_YVU420;
+		    break;
+	    default:
+		    outInfo->drm_fourcc = hnd->format;
+		    break;
+    }
+    outInfo->num_fds = hnd->base.numFds;
+    memcpy(outInfo->fds, hnd->fds, outInfo->num_fds * sizeof(int));
+    outInfo->modifier = (((uint64_t) hnd->format_modifiers[0]) << 32) | (((uint64_t) hnd->format_modifiers[1]) & 0xffffffff);
+    memcpy(outInfo->offset, hnd->offsets, outInfo->num_fds * sizeof(uint32_t));
+    memcpy(outInfo->stride, hnd->strides, outInfo->num_fds * sizeof(uint32_t));
+
+    return CROS_GRALLOC_ERROR_NONE;
+}
 
 // static
 int CrosGralloc1::HookDevOpen(const struct hw_module_t *mod, const char *name,

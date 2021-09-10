@@ -231,6 +231,13 @@ class CrosGralloc1 : public gralloc1_device_t
 		return getAdapter(device)->getModifier(buffer, outModifier, size);
 	}
 
+	int32_t getBufferInfo(buffer_handle_t buffer, cros_gralloc_buffer_info *outInfo);
+	static int32_t getBufferInfoHook(gralloc1_device_t *device, buffer_handle_t buffer,
+				     cros_gralloc_buffer_info *outInfo)
+	{
+		return getAdapter(device)->getBufferInfo(buffer, outInfo);
+	}
+
 	// Buffer Management functions
 	int32_t allocate(struct cros_gralloc_buffer_descriptor *descriptor,
 			 buffer_handle_t *outBufferHandle);

@@ -51,4 +51,14 @@ struct cros_gralloc_handle {
 
 typedef const struct cros_gralloc_handle *cros_gralloc_handle_t;
 
+// exposed to latest mesa egl
+struct cros_gralloc_buffer_info {
+	uint32_t drm_fourcc;
+	int num_fds;
+	int fds[4];
+	uint64_t modifier;
+	int offset[4];
+	int stride[4];
+};
+
 #endif
