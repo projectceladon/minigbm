@@ -46,6 +46,12 @@ cc_defaults {
     ],
     cppflags: ["-std=c++14"],
 
+    product_variables: {
+        platform_sdk_version: {
+            cflags: ["-DANDROID_API_LEVEL=%d"],
+        },
+    },
+
     vendor: true,
 
     header_libs: [
