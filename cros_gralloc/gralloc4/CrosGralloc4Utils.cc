@@ -280,87 +280,13 @@ std::string getUsageString(hidl_bitfield<BufferUsage> bufferUsage) {
 }
 
 int convertToDrmFormat(PixelFormat format, uint32_t* outDrmFormat) {
-    switch (format) {
-        case PixelFormat::BGRA_8888:
-            *outDrmFormat = DRM_FORMAT_ARGB8888;
-            return 0;
-        /**
-         * Choose DRM_FORMAT_R8 because <system/graphics.h> requires the buffers
-         * with a format HAL_PIXEL_FORMAT_BLOB have a height of 1, and width
-         * equal to their size in bytes.
-         */
-        case PixelFormat::BLOB:
-            *outDrmFormat = DRM_FORMAT_R8;
-            return 0;
-        case PixelFormat::DEPTH_16:
-            return -EINVAL;
-        case PixelFormat::DEPTH_24:
-            return -EINVAL;
-        case PixelFormat::DEPTH_24_STENCIL_8:
-            return -EINVAL;
-        case PixelFormat::DEPTH_32F:
-            return -EINVAL;
-        case PixelFormat::DEPTH_32F_STENCIL_8:
-            return -EINVAL;
-        case PixelFormat::HSV_888:
-            return -EINVAL;
-        case PixelFormat::IMPLEMENTATION_DEFINED:
-            *outDrmFormat = DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED;
-            return 0;
-        case PixelFormat::RAW10:
-            return -EINVAL;
-        case PixelFormat::RAW12:
-            return -EINVAL;
-        case PixelFormat::RAW16:
-            *outDrmFormat = DRM_FORMAT_R16;
-            return 0;
-        /* TODO use blob */
-        case PixelFormat::RAW_OPAQUE:
-            return -EINVAL;
-        case PixelFormat::RGBA_1010102:
-            *outDrmFormat = DRM_FORMAT_ABGR2101010;
-            return 0;
-        case PixelFormat::RGBA_8888:
-            *outDrmFormat = DRM_FORMAT_ABGR8888;
-            return 0;
-        case PixelFormat::RGBA_FP16:
-            *outDrmFormat = DRM_FORMAT_ABGR16161616F;
-            return 0;
-        case PixelFormat::RGBX_8888:
-            *outDrmFormat = DRM_FORMAT_XBGR8888;
-            return 0;
-        case PixelFormat::RGB_565:
-            *outDrmFormat = DRM_FORMAT_RGB565;
-            return 0;
-        case PixelFormat::RGB_888:
-            *outDrmFormat = DRM_FORMAT_RGB888;
-            return 0;
-        case PixelFormat::STENCIL_8:
-            return -EINVAL;
-        case PixelFormat::Y16:
-            *outDrmFormat = DRM_FORMAT_R16;
-            return 0;
-        case PixelFormat::Y8:
-            *outDrmFormat = DRM_FORMAT_R8;
-            return 0;
-        case PixelFormat::YCBCR_420_888:
-            *outDrmFormat = DRM_FORMAT_FLEX_YCbCr_420_888;
-            return 0;
-        case PixelFormat::YCBCR_422_SP:
-            return -EINVAL;
-        case PixelFormat::YCBCR_422_I:
-            return -EINVAL;
-        case PixelFormat::YCBCR_P010:
-            *outDrmFormat = DRM_FORMAT_P010;
-            return 0;
-        case PixelFormat::YCRCB_420_SP:
-            *outDrmFormat = DRM_FORMAT_NV21;
-            return 0;
-        case PixelFormat::YV12:
-            *outDrmFormat = DRM_FORMAT_YVU420_ANDROID;
-            return 0;
-    };
-    return -EINVAL;
+    static_assert(std::is_same<std::underlying_type<PixelFormat>::type, int32_t>::value);
+
+    const uint32_t drmFormat = cros_gralloc_convert_format(static_cast<int32_t>(format));
+    if (drmFormat == DRM_FORMAT_NONE) return -EINVAL;
+
+    *outDrmFormat = drmFormat;
+    return 0;
 }
 
 int convertToBufferUsage(uint64_t grallocUsage, uint64_t* outBufferUsage) {
