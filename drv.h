@@ -172,6 +172,12 @@ uint64_t drv_bo_get_format_modifier(struct bo *bo);
 
 uint32_t drv_bo_get_format(struct bo *bo);
 
+uint32_t drv_bo_get_tiling(struct bo *bo);
+
+uint64_t drv_bo_get_use_flags(struct bo *bo);
+
+size_t drv_bo_get_total_size(struct bo *bo);
+
 uint32_t drv_bytes_per_pixel_from_format(uint32_t format, size_t plane);
 
 uint32_t drv_stride_from_format(uint32_t format, uint32_t width, size_t plane);

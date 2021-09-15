@@ -254,15 +254,15 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 	hnd->width = drv_bo_get_width(bo);
 	hnd->height = drv_bo_get_height(bo);
 	hnd->format = drv_bo_get_format(bo);
-	hnd->tiling = bo->meta.tiling;
+	hnd->tiling = drv_bo_get_tiling(bo);
 	hnd->format_modifier = drv_bo_get_format_modifier(bo);
-	hnd->use_flags = descriptor->use_flags;
+	hnd->use_flags = drv_bo_get_use_flags(bo);
 	bytes_per_pixel = drv_bytes_per_pixel_from_format(hnd->format, 0);
 	hnd->pixel_stride = DIV_ROUND_UP(hnd->strides[0], bytes_per_pixel);
 	hnd->magic = cros_gralloc_magic;
 	hnd->droid_format = descriptor->droid_format;
 	hnd->usage = descriptor->droid_usage;
-	hnd->total_size = descriptor->reserved_region_size + bo->meta.total_size;
+	hnd->total_size = descriptor->reserved_region_size + drv_bo_get_total_size(bo);
 	hnd->name_offset = handle_data_size;
 
 	name = (char *)(&hnd->data[hnd->name_offset]);

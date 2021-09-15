@@ -634,6 +634,16 @@ uint32_t drv_bo_get_format(struct bo *bo)
 	return bo->meta.format;
 }
 
+uint32_t drv_bo_get_tiling(struct bo *bo)
+{
+	return bo->meta.tiling;
+}
+
+uint64_t drv_bo_get_use_flags(struct bo *bo)
+{
+	return bo->meta.use_flags;
+}
+
 size_t drv_bo_get_total_size(struct bo *bo)
 {
 	return bo->meta.total_size;
