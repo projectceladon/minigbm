@@ -49,6 +49,16 @@ Error CrosGralloc4Allocator::allocate(const BufferDescriptorInfo& descriptor, ui
         crosDescriptor.use_flags &= ~BO_USE_SCANOUT;
         supported = mDriver->is_supported(&crosDescriptor);
     }
+    if (!supported && (descriptor.usage & BufferUsage::VIDEO_ENCODER) &&
+        descriptor.format != PixelFormat::YCBCR_420_888) {
+        crosDescriptor.use_flags &= ~BO_USE_HW_VIDEO_ENCODER;
+        supported = mDriver->is_supported(&crosDescriptor);
+    }
+    if (!supported && (descriptor.usage & BUFFER_USAGE_FRONT_RENDERING)) {
+        crosDescriptor.use_flags &= ~BO_USE_FRONT_RENDERING;
+        crosDescriptor.use_flags |= BO_USE_LINEAR;
+        supported = mDriver->is_supported(&crosDescriptor);
+    }
 
     if (!supported) {
         std::string drmFormatString = get_drm_format_string(crosDescriptor.drm_format);
