@@ -262,65 +262,7 @@ int convertToDrmFormat(PixelFormat format, uint32_t* outDrmFormat) {
 }
 
 int convertToBufferUsage(uint64_t grallocUsage, uint64_t* outBufferUsage) {
-    uint64_t bufferUsage = BO_USE_NONE;
-
-    if ((grallocUsage & BufferUsage::CPU_READ_MASK) ==
-        static_cast<uint64_t>(BufferUsage::CPU_READ_RARELY)) {
-        bufferUsage |= BO_USE_SW_READ_RARELY;
-    }
-    if ((grallocUsage & BufferUsage::CPU_READ_MASK) ==
-        static_cast<uint64_t>(BufferUsage::CPU_READ_OFTEN)) {
-        bufferUsage |= BO_USE_SW_READ_OFTEN;
-    }
-    if ((grallocUsage & BufferUsage::CPU_WRITE_MASK) ==
-        static_cast<uint64_t>(BufferUsage::CPU_WRITE_RARELY)) {
-        bufferUsage |= BO_USE_SW_WRITE_RARELY;
-    }
-    if ((grallocUsage & BufferUsage::CPU_WRITE_MASK) ==
-        static_cast<uint64_t>(BufferUsage::CPU_WRITE_OFTEN)) {
-        bufferUsage |= BO_USE_SW_WRITE_OFTEN;
-    }
-    if (grallocUsage & BufferUsage::GPU_TEXTURE) {
-        bufferUsage |= BO_USE_TEXTURE;
-    }
-    if (grallocUsage & BufferUsage::GPU_RENDER_TARGET) {
-        bufferUsage |= BO_USE_RENDERING;
-    }
-    if (grallocUsage & BufferUsage::COMPOSER_OVERLAY) {
-        /* HWC wants to use display hardware, but can defer to OpenGL. */
-        bufferUsage |= BO_USE_SCANOUT | BO_USE_TEXTURE;
-    }
-    /* Map this flag to linear until real HW protection is available on Android. */
-    if (grallocUsage & BufferUsage::PROTECTED) {
-        bufferUsage |= BO_USE_LINEAR;
-    }
-    if (grallocUsage & BufferUsage::COMPOSER_CURSOR) {
-        bufferUsage |= BO_USE_NONE;
-    }
-    if (grallocUsage & BufferUsage::VIDEO_ENCODER) {
-        /*HACK: See b/30054495 */
-        bufferUsage |= BO_USE_SW_READ_OFTEN;
-    }
-    if (grallocUsage & BufferUsage::CAMERA_OUTPUT) {
-        bufferUsage |= BO_USE_CAMERA_WRITE;
-    }
-    if (grallocUsage & BufferUsage::CAMERA_INPUT) {
-        bufferUsage |= BO_USE_CAMERA_READ;
-    }
-    if (grallocUsage & BufferUsage::RENDERSCRIPT) {
-        bufferUsage |= BO_USE_RENDERSCRIPT;
-    }
-    if (grallocUsage & BufferUsage::VIDEO_DECODER) {
-        bufferUsage |= BO_USE_HW_VIDEO_DECODER;
-    }
-    if (grallocUsage & BufferUsage::GPU_DATA_BUFFER) {
-        bufferUsage |= BO_USE_GPU_DATA_BUFFER;
-    }
-    if (grallocUsage & BUFFER_USAGE_FRONT_RENDERING) {
-        bufferUsage |= BO_USE_FRONT_RENDERING;
-    }
-
-    *outBufferUsage = bufferUsage;
+    *outBufferUsage = cros_gralloc_convert_usage(grallocUsage);
     return 0;
 }
 
