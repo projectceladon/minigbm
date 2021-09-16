@@ -129,13 +129,42 @@ bool cros_gralloc_driver::is_initialized()
 	return drv_ != nullptr;
 }
 
+bool cros_gralloc_driver::get_resolved_format_and_use_flags(
+    const struct cros_gralloc_buffer_descriptor *descriptor, uint32_t *out_format,
+    uint64_t *out_use_flags)
+{
+	uint32_t resolved_format;
+	uint64_t resolved_use_flags;
+	struct combination *combo;
+
+	resolved_format = drv_resolve_format(drv_, descriptor->drm_format, descriptor->use_flags);
+	if (resolved_format == DRM_FORMAT_NONE)
+		return false;
+
+	resolved_use_flags = descriptor->use_flags;
+	/*
+	 * This unmask is a backup in the case DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED is resolved
+	 * to non-YUV formats.
+	 */
+	if (descriptor->drm_format == DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED &&
+	    (resolved_format == DRM_FORMAT_XBGR8888 || resolved_format == DRM_FORMAT_ABGR8888)) {
+		resolved_use_flags &= ~BO_USE_HW_VIDEO_ENCODER;
+	}
+
+	combo = drv_get_combination(drv_, resolved_format, resolved_use_flags);
+	if (!combo)
+		return false;
+
+	*out_format = resolved_format;
+	*out_use_flags = resolved_use_flags;
+	return true;
+}
+
 bool cros_gralloc_driver::is_supported(const struct cros_gralloc_buffer_descriptor *descriptor)
 {
-	struct combination *combo;
 	uint32_t resolved_format;
-	resolved_format = drv_resolve_format(drv_, descriptor->drm_format, descriptor->use_flags);
-	combo = drv_get_combination(drv_, resolved_format, descriptor->use_flags);
-	return (combo != nullptr);
+	uint64_t resolved_use_flags;
+	return get_resolved_format_and_use_flags(descriptor, &resolved_format, &resolved_use_flags);
 }
 
 int32_t create_reserved_region(const std::string &buffer_name, uint64_t reserved_region_size)
@@ -174,24 +203,18 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 	size_t num_bytes;
 	uint32_t resolved_format;
 	uint32_t bytes_per_pixel;
-	uint64_t use_flags;
+	uint64_t resolved_use_flags;
 	char *name;
 	struct bo *bo;
 	struct cros_gralloc_handle *hnd;
 
-	resolved_format = drv_resolve_format(drv_, descriptor->drm_format, descriptor->use_flags);
-	use_flags = descriptor->use_flags;
-
-	/*
-	 * This unmask is a backup in the case DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED is resolved
-	 * to non-YUV formats.
-	 */
-	if (descriptor->drm_format == DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED &&
-	    (resolved_format == DRM_FORMAT_XBGR8888 || resolved_format == DRM_FORMAT_ABGR8888)) {
-		use_flags &= ~BO_USE_HW_VIDEO_ENCODER;
+	if (!get_resolved_format_and_use_flags(descriptor, &resolved_format, &resolved_use_flags)) {
+		drv_log("Failed to resolve format and use_flags.\n");
+		return -EINVAL;
 	}
 
-	bo = drv_bo_create(drv_, descriptor->width, descriptor->height, resolved_format, use_flags);
+	bo = drv_bo_create(drv_, descriptor->width, descriptor->height, resolved_format,
+			   resolved_use_flags);
 	if (!bo) {
 		drv_log("Failed to create bo.\n");
 		return -errno;
