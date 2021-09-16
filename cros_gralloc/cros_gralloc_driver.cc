@@ -8,6 +8,7 @@
 
 #include <cstdlib>
 #include <fcntl.h>
+#include <hardware/gralloc.h>
 #include <sys/mman.h>
 #include <syscall.h>
 #include <xf86drm.h>
@@ -152,6 +153,24 @@ bool cros_gralloc_driver::get_resolved_format_and_use_flags(
 	}
 
 	combo = drv_get_combination(drv_, resolved_format, resolved_use_flags);
+	if (!combo && (descriptor->droid_usage & GRALLOC_USAGE_HW_COMPOSER)) {
+		resolved_use_flags &= ~BO_USE_SCANOUT;
+		combo = drv_get_combination(drv_, resolved_format, resolved_use_flags);
+	}
+	if (!combo && (descriptor->droid_usage & GRALLOC_USAGE_HW_VIDEO_ENCODER) &&
+	    descriptor->droid_format != HAL_PIXEL_FORMAT_YCbCr_420_888) {
+		// Unmask BO_USE_HW_VIDEO_ENCODER for other formats. They are mostly
+		// intermediate formats not passed directly to the encoder (e.g.
+		// camera). YV12 is passed to the encoder component, but it is converted
+		// to YCbCr_420_888 before being passed to the hw encoder.
+		resolved_use_flags &= ~BO_USE_HW_VIDEO_ENCODER;
+		combo = drv_get_combination(drv_, resolved_format, resolved_use_flags);
+	}
+	if (!combo && (descriptor->droid_usage & BUFFER_USAGE_FRONT_RENDERING)) {
+		resolved_use_flags &= ~BO_USE_FRONT_RENDERING;
+		resolved_use_flags |= BO_USE_LINEAR;
+		combo = drv_get_combination(drv_, resolved_format, resolved_use_flags);
+	}
 	if (!combo)
 		return false;
 

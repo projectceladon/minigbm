@@ -84,7 +84,6 @@ static int gralloc0_alloc(alloc_device_t *dev, int w, int h, int format, int usa
 			  buffer_handle_t *handle, int *stride)
 {
 	int32_t ret;
-	bool supported;
 	struct cros_gralloc_buffer_descriptor descriptor;
 	auto mod = (struct gralloc0_module const *)dev->common.module;
 
@@ -96,28 +95,7 @@ static int gralloc0_alloc(alloc_device_t *dev, int w, int h, int format, int usa
 	descriptor.use_flags = cros_gralloc_convert_usage(usage);
 	descriptor.reserved_region_size = 0;
 
-	supported = mod->driver->is_supported(&descriptor);
-	if (!supported && (usage & GRALLOC_USAGE_HW_COMPOSER)) {
-		descriptor.use_flags &= ~BO_USE_SCANOUT;
-		supported = mod->driver->is_supported(&descriptor);
-	}
-	if (!supported && (usage & GRALLOC_USAGE_HW_VIDEO_ENCODER) &&
-	    format != HAL_PIXEL_FORMAT_YCbCr_420_888) {
-		// Unmask BO_USE_HW_VIDEO_ENCODER for other formats. They are mostly
-		// intermediate formats not passed directly to the encoder (e.g.
-		// camera). YV12 is passed to the encoder component, but it is converted
-		// to YCbCr_420_888 before being passed to the hw encoder.
-		descriptor.use_flags &= ~BO_USE_HW_VIDEO_ENCODER;
-		drv_log("Retrying format %u allocation without encoder flag", format);
-		supported = mod->driver->is_supported(&descriptor);
-	}
-	if (!supported && (usage & BUFFER_USAGE_FRONT_RENDERING)) {
-		descriptor.use_flags &= ~BO_USE_FRONT_RENDERING;
-		descriptor.use_flags |= BO_USE_LINEAR;
-		supported = mod->driver->is_supported(&descriptor);
-	}
-
-	if (!supported) {
+	if (!mod->driver->is_supported(&descriptor)) {
 		drv_log("Unsupported combination -- HAL format: %u, HAL usage: %u, "
 			"drv_format: %4.4s, use_flags: %llu\n",
 			format, usage, reinterpret_cast<char *>(&descriptor.drm_format),

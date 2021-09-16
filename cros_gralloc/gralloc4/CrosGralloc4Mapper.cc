@@ -392,23 +392,7 @@ Return<void> CrosGralloc4Mapper::isSupported(const BufferDescriptorInfo& descrip
         return Void();
     }
 
-    bool supported = mDriver->is_supported(&crosDescriptor);
-    if (!supported && (descriptor.usage & BufferUsage::COMPOSER_OVERLAY)) {
-        crosDescriptor.use_flags &= ~BO_USE_SCANOUT;
-        supported = mDriver->is_supported(&crosDescriptor);
-    }
-    if (!supported && (descriptor.usage & BufferUsage::VIDEO_ENCODER) &&
-        descriptor.format != PixelFormat::YCBCR_420_888) {
-        crosDescriptor.use_flags &= ~BO_USE_HW_VIDEO_ENCODER;
-        supported = mDriver->is_supported(&crosDescriptor);
-    }
-    if (!supported && (descriptor.usage & BUFFER_USAGE_FRONT_RENDERING)) {
-        crosDescriptor.use_flags &= ~BO_USE_FRONT_RENDERING;
-        crosDescriptor.use_flags |= BO_USE_LINEAR;
-        supported = mDriver->is_supported(&crosDescriptor);
-    }
-
-    hidlCb(Error::NONE, supported);
+    hidlCb(Error::NONE, mDriver->is_supported(&crosDescriptor));
     return Void();
 }
 
