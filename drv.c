@@ -230,6 +230,7 @@ struct bo *drv_bo_new(struct driver *drv, uint32_t width, uint32_t height, uint3
 
 	if (!bo->meta.num_planes) {
 		free(bo);
+		errno = EINVAL;
 		return NULL;
 	}
 
@@ -263,6 +264,7 @@ struct bo *drv_bo_create(struct driver *drv, uint32_t width, uint32_t height, ui
 	}
 
 	if (ret) {
+		errno = -ret;
 		free(bo);
 		return NULL;
 	}
