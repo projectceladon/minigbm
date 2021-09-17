@@ -588,6 +588,10 @@ static int virgl_init(struct driver *drv)
 		virgl_add_combinations(drv, texture_source_formats,
 				       ARRAY_SIZE(texture_source_formats), &LINEAR_METADATA,
 				       BO_USE_TEXTURE_MASK);
+		drv_modify_combination(drv, DRM_FORMAT_NV12, &LINEAR_METADATA,
+				       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE |
+					   BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER |
+					   BO_USE_SCANOUT);
 	} else {
 		/* Virtio primary plane only allows this format. */
 		virgl_add_combination(drv, DRM_FORMAT_XRGB8888, &LINEAR_METADATA,
@@ -604,6 +608,9 @@ static int virgl_init(struct driver *drv)
 		virgl_add_combinations(drv, dumb_texture_source_formats,
 				       ARRAY_SIZE(dumb_texture_source_formats), &LINEAR_METADATA,
 				       BO_USE_TEXTURE_MASK);
+		drv_modify_combination(drv, DRM_FORMAT_NV12, &LINEAR_METADATA,
+				       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE |
+					   BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER);
 	}
 
 	/* Android CTS tests require this. */
@@ -611,9 +618,6 @@ static int virgl_init(struct driver *drv)
 	virgl_add_combination(drv, DRM_FORMAT_BGR888, &LINEAR_METADATA, BO_USE_SW_MASK);
 	virgl_add_combination(drv, DRM_FORMAT_P010, &LINEAR_METADATA,
 			      BO_USE_SW_MASK | BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE);
-	drv_modify_combination(drv, DRM_FORMAT_NV12, &LINEAR_METADATA,
-			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER |
-				   BO_USE_HW_VIDEO_ENCODER);
 	drv_modify_combination(drv, DRM_FORMAT_R8, &LINEAR_METADATA,
 			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER |
 				   BO_USE_HW_VIDEO_ENCODER | BO_USE_GPU_DATA_BUFFER);
