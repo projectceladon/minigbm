@@ -303,6 +303,7 @@ const struct backend backend_mediatek = {
 	.bo_invalidate = mediatek_bo_invalidate,
 	.bo_flush = mediatek_bo_flush,
 	.resolve_format = mediatek_resolve_format,
+	.resolve_use_flags = drv_resolve_use_flags_helper,
 };
 
 #endif

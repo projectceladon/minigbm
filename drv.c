@@ -659,6 +659,14 @@ uint32_t drv_resolve_format(struct driver *drv, uint32_t format, uint64_t use_fl
 	return format;
 }
 
+uint64_t drv_resolve_use_flags(struct driver *drv, uint32_t format, uint64_t use_flags)
+{
+	if (drv->backend->resolve_use_flags)
+		return drv->backend->resolve_use_flags(format, use_flags);
+
+	return use_flags;
+}
+
 uint32_t drv_num_buffers_per_bo(struct bo *bo)
 {
 	uint32_t count = 0;

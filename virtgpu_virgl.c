@@ -426,14 +426,6 @@ static uint32_t compute_virgl_bind_flags(uint64_t use_flags, uint32_t format)
 	handle_flag(&use_flags, BO_USE_HW_VIDEO_ENCODER, &bind,
 		    VIRGL_BIND_MINIGBM_HW_VIDEO_ENCODER);
 
-	/*
-	 * HACK: This is for HAL_PIXEL_FORMAT_YV12 buffers allocated by arcvm. None of
-	 * our platforms can display YV12, so we can treat as a SW buffer. Remove once
-	 * this can be intelligently resolved in the guest. Also see gbm_bo_create.
-	 */
-	if (format == DRM_FORMAT_YVU420_ANDROID)
-		bind |= VIRGL_BIND_LINEAR;
-
 	if (use_flags)
 		drv_log("Unhandled bo use flag: %llx\n", (unsigned long long)use_flags);
 
@@ -960,6 +952,27 @@ static uint32_t virgl_resolve_format(uint32_t format, uint64_t use_flags)
 		return format;
 	}
 }
+
+static uint64_t virgl_resolve_use_flags(uint32_t format, uint64_t use_flags)
+{
+	if (format == DRM_FORMAT_YVU420_ANDROID) {
+		use_flags &= ~BO_USE_SCANOUT;
+		/*
+		 * HACK: See b/172389166. This is for HAL_PIXEL_FORMAT_YV12 buffers allocated by
+		 * arcvm. None of our platforms can display YV12, so we can treat as a SW buffer.
+		 * Remove once this can be intelligently resolved in the guest. Also see
+		 * gbm_bo_create.
+		 */
+		use_flags |= BO_USE_LINEAR;
+		return use_flags;
+	}
+
+	if (!params[param_3d].value && format != DRM_FORMAT_XRGB8888)
+		return use_flags & ~BO_USE_SCANOUT;
+
+	return use_flags;
+}
+
 static int virgl_resource_info(struct bo *bo, uint32_t strides[DRV_MAX_PLANES],
 			       uint32_t offsets[DRV_MAX_PLANES], uint64_t *format_modifier)
 {
@@ -1003,4 +1016,5 @@ const struct backend virtgpu_virgl = { .name = "virtgpu_virgl",
 				       .bo_invalidate = virgl_bo_invalidate,
 				       .bo_flush = virgl_bo_flush,
 				       .resolve_format = virgl_resolve_format,
+				       .resolve_use_flags = virgl_resolve_use_flags,
 				       .resource_info = virgl_resource_info };

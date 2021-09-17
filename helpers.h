@@ -52,6 +52,7 @@ uint64_t drv_pick_modifier(const uint64_t *modifiers, uint32_t count,
 bool drv_has_modifier(const uint64_t *list, uint32_t count, uint64_t modifier);
 uint32_t drv_get_standard_fourcc(uint32_t fourcc_internal);
 uint32_t drv_resolve_format_helper(uint32_t format, uint64_t use_flags);
+uint64_t drv_resolve_use_flags_helper(uint32_t format, uint64_t use_flags);
 
 #ifdef __cplusplus
 }
