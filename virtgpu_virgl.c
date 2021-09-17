@@ -30,13 +30,15 @@ static const uint32_t render_target_formats[] = { DRM_FORMAT_ABGR8888, DRM_FORMA
 						  DRM_FORMAT_XRGB8888 };
 
 static const uint32_t dumb_texture_source_formats[] = {
-	DRM_FORMAT_R8,	 DRM_FORMAT_R16,  DRM_FORMAT_YVU420,
-	DRM_FORMAT_NV12, DRM_FORMAT_NV21, DRM_FORMAT_YVU420_ANDROID
+	DRM_FORMAT_R8,		DRM_FORMAT_R16,		 DRM_FORMAT_YVU420,
+	DRM_FORMAT_NV12,	DRM_FORMAT_NV21,	 DRM_FORMAT_YVU420_ANDROID,
+	DRM_FORMAT_ABGR2101010, DRM_FORMAT_ABGR16161616F
 };
 
-static const uint32_t texture_source_formats[] = { DRM_FORMAT_NV12, DRM_FORMAT_NV21,
-						   DRM_FORMAT_R8,   DRM_FORMAT_R16,
-						   DRM_FORMAT_RG88, DRM_FORMAT_YVU420_ANDROID };
+static const uint32_t texture_source_formats[] = {
+	DRM_FORMAT_NV12, DRM_FORMAT_NV21,	    DRM_FORMAT_R8,	    DRM_FORMAT_R16,
+	DRM_FORMAT_RG88, DRM_FORMAT_YVU420_ANDROID, DRM_FORMAT_ABGR2101010, DRM_FORMAT_ABGR16161616F
+};
 
 extern struct virtgpu_param params[];
 
@@ -602,19 +604,11 @@ static int virgl_init(struct driver *drv)
 		virgl_add_combinations(drv, dumb_texture_source_formats,
 				       ARRAY_SIZE(dumb_texture_source_formats), &LINEAR_METADATA,
 				       BO_USE_TEXTURE_MASK);
-		virgl_add_combination(drv, DRM_FORMAT_NV12, &LINEAR_METADATA,
-				      BO_USE_SW_MASK | BO_USE_LINEAR);
-		virgl_add_combination(drv, DRM_FORMAT_NV21, &LINEAR_METADATA,
-				      BO_USE_SW_MASK | BO_USE_LINEAR);
 	}
 
 	/* Android CTS tests require this. */
 	virgl_add_combination(drv, DRM_FORMAT_RGB888, &LINEAR_METADATA, BO_USE_SW_MASK);
 	virgl_add_combination(drv, DRM_FORMAT_BGR888, &LINEAR_METADATA, BO_USE_SW_MASK);
-	virgl_add_combination(drv, DRM_FORMAT_ABGR16161616F, &LINEAR_METADATA,
-			      BO_USE_SW_MASK | BO_USE_TEXTURE_MASK);
-	virgl_add_combination(drv, DRM_FORMAT_ABGR2101010, &LINEAR_METADATA,
-			      BO_USE_SW_MASK | BO_USE_TEXTURE_MASK);
 	virgl_add_combination(drv, DRM_FORMAT_P010, &LINEAR_METADATA,
 			      BO_USE_SW_MASK | BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE);
 	drv_modify_combination(drv, DRM_FORMAT_NV12, &LINEAR_METADATA,
