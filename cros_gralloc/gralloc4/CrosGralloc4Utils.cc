@@ -82,16 +82,7 @@ int convertToCrosDescriptor(const BufferDescriptorInfo& descriptor,
 }
 
 int convertToMapUsage(uint64_t grallocUsage, uint32_t* outMapUsage) {
-    uint32_t mapUsage = BO_MAP_NONE;
-
-    if (grallocUsage & BufferUsage::CPU_READ_MASK) {
-        mapUsage |= BO_MAP_READ;
-    }
-    if (grallocUsage & BufferUsage::CPU_WRITE_MASK) {
-        mapUsage |= BO_MAP_WRITE;
-    }
-
-    *outMapUsage = mapUsage;
+    *outMapUsage = cros_gralloc_convert_map_usage(grallocUsage);
     return 0;
 }
 

@@ -122,6 +122,18 @@ uint64_t cros_gralloc_convert_usage(uint64_t usage)
 	return use_flags;
 }
 
+uint32_t cros_gralloc_convert_map_usage(uint64_t usage)
+{
+	uint32_t map_flags = BO_MAP_NONE;
+
+	if (usage & GRALLOC_USAGE_SW_READ_MASK)
+		map_flags |= BO_MAP_READ;
+	if (usage & GRALLOC_USAGE_SW_WRITE_MASK)
+		map_flags |= BO_MAP_WRITE;
+
+	return map_flags;
+}
+
 cros_gralloc_handle_t cros_gralloc_convert_handle(buffer_handle_t handle)
 {
 	auto hnd = reinterpret_cast<cros_gralloc_handle_t>(handle);

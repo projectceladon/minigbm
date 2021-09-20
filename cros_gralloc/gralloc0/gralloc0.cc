@@ -61,21 +61,8 @@ enum {
 };
 // clang-format on
 
-static uint32_t gralloc0_convert_map_usage(int map_usage)
-{
-	uint32_t map_flags = BO_MAP_NONE;
-
-	if (map_usage & GRALLOC_USAGE_SW_READ_MASK)
-		map_flags |= BO_MAP_READ;
-	if (map_usage & GRALLOC_USAGE_SW_WRITE_MASK)
-		map_flags |= BO_MAP_WRITE;
-
-	return map_flags;
-}
-
 static int gralloc0_droid_yuv_format(int droid_format)
 {
-
 	return (droid_format == HAL_PIXEL_FORMAT_YCbCr_420_888 ||
 		droid_format == HAL_PIXEL_FORMAT_YV12);
 }
@@ -366,7 +353,7 @@ static int gralloc0_lock_async(struct gralloc_module_t const *module, buffer_han
 	assert(w >= 0);
 	assert(h >= 0);
 
-	map_flags = gralloc0_convert_map_usage(usage);
+	map_flags = cros_gralloc_convert_map_usage(static_cast<uint64_t>(usage));
 	ret = mod->driver->lock(handle, fence_fd, true, &rect, map_flags, addr);
 	*vaddr = addr[0];
 	return ret;
@@ -418,7 +405,7 @@ static int gralloc0_lock_async_ycbcr(struct gralloc_module_t const *module, buff
 	assert(w >= 0);
 	assert(h >= 0);
 
-	map_flags = gralloc0_convert_map_usage(usage);
+	map_flags = cros_gralloc_convert_map_usage(static_cast<uint64_t>(usage));
 	ret = mod->driver->lock(handle, fence_fd, true, &rect, map_flags, addr);
 	if (ret)
 		return ret;
