@@ -257,6 +257,8 @@ struct bo *drv_bo_create(struct driver *drv, uint32_t width, uint32_t height, ui
 	size_t plane;
 	struct bo *bo;
 
+        width = (width +3) & (~3);
+        height = (height +3) & (~3);
 	bo = drv_bo_new(drv, width, height, format, use_flags);
 
 	if (!bo)
@@ -289,12 +291,13 @@ struct bo *drv_bo_create_with_modifiers(struct driver *drv, uint32_t width, uint
 	int ret;
 	size_t plane;
 	struct bo *bo;
-
 	if (!drv->backend->bo_create_with_modifiers) {
 		errno = ENOENT;
 		return NULL;
 	}
 
+        width = (width +3) & (~3);
+        height = (height +3) & (~3);
 	bo = drv_bo_new(drv, width, height, format, BO_USE_NONE);
 
 	if (!bo)
