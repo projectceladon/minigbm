@@ -654,7 +654,7 @@ size_t drv_bo_get_total_size(struct bo *bo)
 uint32_t drv_resolve_format(struct driver *drv, uint32_t format, uint64_t use_flags)
 {
 	if (drv->backend->resolve_format)
-		return drv->backend->resolve_format(drv, format, use_flags);
+		return drv->backend->resolve_format(format, use_flags);
 
 	return format;
 }

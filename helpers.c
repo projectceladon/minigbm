@@ -649,7 +649,7 @@ uint32_t drv_get_standard_fourcc(uint32_t fourcc_internal)
 	return (fourcc_internal == DRM_FORMAT_YVU420_ANDROID) ? DRM_FORMAT_YVU420 : fourcc_internal;
 }
 
-uint32_t drv_resolve_format_helper(struct driver *drv, uint32_t format, uint64_t use_flags)
+uint32_t drv_resolve_format_helper(uint32_t format, uint64_t use_flags)
 {
 	switch (format) {
 	case DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED:
