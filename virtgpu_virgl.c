@@ -36,8 +36,8 @@ static const uint32_t dumb_texture_source_formats[] = {
 };
 
 static const uint32_t texture_source_formats[] = {
-	DRM_FORMAT_NV12, DRM_FORMAT_NV21,	    DRM_FORMAT_R8,	    DRM_FORMAT_R16,
-	DRM_FORMAT_RG88, DRM_FORMAT_YVU420_ANDROID, DRM_FORMAT_ABGR2101010, DRM_FORMAT_ABGR16161616F
+	DRM_FORMAT_NV21,	   DRM_FORMAT_R8,	   DRM_FORMAT_R16,	    DRM_FORMAT_RG88,
+	DRM_FORMAT_YVU420_ANDROID, DRM_FORMAT_ABGR2101010, DRM_FORMAT_ABGR16161616F
 };
 
 extern struct virtgpu_param params[];
@@ -334,12 +334,10 @@ static bool virgl_supports_combination_through_emulation(struct driver *drv, uin
 static void virgl_add_combination(struct driver *drv, uint32_t drm_format,
 				  struct format_metadata *metadata, uint64_t use_flags)
 {
-	struct virgl_priv *priv = (struct virgl_priv *)drv->priv;
-
-	if (params[param_3d].value && priv->caps.max_version >= 1) {
-		if ((use_flags & BO_USE_SCANOUT) && priv->caps_is_v2 &&
-		    !virgl_supports_combination_natively(drv, drm_format, use_flags)) {
-			drv_log("Scanout format: %d\n", drm_format);
+	if (params[param_3d].value) {
+		if ((use_flags & BO_USE_SCANOUT) &&
+		    !virgl_supports_combination_natively(drv, drm_format, BO_USE_SCANOUT)) {
+			drv_log("Strip scanout on format: %d\n", drm_format);
 			use_flags &= ~BO_USE_SCANOUT;
 		}
 
@@ -580,10 +578,12 @@ static int virgl_init(struct driver *drv)
 		virgl_add_combinations(drv, texture_source_formats,
 				       ARRAY_SIZE(texture_source_formats), &LINEAR_METADATA,
 				       BO_USE_TEXTURE_MASK);
-		drv_modify_combination(drv, DRM_FORMAT_NV12, &LINEAR_METADATA,
-				       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE |
-					   BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER |
-					   BO_USE_SCANOUT);
+		/* NV12 with scanout must flow through virgl_add_combination, so that the native
+		 * support is checked and scanout use_flag can be conditionally stripped. */
+		virgl_add_combination(drv, DRM_FORMAT_NV12, &LINEAR_METADATA,
+				      BO_USE_TEXTURE_MASK | BO_USE_CAMERA_READ |
+					  BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER |
+					  BO_USE_HW_VIDEO_ENCODER | BO_USE_SCANOUT);
 	} else {
 		/* Virtio primary plane only allows this format. */
 		virgl_add_combination(drv, DRM_FORMAT_XRGB8888, &LINEAR_METADATA,
@@ -953,7 +953,7 @@ static uint32_t virgl_resolve_format(uint32_t format, uint64_t use_flags)
 	}
 }
 
-static uint64_t virgl_resolve_use_flags(uint32_t format, uint64_t use_flags)
+static uint64_t virgl_resolve_use_flags(struct driver *drv, uint32_t format, uint64_t use_flags)
 {
 	if (format == DRM_FORMAT_YVU420_ANDROID) {
 		use_flags &= ~BO_USE_SCANOUT;
@@ -967,8 +967,27 @@ static uint64_t virgl_resolve_use_flags(uint32_t format, uint64_t use_flags)
 		return use_flags;
 	}
 
-	if (!params[param_3d].value && format != DRM_FORMAT_XRGB8888)
-		return use_flags & ~BO_USE_SCANOUT;
+	if (params[param_3d].value) {
+		switch (format) {
+		/* formats need to support scanout */
+		case DRM_FORMAT_ABGR8888:
+		case DRM_FORMAT_ARGB8888:
+		case DRM_FORMAT_RGB565:
+		case DRM_FORMAT_XBGR8888:
+		case DRM_FORMAT_XRGB8888:
+		case DRM_FORMAT_NV12:
+			/* strip scanout use_flag if necessary */
+			if ((use_flags & BO_USE_SCANOUT) &&
+			    !virgl_supports_combination_natively(drv, format, BO_USE_SCANOUT))
+				return use_flags & ~BO_USE_SCANOUT;
+			break;
+		default:
+			break;
+		}
+	} else {
+		if (format != DRM_FORMAT_XRGB8888)
+			return use_flags & ~BO_USE_SCANOUT;
+	}
 
 	return use_flags;
 }

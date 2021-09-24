@@ -662,7 +662,7 @@ uint32_t drv_resolve_format(struct driver *drv, uint32_t format, uint64_t use_fl
 uint64_t drv_resolve_use_flags(struct driver *drv, uint32_t format, uint64_t use_flags)
 {
 	if (drv->backend->resolve_use_flags)
-		return drv->backend->resolve_use_flags(format, use_flags);
+		return drv->backend->resolve_use_flags(drv, format, use_flags);
 
 	return use_flags;
 }

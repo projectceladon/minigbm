@@ -666,7 +666,7 @@ uint32_t drv_resolve_format_helper(uint32_t format, uint64_t use_flags)
 	}
 }
 
-uint64_t drv_resolve_use_flags_helper(uint32_t format, uint64_t use_flags)
+uint64_t drv_resolve_use_flags_helper(struct driver *drv, uint32_t format, uint64_t use_flags)
 {
 	if (format == DRM_FORMAT_YVU420_ANDROID)
 		return use_flags & ~BO_USE_SCANOUT;
