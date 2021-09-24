@@ -237,11 +237,94 @@ struct bo *drv_bo_new(struct driver *drv, uint32_t width, uint32_t height, uint3
 	return bo;
 }
 
+static int drv_bo_mapping_destroy(struct bo *bo)
+{
+	struct driver *drv = bo->drv;
+	uint32_t idx = 0;
+
+	/*
+	 * This function is called right before the buffer is destroyed. It will free any mappings
+	 * associated with the buffer.
+	 */
+	pthread_mutex_lock(&drv->driver_lock);
+	for (size_t plane = 0; plane < bo->meta.num_planes; plane++) {
+		while (idx < drv_array_size(drv->mappings)) {
+			struct mapping *mapping =
+			    (struct mapping *)drv_array_at_idx(drv->mappings, idx);
+			if (mapping->vma->handle != bo->handles[plane].u32) {
+				idx++;
+				continue;
+			}
+
+			if (!--mapping->vma->refcount) {
+				int ret = drv->backend->bo_unmap(bo, mapping->vma);
+				if (ret) {
+					drv_log("munmap failed\n");
+					return ret;
+				}
+
+				free(mapping->vma);
+			}
+
+			/* This shrinks and shifts the array, so don't increment idx. */
+			drv_array_remove(drv->mappings, idx);
+		}
+	}
+	pthread_mutex_unlock(&drv->driver_lock);
+
+	return 0;
+}
+
+/*
+ * Acquire a reference on plane buffers of the bo.
+ */
+static void drv_bo_acquire(struct bo *bo)
+{
+	struct driver *drv = bo->drv;
+
+	pthread_mutex_lock(&drv->driver_lock);
+	for (size_t plane = 0; plane < bo->meta.num_planes; plane++) {
+		uintptr_t num = 0;
+
+		if (!drmHashLookup(drv->buffer_table, bo->handles[plane].u32, (void **)&num))
+			drmHashDelete(drv->buffer_table, bo->handles[plane].u32);
+
+		drmHashInsert(drv->buffer_table, bo->handles[plane].u32, (void *)(num + 1));
+	}
+	pthread_mutex_unlock(&drv->driver_lock);
+}
+
+/*
+ * Release a reference on plane buffers of the bo. Return true when the bo has lost all its
+ * references. Otherwise, return false.
+ */
+static bool drv_bo_release(struct bo *bo)
+{
+	struct driver *drv = bo->drv;
+	bool unreferenced = true;
+
+	pthread_mutex_lock(&drv->driver_lock);
+	for (size_t plane = 0; plane < bo->meta.num_planes; plane++) {
+		uintptr_t num = 0;
+
+		if (!drmHashLookup(drv->buffer_table, bo->handles[plane].u32, (void **)&num)) {
+			drmHashDelete(drv->buffer_table, bo->handles[plane].u32);
+		}
+
+		if (num > 1) {
+			drmHashInsert(drv->buffer_table, bo->handles[plane].u32, (void *)(num - 1));
+			unreferenced = false;
+		}
+	}
+	pthread_mutex_unlock(&drv->driver_lock);
+
+	return unreferenced;
+}
+
 struct bo *drv_bo_create(struct driver *drv, uint32_t width, uint32_t height, uint32_t format,
 			 uint64_t use_flags)
 {
 	int ret;
-	size_t plane;
 	struct bo *bo;
 	bool is_test_alloc;
 
@@ -269,16 +352,7 @@ struct bo *drv_bo_create(struct driver *drv, uint32_t width, uint32_t height, ui
 		return NULL;
 	}
 
-	pthread_mutex_lock(&drv->driver_lock);
-
-	for (plane = 0; plane < bo->meta.num_planes; plane++) {
-		if (plane > 0)
-			assert(bo->meta.offsets[plane] >= bo->meta.offsets[plane - 1]);
-
-		drv_increment_reference_count(drv, bo, plane);
-	}
-
-	pthread_mutex_unlock(&drv->driver_lock);
+	drv_bo_acquire(bo);
 
 	return bo;
 }
@@ -287,7 +361,6 @@ struct bo *drv_bo_create_with_modifiers(struct driver *drv, uint32_t width, uint
 					uint32_t format, const uint64_t *modifiers, uint32_t count)
 {
 	int ret;
-	size_t plane;
 	struct bo *bo;
 
 	if (!drv->backend->bo_create_with_modifiers && !drv->backend->bo_compute_metadata) {
@@ -316,43 +389,18 @@ struct bo *drv_bo_create_with_modifiers(struct driver *drv, uint32_t width, uint
 		return NULL;
 	}
 
-	pthread_mutex_lock(&drv->driver_lock);
-
-	for (plane = 0; plane < bo->meta.num_planes; plane++) {
-		if (plane > 0)
-			assert(bo->meta.offsets[plane] >= bo->meta.offsets[plane - 1]);
-
-		drv_increment_reference_count(drv, bo, plane);
-	}
-
-	pthread_mutex_unlock(&drv->driver_lock);
+	drv_bo_acquire(bo);
 
 	return bo;
 }
 
 void drv_bo_destroy(struct bo *bo)
 {
-	int ret;
-	size_t plane;
-	uintptr_t total = 0;
-	struct driver *drv = bo->drv;
+	if (!bo->is_test_buffer && drv_bo_release(bo)) {
+		int ret = drv_bo_mapping_destroy(bo);
+		assert(ret == 0);
 
-	if (!bo->is_test_buffer) {
-		pthread_mutex_lock(&drv->driver_lock);
-
-		for (plane = 0; plane < bo->meta.num_planes; plane++)
-			drv_decrement_reference_count(drv, bo, plane);
-
-		for (plane = 0; plane < bo->meta.num_planes; plane++)
-			total += drv_get_reference_count(drv, bo, plane);
-
-		pthread_mutex_unlock(&drv->driver_lock);
-
-		if (total == 0) {
-			ret = drv_mapping_destroy(bo);
-			assert(ret == 0);
-			bo->drv->backend->bo_destroy(bo);
-		}
+		bo->drv->backend->bo_destroy(bo);
 	}
 
 	free(bo);
@@ -376,11 +424,7 @@ struct bo *drv_bo_import(struct driver *drv, struct drv_import_fd_data *data)
 		return NULL;
 	}
 
-	for (plane = 0; plane < bo->meta.num_planes; plane++) {
-		pthread_mutex_lock(&bo->drv->driver_lock);
-		drv_increment_reference_count(bo->drv, bo, plane);
-		pthread_mutex_unlock(&bo->drv->driver_lock);
-	}
+	drv_bo_acquire(bo);
 
 	bo->meta.format_modifier = data->format_modifier;
 	for (plane = 0; plane < bo->meta.num_planes; plane++) {
