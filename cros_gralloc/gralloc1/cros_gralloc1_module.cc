@@ -1057,17 +1057,19 @@ int32_t CrosGralloc1::getBufferInfo(buffer_handle_t buffer, cros_gralloc_buffer_
 	    case DRM_FORMAT_FLEX_YCbCr_420_888:
 	    case DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED:
 		    outInfo->drm_fourcc = DRM_FORMAT_NV12;
+                    outInfo->modifier = (((uint64_t) hnd->format_modifiers[0]) << 32) | (((uint64_t) hnd->format_modifiers[1]) & 0xffffffff);
 		    break;
 	    case DRM_FORMAT_YVU420_ANDROID:
 		    outInfo->drm_fourcc = DRM_FORMAT_YVU420;
+                    outInfo->modifier = (((uint64_t) hnd->format_modifiers[0]) << 32) | (((uint64_t) hnd->format_modifiers[1]) & 0xffffffff);
 		    break;
 	    default:
 		    outInfo->drm_fourcc = hnd->format;
+                    outInfo->modifier = 0;
 		    break;
     }
     outInfo->num_fds = hnd->base.numFds;
     memcpy(outInfo->fds, hnd->fds, outInfo->num_fds * sizeof(int));
-    outInfo->modifier = (((uint64_t) hnd->format_modifiers[0]) << 32) | (((uint64_t) hnd->format_modifiers[1]) & 0xffffffff);
     memcpy(outInfo->offset, hnd->offsets, outInfo->num_fds * sizeof(uint32_t));
     memcpy(outInfo->stride, hnd->strides, outInfo->num_fds * sizeof(uint32_t));
 
