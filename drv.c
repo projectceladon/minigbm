@@ -128,16 +128,19 @@ struct driver *drv_create(int fd)
 	if (!drv->backend)
 		goto free_driver;
 
-	if (pthread_mutex_init(&drv->driver_lock, NULL))
+	if (pthread_mutex_init(&drv->buffer_table_lock, NULL))
 		goto free_driver;
 
 	drv->buffer_table = drmHashCreate();
 	if (!drv->buffer_table)
-		goto free_lock;
+		goto free_buffer_table_lock;
+
+	if (pthread_mutex_init(&drv->mappings_lock, NULL))
+		goto free_buffer_table;
 
 	drv->mappings = drv_array_init(sizeof(struct mapping));
 	if (!drv->mappings)
-		goto free_buffer_table;
+		goto free_mappings_lock;
 
 	drv->combos = drv_array_init(sizeof(struct combination));
 	if (!drv->combos)
@@ -155,10 +158,12 @@ struct driver *drv_create(int fd)
 
 free_mappings:
 	drv_array_destroy(drv->mappings);
+free_mappings_lock:
+	pthread_mutex_destroy(&drv->mappings_lock);
 free_buffer_table:
 	drmHashDestroy(drv->buffer_table);
-free_lock:
-	pthread_mutex_destroy(&drv->driver_lock);
+free_buffer_table_lock:
+	pthread_mutex_destroy(&drv->buffer_table_lock);
 free_driver:
 	free(drv);
 	return NULL;
@@ -166,17 +171,16 @@ free_driver:
 
 void drv_destroy(struct driver *drv)
 {
-	pthread_mutex_lock(&drv->driver_lock);
-
 	if (drv->backend->close)
 		drv->backend->close(drv);
 
-	drmHashDestroy(drv->buffer_table);
-	drv_array_destroy(drv->mappings);
 	drv_array_destroy(drv->combos);
 
-	pthread_mutex_unlock(&drv->driver_lock);
-	pthread_mutex_destroy(&drv->driver_lock);
+	drv_array_destroy(drv->mappings);
+	pthread_mutex_destroy(&drv->mappings_lock);
+
+	drmHashDestroy(drv->buffer_table);
+	pthread_mutex_destroy(&drv->buffer_table_lock);
 
 	free(drv);
 }
@@ -246,7 +250,7 @@ static int drv_bo_mapping_destroy(struct bo *bo)
 	 * This function is called right before the buffer is destroyed. It will free any mappings
 	 * associated with the buffer.
 	 */
-	pthread_mutex_lock(&drv->driver_lock);
+	pthread_mutex_lock(&drv->mappings_lock);
 	for (size_t plane = 0; plane < bo->meta.num_planes; plane++) {
 		while (idx < drv_array_size(drv->mappings)) {
 			struct mapping *mapping =
@@ -270,7 +274,7 @@ static int drv_bo_mapping_destroy(struct bo *bo)
 			drv_array_remove(drv->mappings, idx);
 		}
 	}
-	pthread_mutex_unlock(&drv->driver_lock);
+	pthread_mutex_unlock(&drv->mappings_lock);
 
 	return 0;
 }
@@ -282,7 +286,7 @@ static void drv_bo_acquire(struct bo *bo)
 {
 	struct driver *drv = bo->drv;
 
-	pthread_mutex_lock(&drv->driver_lock);
+	pthread_mutex_lock(&drv->buffer_table_lock);
 	for (size_t plane = 0; plane < bo->meta.num_planes; plane++) {
 		uintptr_t num = 0;
 
@@ -291,7 +295,7 @@ static void drv_bo_acquire(struct bo *bo)
 
 		drmHashInsert(drv->buffer_table, bo->handles[plane].u32, (void *)(num + 1));
 	}
-	pthread_mutex_unlock(&drv->driver_lock);
+	pthread_mutex_unlock(&drv->buffer_table_lock);
 }
 
 /*
@@ -303,7 +307,7 @@ static bool drv_bo_release(struct bo *bo)
 	struct driver *drv = bo->drv;
 	bool unreferenced = true;
 
-	pthread_mutex_lock(&drv->driver_lock);
+	pthread_mutex_lock(&drv->buffer_table_lock);
 	for (size_t plane = 0; plane < bo->meta.num_planes; plane++) {
 		uintptr_t num = 0;
 
@@ -316,7 +320,7 @@ static bool drv_bo_release(struct bo *bo)
 			unreferenced = false;
 		}
 	}
-	pthread_mutex_unlock(&drv->driver_lock);
+	pthread_mutex_unlock(&drv->buffer_table_lock);
 
 	return unreferenced;
 }
@@ -461,6 +465,7 @@ destroy_bo:
 void *drv_bo_map(struct bo *bo, const struct rectangle *rect, uint32_t map_flags,
 		 struct mapping **map_data, size_t plane)
 {
+	struct driver *drv = bo->drv;
 	uint32_t i;
 	uint8_t *addr;
 	struct mapping mapping = { 0 };
@@ -479,10 +484,10 @@ void *drv_bo_map(struct bo *bo, const struct rectangle *rect, uint32_t map_flags
 	mapping.rect = *rect;
 	mapping.refcount = 1;
 
-	pthread_mutex_lock(&bo->drv->driver_lock);
+	pthread_mutex_lock(&drv->mappings_lock);
 
-	for (i = 0; i < drv_array_size(bo->drv->mappings); i++) {
-		struct mapping *prior = (struct mapping *)drv_array_at_idx(bo->drv->mappings, i);
+	for (i = 0; i < drv_array_size(drv->mappings); i++) {
+		struct mapping *prior = (struct mapping *)drv_array_at_idx(drv->mappings, i);
 		if (prior->vma->handle != bo->handles[plane].u32 ||
 		    prior->vma->map_flags != map_flags)
 			continue;
@@ -496,8 +501,8 @@ void *drv_bo_map(struct bo *bo, const struct rectangle *rect, uint32_t map_flags
 		goto exact_match;
 	}
 
-	for (i = 0; i < drv_array_size(bo->drv->mappings); i++) {
-		struct mapping *prior = (struct mapping *)drv_array_at_idx(bo->drv->mappings, i);
+	for (i = 0; i < drv_array_size(drv->mappings); i++) {
+		struct mapping *prior = (struct mapping *)drv_array_at_idx(drv->mappings, i);
 		if (prior->vma->handle != bo->handles[plane].u32 ||
 		    prior->vma->map_flags != map_flags)
 			continue;
@@ -515,11 +520,11 @@ void *drv_bo_map(struct bo *bo, const struct rectangle *rect, uint32_t map_flags
 	}
 
 	memcpy(mapping.vma->map_strides, bo->meta.strides, sizeof(mapping.vma->map_strides));
-	addr = bo->drv->backend->bo_map(bo, mapping.vma, plane, map_flags);
+	addr = drv->backend->bo_map(bo, mapping.vma, plane, map_flags);
 	if (addr == MAP_FAILED) {
 		*map_data = NULL;
 		free(mapping.vma);
-		pthread_mutex_unlock(&bo->drv->driver_lock);
+		pthread_mutex_unlock(&drv->mappings_lock);
 		return MAP_FAILED;
 	}
 
@@ -529,39 +534,40 @@ void *drv_bo_map(struct bo *bo, const struct rectangle *rect, uint32_t map_flags
 	mapping.vma->map_flags = map_flags;
 
 success:
-	*map_data = drv_array_append(bo->drv->mappings, &mapping);
+	*map_data = drv_array_append(drv->mappings, &mapping);
 exact_match:
 	drv_bo_invalidate(bo, *map_data);
 	addr = (uint8_t *)((*map_data)->vma->addr);
 	addr += drv_bo_get_plane_offset(bo, plane);
-	pthread_mutex_unlock(&bo->drv->driver_lock);
+	pthread_mutex_unlock(&drv->mappings_lock);
 	return (void *)addr;
 }
 
 int drv_bo_unmap(struct bo *bo, struct mapping *mapping)
 {
+	struct driver *drv = bo->drv;
 	uint32_t i;
 	int ret = 0;
 
-	pthread_mutex_lock(&bo->drv->driver_lock);
+	pthread_mutex_lock(&drv->mappings_lock);
 
 	if (--mapping->refcount)
 		goto out;
 
 	if (!--mapping->vma->refcount) {
-		ret = bo->drv->backend->bo_unmap(bo, mapping->vma);
+		ret = drv->backend->bo_unmap(bo, mapping->vma);
 		free(mapping->vma);
 	}
 
-	for (i = 0; i < drv_array_size(bo->drv->mappings); i++) {
-		if (mapping == (struct mapping *)drv_array_at_idx(bo->drv->mappings, i)) {
-			drv_array_remove(bo->drv->mappings, i);
+	for (i = 0; i < drv_array_size(drv->mappings); i++) {
+		if (mapping == (struct mapping *)drv_array_at_idx(drv->mappings, i)) {
+			drv_array_remove(drv->mappings, i);
 			break;
 		}
 	}
 
 out:
-	pthread_mutex_unlock(&bo->drv->driver_lock);
+	pthread_mutex_unlock(&drv->mappings_lock);
 	return ret;
 }
 

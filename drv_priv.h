@@ -64,15 +64,11 @@ struct driver {
 	int fd;
 	const struct backend *backend;
 	void *priv;
+	pthread_mutex_t buffer_table_lock;
 	void *buffer_table;
+	pthread_mutex_t mappings_lock;
 	struct drv_array *mappings;
 	struct drv_array *combos;
-	/*
-	 * The driver_lock currently protects:
-	 * 1. buffer_table
-	 * 2. mappings
-	 */
-	pthread_mutex_t driver_lock;
 	bool compression;
 };
 
