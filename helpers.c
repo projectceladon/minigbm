@@ -494,7 +494,7 @@ int drv_mapping_destroy(struct bo *bo)
 	 * This function is called right before the buffer is destroyed. It will free any mappings
 	 * associated with the buffer.
 	 */
-
+	pthread_mutex_lock(&bo->drv->driver_lock);
 	idx = 0;
 	for (plane = 0; plane < bo->meta.num_planes; plane++) {
 		while (idx < drv_array_size(bo->drv->mappings)) {
@@ -518,6 +518,7 @@ int drv_mapping_destroy(struct bo *bo)
 			drv_array_remove(bo->drv->mappings, idx);
 		}
 	}
+	pthread_mutex_unlock(&bo->drv->driver_lock);
 
 	return 0;
 }
@@ -553,7 +554,7 @@ void drv_decrement_reference_count(struct driver *drv, struct bo *bo, size_t pla
 
 	drmHashDelete(drv->buffer_table, bo->handles[plane].u32);
 
-	if (num > 0)
+	if (num > 1)
 		drmHashInsert(drv->buffer_table, bo->handles[plane].u32, (void *)(num - 1));
 }
 
