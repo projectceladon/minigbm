@@ -281,7 +281,7 @@ static int gralloc0_perform(struct gralloc_module_t const *module, int op, ...)
 		memset(info, 0, sizeof(*info));
 		info->drm_fourcc = drv_get_standard_fourcc(hnd->format);
 		info->num_fds = hnd->num_planes;
-		for (uint32_t i = 0; i < info->num_fds; i++)
+		for (int i = 0; i < info->num_fds; i++)
 			info->fds[i] = hnd->fds[i];
 
 		ret = mod->driver->resource_info(handle, strides, offsets, &format_modifier);
