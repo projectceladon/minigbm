@@ -36,6 +36,7 @@ struct cross_domain_private {
 	uint32_t ring_handle;
 	void *ring_addr;
 	struct drv_array *metadata_cache;
+	pthread_mutex_t metadata_cache_lock;
 };
 
 static void cross_domain_release_private(struct driver *drv)
@@ -57,7 +58,11 @@ static void cross_domain_release_private(struct driver *drv)
 		}
 	}
 
-	drv_array_destroy(priv->metadata_cache);
+	if (priv->metadata_cache)
+		drv_array_destroy(priv->metadata_cache);
+
+	pthread_mutex_destroy(&priv->metadata_cache_lock);
+
 	free(priv);
 }
 
@@ -150,7 +155,7 @@ static int cross_domain_metadata_query(struct driver *drv, struct bo_metadata *m
 	uint32_t plane, remaining_size;
 
 	memset(&cmd_get_reqs, 0, sizeof(cmd_get_reqs));
-	pthread_mutex_lock(&drv->driver_lock);
+	pthread_mutex_lock(&priv->metadata_cache_lock);
 	for (uint32_t i = 0; i < drv_array_size(priv->metadata_cache); i++) {
 		cached_data = (struct bo_metadata *)drv_array_at_idx(priv->metadata_cache, i);
 		if (!metadata_equal(metadata, cached_data))
@@ -203,7 +208,7 @@ static int cross_domain_metadata_query(struct driver *drv, struct bo_metadata *m
 	drv_array_append(priv->metadata_cache, metadata);
 
 out_unlock:
-	pthread_mutex_unlock(&drv->driver_lock);
+	pthread_mutex_unlock(&priv->metadata_cache_lock);
 	return ret;
 }
 
@@ -245,6 +250,12 @@ static int cross_domain_init(struct driver *drv)
 	priv = calloc(1, sizeof(*priv));
 	if (!priv)
 		return -ENOMEM;
+
+	ret = pthread_mutex_init(&priv->metadata_cache_lock, NULL);
+	if (!ret) {
+		free(priv);
+		return ret;
+	}
 
 	priv->metadata_cache = drv_array_init(sizeof(struct bo_metadata));
 	if (!priv->metadata_cache) {

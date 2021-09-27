@@ -71,7 +71,6 @@ struct driver {
 	 * The driver_lock currently protects:
 	 * 1. buffer_table
 	 * 2. mappings
-	 * 3. metadata_cache in virtgpu_cros_domain
 	 */
 	pthread_mutex_t driver_lock;
 	bool compression;
