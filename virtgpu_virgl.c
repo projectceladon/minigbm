@@ -565,6 +565,9 @@ static int virgl_init(struct driver *drv)
 	struct virgl_priv *priv;
 
 	priv = calloc(1, sizeof(*priv));
+	if (!priv)
+		return -ENOMEM;
+
 	drv->priv = priv;
 
 	virgl_init_params_and_caps(drv);

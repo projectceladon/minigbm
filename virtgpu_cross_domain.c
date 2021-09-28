@@ -243,7 +243,15 @@ static int cross_domain_init(struct driver *drv)
 		return -ENOTSUP;
 
 	priv = calloc(1, sizeof(*priv));
+	if (!priv)
+		return -ENOMEM;
+
 	priv->metadata_cache = drv_array_init(sizeof(struct bo_metadata));
+	if (!priv->metadata_cache) {
+		ret = -ENOMEM;
+		goto free_private;
+	}
+
 	priv->ring_addr = MAP_FAILED;
 	drv->priv = priv;
 

@@ -508,6 +508,12 @@ void *drv_bo_map(struct bo *bo, const struct rectangle *rect, uint32_t map_flags
 	}
 
 	mapping.vma = calloc(1, sizeof(*mapping.vma));
+	if (!mapping.vma) {
+		*map_data = NULL;
+		pthread_mutex_unlock(&drv->mappings_lock);
+		return MAP_FAILED;
+	}
+
 	memcpy(mapping.vma->map_strides, bo->meta.strides, sizeof(mapping.vma->map_strides));
 	addr = bo->drv->backend->bo_map(bo, mapping.vma, plane, map_flags);
 	if (addr == MAP_FAILED) {
