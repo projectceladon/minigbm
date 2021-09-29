@@ -772,3 +772,11 @@ int drv_resource_info(struct bo *bo, uint32_t strides[DRV_MAX_PLANES],
 
 	return 0;
 }
+
+uint32_t drv_get_max_texture_2d_size(struct driver *drv)
+{
+	if (drv->backend->get_max_texture_2d_size)
+		return drv->backend->get_max_texture_2d_size(drv);
+
+	return UINT32_MAX;
+}

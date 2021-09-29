@@ -96,6 +96,7 @@ struct backend {
 	size_t (*num_planes_from_modifier)(struct driver *drv, uint32_t format, uint64_t modifier);
 	int (*resource_info)(struct bo *bo, uint32_t strides[DRV_MAX_PLANES],
 			     uint32_t offsets[DRV_MAX_PLANES], uint64_t *format_modifier);
+	uint32_t (*get_max_texture_2d_size)(struct driver *drv);
 };
 
 // clang-format off

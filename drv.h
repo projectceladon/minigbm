@@ -195,6 +195,8 @@ uint32_t drv_num_buffers_per_bo(struct bo *bo);
 int drv_resource_info(struct bo *bo, uint32_t strides[DRV_MAX_PLANES],
 		      uint32_t offsets[DRV_MAX_PLANES], uint64_t *format_modifier);
 
+uint32_t drv_get_max_texture_2d_size(struct driver *drv);
+
 #define drv_log(format, ...)                                                                       \
 	do {                                                                                       \
 		drv_log_prefix("minigbm", __FILE__, __LINE__, format, ##__VA_ARGS__);              \
