@@ -179,7 +179,16 @@ bool cros_gralloc_driver::is_supported(const struct cros_gralloc_buffer_descript
 {
 	uint32_t resolved_format;
 	uint64_t resolved_use_flags;
-	return get_resolved_format_and_use_flags(descriptor, &resolved_format, &resolved_use_flags);
+	uint32_t max_texture_size = drv_get_max_texture_2d_size(drv_);
+	if (!get_resolved_format_and_use_flags(descriptor, &resolved_format, &resolved_use_flags))
+		return false;
+
+	// Allow blob buffers to go beyond the limit.
+	if (descriptor->droid_format == HAL_PIXEL_FORMAT_BLOB)
+		return true;
+
+	return descriptor->width <= max_texture_size &&
+	       descriptor->height <= max_texture_size;
 }
 
 int32_t create_reserved_region(const std::string &buffer_name, uint64_t reserved_region_size)
