@@ -241,7 +241,7 @@ struct bo *drv_bo_new(struct driver *drv, uint32_t width, uint32_t height, uint3
 	return bo;
 }
 
-static int drv_bo_mapping_destroy(struct bo *bo)
+static void drv_bo_mapping_destroy(struct bo *bo)
 {
 	struct driver *drv = bo->drv;
 	uint32_t idx = 0;
@@ -264,7 +264,7 @@ static int drv_bo_mapping_destroy(struct bo *bo)
 				int ret = drv->backend->bo_unmap(bo, mapping->vma);
 				if (ret) {
 					drv_log("munmap failed\n");
-					return ret;
+					return;
 				}
 
 				free(mapping->vma);
@@ -275,8 +275,6 @@ static int drv_bo_mapping_destroy(struct bo *bo)
 		}
 	}
 	pthread_mutex_unlock(&drv->mappings_lock);
-
-	return 0;
 }
 
 /*
@@ -401,9 +399,7 @@ struct bo *drv_bo_create_with_modifiers(struct driver *drv, uint32_t width, uint
 void drv_bo_destroy(struct bo *bo)
 {
 	if (!bo->is_test_buffer && drv_bo_release(bo)) {
-		int ret = drv_bo_mapping_destroy(bo);
-		assert(ret == 0);
-
+		drv_bo_mapping_destroy(bo);
 		bo->drv->backend->bo_destroy(bo);
 	}
 
