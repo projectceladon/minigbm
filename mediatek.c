@@ -172,6 +172,7 @@ static void *mediatek_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint3
 	int ret, prime_fd;
 	struct drm_mtk_gem_map_off gem_map = { 0 };
 	struct mediatek_private_map_data *priv;
+	void *addr = NULL;
 
 	gem_map.handle = bo->handles[0].u32;
 
@@ -187,22 +188,38 @@ static void *mediatek_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint3
 		return MAP_FAILED;
 	}
 
-	void *addr = mmap(0, bo->meta.total_size, drv_get_prot(map_flags), MAP_SHARED, bo->drv->fd,
-			  gem_map.offset);
+	addr = mmap(0, bo->meta.total_size, drv_get_prot(map_flags), MAP_SHARED, bo->drv->fd,
+		    gem_map.offset);
+	if (addr == MAP_FAILED)
+		goto out_close_prime_fd;
 
 	vma->length = bo->meta.total_size;
 
 	priv = calloc(1, sizeof(*priv));
-	priv->prime_fd = prime_fd;
-	vma->priv = priv;
+	if (!priv)
+		goto out_unmap_addr;
 
 	if (bo->meta.use_flags & BO_USE_RENDERSCRIPT) {
 		priv->cached_addr = calloc(1, bo->meta.total_size);
+		if (!priv->cached_addr)
+			goto out_free_priv;
+
 		priv->gem_addr = addr;
 		addr = priv->cached_addr;
 	}
 
+	priv->prime_fd = prime_fd;
+	vma->priv = priv;
+
 	return addr;
+
+out_free_priv:
+	free(priv);
+out_unmap_addr:
+	munmap(addr, bo->meta.total_size);
+out_close_prime_fd:
+	close(prime_fd);
+	return MAP_FAILED;
 }
 
 static int mediatek_bo_unmap(struct bo *bo, struct vma *vma)
@@ -258,7 +275,7 @@ static int mediatek_bo_flush(struct bo *bo, struct mapping *mapping)
 	return 0;
 }
 
-static uint32_t mediatek_resolve_format(struct driver *drv, uint32_t format, uint64_t use_flags)
+static uint32_t mediatek_resolve_format(uint32_t format, uint64_t use_flags)
 {
 	switch (format) {
 	case DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED:
@@ -303,6 +320,7 @@ const struct backend backend_mediatek = {
 	.bo_invalidate = mediatek_bo_invalidate,
 	.bo_flush = mediatek_bo_flush,
 	.resolve_format = mediatek_resolve_format,
+	.resolve_use_flags = drv_resolve_use_flags_helper,
 };
 
 #endif

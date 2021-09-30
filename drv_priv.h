@@ -34,7 +34,7 @@ struct bo_metadata {
 	 * specific metadata.  It's easiest just to stuff all the metadata here rather than
 	 * having two metadata structs.
 	 */
-	uint64_t blob_id;
+	uint32_t blob_id;
 	uint32_t map_info;
 	int32_t memory_idx;
 	int32_t physical_device_idx;
@@ -64,10 +64,11 @@ struct driver {
 	int fd;
 	const struct backend *backend;
 	void *priv;
+	pthread_mutex_t buffer_table_lock;
 	void *buffer_table;
+	pthread_mutex_t mappings_lock;
 	struct drv_array *mappings;
 	struct drv_array *combos;
-	pthread_mutex_t driver_lock;
 	bool compression;
 };
 
@@ -90,10 +91,12 @@ struct backend {
 	int (*bo_unmap)(struct bo *bo, struct vma *vma);
 	int (*bo_invalidate)(struct bo *bo, struct mapping *mapping);
 	int (*bo_flush)(struct bo *bo, struct mapping *mapping);
-	uint32_t (*resolve_format)(struct driver *drv, uint32_t format, uint64_t use_flags);
+	uint32_t (*resolve_format)(uint32_t format, uint64_t use_flags);
+	uint64_t (*resolve_use_flags)(struct driver *drv, uint32_t format, uint64_t use_flags);
 	size_t (*num_planes_from_modifier)(struct driver *drv, uint32_t format, uint64_t modifier);
 	int (*resource_info)(struct bo *bo, uint32_t strides[DRV_MAX_PLANES],
 			     uint32_t offsets[DRV_MAX_PLANES], uint64_t *format_modifier);
+	uint32_t (*get_max_texture_2d_size)(struct driver *drv);
 };
 
 // clang-format off
