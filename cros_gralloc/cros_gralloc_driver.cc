@@ -8,6 +8,7 @@
 
 #include <cstdlib>
 #include <fcntl.h>
+#include <hardware/gralloc.h>
 #include <sys/mman.h>
 #include <syscall.h>
 #include <xf86drm.h>
@@ -129,13 +130,65 @@ bool cros_gralloc_driver::is_initialized()
 	return drv_ != nullptr;
 }
 
+bool cros_gralloc_driver::get_resolved_format_and_use_flags(
+    const struct cros_gralloc_buffer_descriptor *descriptor, uint32_t *out_format,
+    uint64_t *out_use_flags)
+{
+	uint32_t resolved_format;
+	uint64_t resolved_use_flags;
+	struct combination *combo;
+
+	resolved_format = drv_resolve_format(drv_, descriptor->drm_format, descriptor->use_flags);
+	if (resolved_format == DRM_FORMAT_NONE)
+		return false;
+
+	resolved_use_flags = drv_resolve_use_flags(drv_, resolved_format, descriptor->use_flags);
+	/*
+	 * This unmask is a backup in the case DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED is resolved
+	 * to non-YUV formats.
+	 */
+	if (descriptor->drm_format == DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED &&
+	    (resolved_format == DRM_FORMAT_XBGR8888 || resolved_format == DRM_FORMAT_ABGR8888)) {
+		resolved_use_flags &= ~BO_USE_HW_VIDEO_ENCODER;
+	}
+
+	combo = drv_get_combination(drv_, resolved_format, resolved_use_flags);
+	if (!combo && (descriptor->droid_usage & GRALLOC_USAGE_HW_VIDEO_ENCODER) &&
+	    descriptor->droid_format != HAL_PIXEL_FORMAT_YCbCr_420_888) {
+		// Unmask BO_USE_HW_VIDEO_ENCODER for other formats. They are mostly
+		// intermediate formats not passed directly to the encoder (e.g.
+		// camera). YV12 is passed to the encoder component, but it is converted
+		// to YCbCr_420_888 before being passed to the hw encoder.
+		resolved_use_flags &= ~BO_USE_HW_VIDEO_ENCODER;
+		combo = drv_get_combination(drv_, resolved_format, resolved_use_flags);
+	}
+	if (!combo && (descriptor->droid_usage & BUFFER_USAGE_FRONT_RENDERING)) {
+		resolved_use_flags &= ~BO_USE_FRONT_RENDERING;
+		resolved_use_flags |= BO_USE_LINEAR;
+		combo = drv_get_combination(drv_, resolved_format, resolved_use_flags);
+	}
+	if (!combo)
+		return false;
+
+	*out_format = resolved_format;
+	*out_use_flags = resolved_use_flags;
+	return true;
+}
+
 bool cros_gralloc_driver::is_supported(const struct cros_gralloc_buffer_descriptor *descriptor)
 {
-	struct combination *combo;
 	uint32_t resolved_format;
-	resolved_format = drv_resolve_format(drv_, descriptor->drm_format, descriptor->use_flags);
-	combo = drv_get_combination(drv_, resolved_format, descriptor->use_flags);
-	return (combo != nullptr);
+	uint64_t resolved_use_flags;
+	uint32_t max_texture_size = drv_get_max_texture_2d_size(drv_);
+	if (!get_resolved_format_and_use_flags(descriptor, &resolved_format, &resolved_use_flags))
+		return false;
+
+	// Allow blob buffers to go beyond the limit.
+	if (descriptor->droid_format == HAL_PIXEL_FORMAT_BLOB)
+		return true;
+
+	return descriptor->width <= max_texture_size &&
+	       descriptor->height <= max_texture_size;
 }
 
 int32_t create_reserved_region(const std::string &buffer_name, uint64_t reserved_region_size)
@@ -174,24 +227,18 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 	size_t num_bytes;
 	uint32_t resolved_format;
 	uint32_t bytes_per_pixel;
-	uint64_t use_flags;
+	uint64_t resolved_use_flags;
 	char *name;
 	struct bo *bo;
 	struct cros_gralloc_handle *hnd;
 
-	resolved_format = drv_resolve_format(drv_, descriptor->drm_format, descriptor->use_flags);
-	use_flags = descriptor->use_flags;
-
-	/*
-	 * This unmask is a backup in the case DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED is resolved
-	 * to non-YUV formats.
-	 */
-	if (descriptor->drm_format == DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED &&
-	    (resolved_format == DRM_FORMAT_XBGR8888 || resolved_format == DRM_FORMAT_ABGR8888)) {
-		use_flags &= ~BO_USE_HW_VIDEO_ENCODER;
+	if (!get_resolved_format_and_use_flags(descriptor, &resolved_format, &resolved_use_flags)) {
+		drv_log("Failed to resolve format and use_flags.\n");
+		return -EINVAL;
 	}
 
-	bo = drv_bo_create(drv_, descriptor->width, descriptor->height, resolved_format, use_flags);
+	bo = drv_bo_create(drv_, descriptor->width, descriptor->height, resolved_format,
+			   resolved_use_flags);
 	if (!bo) {
 		drv_log("Failed to create bo.\n");
 		return -errno;
@@ -254,15 +301,15 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 	hnd->width = drv_bo_get_width(bo);
 	hnd->height = drv_bo_get_height(bo);
 	hnd->format = drv_bo_get_format(bo);
-	hnd->tiling = bo->meta.tiling;
+	hnd->tiling = drv_bo_get_tiling(bo);
 	hnd->format_modifier = drv_bo_get_format_modifier(bo);
-	hnd->use_flags = descriptor->use_flags;
+	hnd->use_flags = drv_bo_get_use_flags(bo);
 	bytes_per_pixel = drv_bytes_per_pixel_from_format(hnd->format, 0);
 	hnd->pixel_stride = DIV_ROUND_UP(hnd->strides[0], bytes_per_pixel);
 	hnd->magic = cros_gralloc_magic;
 	hnd->droid_format = descriptor->droid_format;
 	hnd->usage = descriptor->droid_usage;
-	hnd->total_size = descriptor->reserved_region_size + bo->meta.total_size;
+	hnd->total_size = descriptor->reserved_region_size + drv_bo_get_total_size(bo);
 	hnd->name_offset = handle_data_size;
 
 	name = (char *)(&hnd->data[hnd->name_offset]);

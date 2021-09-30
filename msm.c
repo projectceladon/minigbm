@@ -41,7 +41,8 @@ static const uint32_t render_target_formats[] = { DRM_FORMAT_ABGR8888, DRM_FORMA
 						  DRM_FORMAT_XRGB8888 };
 
 static const uint32_t texture_source_formats[] = { DRM_FORMAT_NV12, DRM_FORMAT_R8,
-						   DRM_FORMAT_YVU420, DRM_FORMAT_YVU420_ANDROID };
+						   DRM_FORMAT_YVU420, DRM_FORMAT_YVU420_ANDROID,
+						   DRM_FORMAT_P010 };
 
 /*
  * Each macrotile consists of m x n (mostly 4 x 4) tiles.
@@ -94,9 +95,14 @@ static void msm_calculate_layout(struct bo *bo)
 	/* NV12 format requires extra padding with platform
 	 * specific alignments for venus driver
 	 */
-	if (bo->meta.format == DRM_FORMAT_NV12) {
+	if (bo->meta.format == DRM_FORMAT_NV12 || bo->meta.format == DRM_FORMAT_P010) {
 		uint32_t y_stride, uv_stride, y_scanline, uv_scanline, y_plane, uv_plane, size,
 		    extra_padding;
+
+		// P010 has the same layout as NV12.  The difference is that each
+		// pixel in P010 takes 2 bytes, while in NV12 each pixel takes 1 byte.
+		if (bo->meta.format == DRM_FORMAT_P010)
+			width *= 2;
 
 		y_stride = ALIGN(width, VENUS_STRIDE_ALIGN);
 		uv_stride = ALIGN(width, VENUS_STRIDE_ALIGN);
@@ -263,6 +269,11 @@ static int msm_init(struct driver *drv)
 
 	/* Android CTS tests require this. */
 	drv_add_combination(drv, DRM_FORMAT_BGR888, &LINEAR_METADATA, BO_USE_SW_MASK);
+
+#ifdef SC_7280
+	drv_modify_combination(drv, DRM_FORMAT_P010, &LINEAR_METADATA,
+			       BO_USE_SCANOUT | BO_USE_HW_VIDEO_ENCODER);
+#endif
 
 	drv_modify_linear_combinations(drv);
 

@@ -44,13 +44,7 @@ Error CrosGralloc4Allocator::allocate(const BufferDescriptorInfo& descriptor, ui
         return Error::UNSUPPORTED;
     }
 
-    bool supported = mDriver->is_supported(&crosDescriptor);
-    if (!supported && (descriptor.usage & BufferUsage::COMPOSER_OVERLAY)) {
-        crosDescriptor.use_flags &= ~BO_USE_SCANOUT;
-        supported = mDriver->is_supported(&crosDescriptor);
-    }
-
-    if (!supported) {
+    if (!mDriver->is_supported(&crosDescriptor)) {
         std::string drmFormatString = get_drm_format_string(crosDescriptor.drm_format);
         std::string pixelFormatString = getPixelFormatString(descriptor.format);
         std::string usageString = getUsageString(descriptor.usage);
