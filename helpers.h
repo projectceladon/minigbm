@@ -35,11 +35,7 @@ int drv_gem_bo_destroy(struct bo *bo);
 int drv_prime_bo_import(struct bo *bo, struct drv_import_fd_data *data);
 void *drv_dumb_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t map_flags);
 int drv_bo_munmap(struct bo *bo, struct vma *vma);
-int drv_mapping_destroy(struct bo *bo);
 int drv_get_prot(uint32_t map_flags);
-uintptr_t drv_get_reference_count(struct driver *drv, struct bo *bo, size_t plane);
-void drv_increment_reference_count(struct driver *drv, struct bo *bo, size_t plane);
-void drv_decrement_reference_count(struct driver *drv, struct bo *bo, size_t plane);
 void drv_add_combination(struct driver *drv, uint32_t format, struct format_metadata *metadata,
 			 uint64_t usage);
 void drv_add_combinations(struct driver *drv, const uint32_t *formats, uint32_t num_formats,
@@ -51,7 +47,8 @@ uint64_t drv_pick_modifier(const uint64_t *modifiers, uint32_t count,
 			   const uint64_t *modifier_order, uint32_t order_count);
 bool drv_has_modifier(const uint64_t *list, uint32_t count, uint64_t modifier);
 uint32_t drv_get_standard_fourcc(uint32_t fourcc_internal);
-uint32_t drv_resolve_format_helper(struct driver *drv, uint32_t format, uint64_t use_flags);
+uint32_t drv_resolve_format_helper(uint32_t format, uint64_t use_flags);
+uint64_t drv_resolve_use_flags_helper(struct driver *drv, uint32_t format, uint64_t use_flags);
 
 #ifdef __cplusplus
 }
