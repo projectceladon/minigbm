@@ -483,78 +483,9 @@ int drv_bo_munmap(struct bo *bo, struct vma *vma)
 	return munmap(vma->addr, vma->length);
 }
 
-int drv_mapping_destroy(struct bo *bo)
-{
-	int ret;
-	size_t plane;
-	struct mapping *mapping;
-	uint32_t idx;
-
-	/*
-	 * This function is called right before the buffer is destroyed. It will free any mappings
-	 * associated with the buffer.
-	 */
-
-	idx = 0;
-	for (plane = 0; plane < bo->meta.num_planes; plane++) {
-		while (idx < drv_array_size(bo->drv->mappings)) {
-			mapping = (struct mapping *)drv_array_at_idx(bo->drv->mappings, idx);
-			if (mapping->vma->handle != bo->handles[plane].u32) {
-				idx++;
-				continue;
-			}
-
-			if (!--mapping->vma->refcount) {
-				ret = bo->drv->backend->bo_unmap(bo, mapping->vma);
-				if (ret) {
-					drv_log("munmap failed\n");
-					return ret;
-				}
-
-				free(mapping->vma);
-			}
-
-			/* This shrinks and shifts the array, so don't increment idx. */
-			drv_array_remove(bo->drv->mappings, idx);
-		}
-	}
-
-	return 0;
-}
-
 int drv_get_prot(uint32_t map_flags)
 {
 	return (BO_MAP_WRITE & map_flags) ? PROT_WRITE | PROT_READ : PROT_READ;
-}
-
-uintptr_t drv_get_reference_count(struct driver *drv, struct bo *bo, size_t plane)
-{
-	void *count;
-	uintptr_t num = 0;
-
-	if (!drmHashLookup(drv->buffer_table, bo->handles[plane].u32, &count))
-		num = (uintptr_t)(count);
-
-	return num;
-}
-
-void drv_increment_reference_count(struct driver *drv, struct bo *bo, size_t plane)
-{
-	uintptr_t num = drv_get_reference_count(drv, bo, plane);
-
-	/* If a value isn't in the table, drmHashDelete is a no-op */
-	drmHashDelete(drv->buffer_table, bo->handles[plane].u32);
-	drmHashInsert(drv->buffer_table, bo->handles[plane].u32, (void *)(num + 1));
-}
-
-void drv_decrement_reference_count(struct driver *drv, struct bo *bo, size_t plane)
-{
-	uintptr_t num = drv_get_reference_count(drv, bo, plane);
-
-	drmHashDelete(drv->buffer_table, bo->handles[plane].u32);
-
-	if (num > 0)
-		drmHashInsert(drv->buffer_table, bo->handles[plane].u32, (void *)(num - 1));
 }
 
 void drv_add_combination(struct driver *drv, const uint32_t format,
@@ -649,7 +580,7 @@ uint32_t drv_get_standard_fourcc(uint32_t fourcc_internal)
 	return (fourcc_internal == DRM_FORMAT_YVU420_ANDROID) ? DRM_FORMAT_YVU420 : fourcc_internal;
 }
 
-uint32_t drv_resolve_format_helper(struct driver *drv, uint32_t format, uint64_t use_flags)
+uint32_t drv_resolve_format_helper(uint32_t format, uint64_t use_flags)
 {
 	switch (format) {
 	case DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED:
@@ -664,4 +595,12 @@ uint32_t drv_resolve_format_helper(struct driver *drv, uint32_t format, uint64_t
 	default:
 		return format;
 	}
+}
+
+uint64_t drv_resolve_use_flags_helper(struct driver *drv, uint32_t format, uint64_t use_flags)
+{
+	if (format == DRM_FORMAT_YVU420_ANDROID)
+		return use_flags & ~BO_USE_SCANOUT;
+
+	return use_flags;
 }

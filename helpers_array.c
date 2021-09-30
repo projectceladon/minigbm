@@ -23,10 +23,17 @@ struct drv_array *drv_array_init(uint32_t item_size)
 	struct drv_array *array;
 
 	array = calloc(1, sizeof(*array));
+	if (!array)
+		return NULL;
 
 	/* Start with a power of 2 number of allocations. */
 	array->allocations = 2;
 	array->items = calloc(array->allocations, sizeof(*array->items));
+	if (!array->items) {
+		free(array);
+		return NULL;
+	}
+
 	array->item_size = item_size;
 	return array;
 }

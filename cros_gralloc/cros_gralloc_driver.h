@@ -49,6 +49,9 @@ class cros_gralloc_driver
 	bool is_initialized();
 	cros_gralloc_buffer *get_buffer(cros_gralloc_handle_t hnd);
 	void emplace_buffer(struct bo *bo, struct cros_gralloc_handle *hnd);
+	bool
+	get_resolved_format_and_use_flags(const struct cros_gralloc_buffer_descriptor *descriptor,
+					  uint32_t *out_format, uint64_t *out_use_flags);
 
 	struct driver *drv_ = nullptr;
 	std::mutex mutex_;
