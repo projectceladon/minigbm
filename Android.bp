@@ -81,6 +81,12 @@ cc_defaults {
         "-Wcast-align",
         "-Wno-unused-parameter",
     ],
+
+    product_variables: {
+        platform_sdk_version: {
+            cflags: ["-DANDROID_API_LEVEL=%d"],
+        },
+    },
 }
 
 cc_library_headers {
