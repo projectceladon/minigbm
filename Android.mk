@@ -11,10 +11,10 @@ MINIGBM_SRC := \
 	amdgpu.c \
 	dri.c \
 	drv.c \
+	drv_array_helpers.c \
+	drv_helpers.c \
 	dumb_driver.c \
 	exynos.c \
-	helpers_array.c \
-	helpers.c \
 	i915.c \
 	mediatek.c \
 	meson.c \

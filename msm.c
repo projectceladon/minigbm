@@ -18,8 +18,8 @@
 #include <sys/mman.h>
 #include <xf86drm.h>
 
+#include "drv_helpers.h"
 #include "drv_priv.h"
-#include "helpers.h"
 #include "util.h"
 
 /* Alignment values are based on SDM845 Gfx IP */

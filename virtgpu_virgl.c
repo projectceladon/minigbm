@@ -12,11 +12,11 @@
 #include <sys/mman.h>
 #include <xf86drm.h>
 
+#include "drv_helpers.h"
 #include "drv_priv.h"
 #include "external/virgl_hw.h"
 #include "external/virgl_protocol.h"
 #include "external/virtgpu_drm.h"
-#include "helpers.h"
 #include "util.h"
 #include "virtgpu.h"
 

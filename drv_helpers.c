@@ -4,6 +4,8 @@
  * found in the LICENSE file.
  */
 
+#include "drv_helpers.h"
+
 #include <assert.h>
 #include <errno.h>
 #include <stdio.h>
@@ -15,7 +17,6 @@
 #include <xf86drm.h>
 
 #include "drv_priv.h"
-#include "helpers.h"
 #include "util.h"
 
 struct planar_layout {
@@ -570,14 +571,6 @@ bool drv_has_modifier(const uint64_t *list, uint32_t count, uint64_t modifier)
 			return true;
 
 	return false;
-}
-
-/*
- * Map internal fourcc codes back to standard fourcc codes.
- */
-uint32_t drv_get_standard_fourcc(uint32_t fourcc_internal)
-{
-	return (fourcc_internal == DRM_FORMAT_YVU420_ANDROID) ? DRM_FORMAT_YVU420 : fourcc_internal;
 }
 
 uint32_t drv_resolve_format_helper(uint32_t format, uint64_t use_flags)

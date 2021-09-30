@@ -14,8 +14,8 @@
 #include <sys/mman.h>
 #include <xf86drm.h>
 
+#include "drv_helpers.h"
 #include "drv_priv.h"
-#include "helpers.h"
 #include "util.h"
 
 struct rockchip_private_map_data {

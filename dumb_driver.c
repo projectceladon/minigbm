@@ -4,8 +4,8 @@
  * found in the LICENSE file.
  */
 
+#include "drv_helpers.h"
 #include "drv_priv.h"
-#include "helpers.h"
 #include "util.h"
 
 #define INIT_DUMB_DRIVER(driver)                                                                   \

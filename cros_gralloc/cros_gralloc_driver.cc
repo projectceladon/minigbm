@@ -13,8 +13,6 @@
 #include <syscall.h>
 #include <xf86drm.h>
 
-#include "../drv_priv.h"
-#include "../helpers.h"
 #include "../util.h"
 
 // Constants taken from pipe_loader_drm.c in Mesa

@@ -19,8 +19,8 @@
 #include <mediatek_drm.h>
 // clang-format on
 
+#include "drv_helpers.h"
 #include "drv_priv.h"
-#include "helpers.h"
 #include "util.h"
 
 #define TILE_TYPE_LINEAR 0

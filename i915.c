@@ -15,9 +15,9 @@
 #include <unistd.h>
 #include <xf86drm.h>
 
+#include "drv_helpers.h"
 #include "drv_priv.h"
 #include "external/i915_drm.h"
-#include "helpers.h"
 #include "util.h"
 
 #define I915_CACHELINE_SIZE 64

@@ -9,7 +9,6 @@
 #include <pthread.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/types.h>
@@ -21,8 +20,8 @@
 #include <libgen.h>
 #endif
 
+#include "drv_helpers.h"
 #include "drv_priv.h"
-#include "helpers.h"
 #include "util.h"
 
 #ifdef DRV_AMDGPU
@@ -701,6 +700,14 @@ uint64_t drv_bo_get_use_flags(struct bo *bo)
 size_t drv_bo_get_total_size(struct bo *bo)
 {
 	return bo->meta.total_size;
+}
+
+/*
+ * Map internal fourcc codes back to standard fourcc codes.
+ */
+uint32_t drv_get_standard_fourcc(uint32_t fourcc_internal)
+{
+	return (fourcc_internal == DRM_FORMAT_YVU420_ANDROID) ? DRM_FORMAT_YVU420 : fourcc_internal;
 }
 
 uint32_t drv_resolve_format(struct driver *drv, uint32_t format, uint64_t use_flags)

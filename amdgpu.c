@@ -19,8 +19,8 @@
 #include <xf86drmMode.h>
 
 #include "dri.h"
+#include "drv_helpers.h"
 #include "drv_priv.h"
-#include "helpers.h"
 #include "util.h"
 
 // clang-format off
