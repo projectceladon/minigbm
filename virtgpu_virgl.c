@@ -959,6 +959,7 @@ static void virgl_3d_resolve_format_and_use_flags(struct driver *drv, uint32_t f
 		} else {
 			/* HACK: See b/28671744 */
 			*out_format = DRM_FORMAT_XBGR8888;
+			*out_use_flags &= ~BO_USE_HW_VIDEO_ENCODER;
 		}
 		break;
 	case DRM_FORMAT_FLEX_YCbCr_420_888:
@@ -1006,6 +1007,7 @@ static void virgl_2d_resolve_format_and_use_flags(uint32_t format, uint64_t use_
 		} else {
 			/* HACK: See b/28671744 */
 			*out_format = DRM_FORMAT_XBGR8888;
+			*out_use_flags &= ~BO_USE_HW_VIDEO_ENCODER;
 		}
 		break;
 	case DRM_FORMAT_FLEX_YCbCr_420_888:

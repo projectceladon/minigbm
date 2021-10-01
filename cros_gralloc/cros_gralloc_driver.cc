@@ -139,15 +139,6 @@ bool cros_gralloc_driver::get_resolved_format_and_use_flags(
 	drv_resolve_format_and_use_flags(drv_, descriptor->drm_format, descriptor->use_flags,
 					 &resolved_format, &resolved_use_flags);
 
-	/*
-	 * This unmask is a backup in the case DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED is resolved
-	 * to non-YUV formats.
-	 */
-	if (descriptor->drm_format == DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED &&
-	    (resolved_format == DRM_FORMAT_XBGR8888 || resolved_format == DRM_FORMAT_ABGR8888)) {
-		resolved_use_flags &= ~BO_USE_HW_VIDEO_ENCODER;
-	}
-
 	combo = drv_get_combination(drv_, resolved_format, resolved_use_flags);
 	if (!combo && (descriptor->droid_usage & GRALLOC_USAGE_HW_VIDEO_ENCODER) &&
 	    descriptor->droid_format != HAL_PIXEL_FORMAT_YCbCr_420_888) {

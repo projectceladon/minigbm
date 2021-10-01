@@ -587,6 +587,7 @@ void drv_resolve_format_and_use_flags_helper(struct driver *drv, uint32_t format
 		} else {
 			/* HACK: See b/28671744 */
 			*out_format = DRM_FORMAT_XBGR8888;
+			*out_use_flags &= ~BO_USE_HW_VIDEO_ENCODER;
 		}
 		break;
 	case DRM_FORMAT_FLEX_YCbCr_420_888:
