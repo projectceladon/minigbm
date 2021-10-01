@@ -271,8 +271,7 @@ const struct backend backend_rockchip = {
 	.bo_unmap = rockchip_bo_unmap,
 	.bo_invalidate = rockchip_bo_invalidate,
 	.bo_flush = rockchip_bo_flush,
-	.resolve_format = drv_resolve_format_helper,
-	.resolve_use_flags = drv_resolve_use_flags_helper,
+	.resolve_format_and_use_flags = drv_resolve_format_and_use_flags_helper,
 };
 
 #endif

@@ -44,7 +44,8 @@ int drv_modify_linear_combinations(struct driver *drv);
 uint64_t drv_pick_modifier(const uint64_t *modifiers, uint32_t count,
 			   const uint64_t *modifier_order, uint32_t order_count);
 bool drv_has_modifier(const uint64_t *list, uint32_t count, uint64_t modifier);
-uint32_t drv_resolve_format_helper(uint32_t format, uint64_t use_flags);
-uint64_t drv_resolve_use_flags_helper(struct driver *drv, uint32_t format, uint64_t use_flags);
+void drv_resolve_format_and_use_flags_helper(struct driver *drv, uint32_t format,
+					     uint64_t use_flags, uint32_t *out_format,
+					     uint64_t *out_use_flags);
 
 #endif

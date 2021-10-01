@@ -684,8 +684,7 @@ const struct backend backend_i915 = {
 	.bo_unmap = drv_bo_munmap,
 	.bo_invalidate = i915_bo_invalidate,
 	.bo_flush = i915_bo_flush,
-	.resolve_format = drv_resolve_format_helper,
-	.resolve_use_flags = drv_resolve_use_flags_helper,
+	.resolve_format_and_use_flags = drv_resolve_format_and_use_flags_helper,
 };
 
 #endif

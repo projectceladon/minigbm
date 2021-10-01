@@ -185,7 +185,8 @@ uint32_t drv_bytes_per_pixel_from_format(uint32_t format, size_t plane);
 
 uint32_t drv_stride_from_format(uint32_t format, uint32_t width, size_t plane);
 
-uint32_t drv_resolve_format(struct driver *drv, uint32_t format, uint64_t use_flags);
+void drv_resolve_format_and_use_flags(struct driver *drv, uint32_t format, uint64_t use_flags,
+				      uint32_t *out_format, uint64_t *out_use_flags);
 
 uint64_t drv_resolve_use_flags(struct driver *drv, uint32_t format, uint64_t use_flags);
 

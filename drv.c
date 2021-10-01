@@ -710,20 +710,13 @@ uint32_t drv_get_standard_fourcc(uint32_t fourcc_internal)
 	return (fourcc_internal == DRM_FORMAT_YVU420_ANDROID) ? DRM_FORMAT_YVU420 : fourcc_internal;
 }
 
-uint32_t drv_resolve_format(struct driver *drv, uint32_t format, uint64_t use_flags)
+void drv_resolve_format_and_use_flags(struct driver *drv, uint32_t format, uint64_t use_flags,
+				      uint32_t *out_format, uint64_t *out_use_flags)
 {
-	if (drv->backend->resolve_format)
-		return drv->backend->resolve_format(format, use_flags);
+	assert(drv->backend->resolve_format_and_use_flags);
 
-	return format;
-}
-
-uint64_t drv_resolve_use_flags(struct driver *drv, uint32_t format, uint64_t use_flags)
-{
-	if (drv->backend->resolve_use_flags)
-		return drv->backend->resolve_use_flags(drv, format, use_flags);
-
-	return use_flags;
+	drv->backend->resolve_format_and_use_flags(drv, format, use_flags, out_format,
+						   out_use_flags);
 }
 
 uint32_t drv_num_buffers_per_bo(struct bo *bo)

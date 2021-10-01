@@ -785,8 +785,7 @@ const struct backend backend_amdgpu = {
 	.bo_map = amdgpu_map_bo,
 	.bo_unmap = amdgpu_unmap_bo,
 	.bo_invalidate = amdgpu_bo_invalidate,
-	.resolve_format = drv_resolve_format_helper,
-	.resolve_use_flags = drv_resolve_use_flags_helper,
+	.resolve_format_and_use_flags = drv_resolve_format_and_use_flags_helper,
 	.num_planes_from_modifier = dri_num_planes_from_modifier,
 };
 

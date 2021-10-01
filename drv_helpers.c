@@ -573,27 +573,30 @@ bool drv_has_modifier(const uint64_t *list, uint32_t count, uint64_t modifier)
 	return false;
 }
 
-uint32_t drv_resolve_format_helper(uint32_t format, uint64_t use_flags)
+void drv_resolve_format_and_use_flags_helper(struct driver *drv, uint32_t format,
+					     uint64_t use_flags, uint32_t *out_format,
+					     uint64_t *out_use_flags)
 {
+	*out_format = format;
+	*out_use_flags = use_flags;
 	switch (format) {
 	case DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED:
 		/* Common camera implementation defined format. */
-		if (use_flags & (BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE))
-			return DRM_FORMAT_NV12;
-		/* A common hack: See b/28671744 */
-		return DRM_FORMAT_XBGR8888;
+		if (use_flags & (BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE)) {
+			*out_format = DRM_FORMAT_NV12;
+		} else {
+			/* HACK: See b/28671744 */
+			*out_format = DRM_FORMAT_XBGR8888;
+		}
+		break;
 	case DRM_FORMAT_FLEX_YCbCr_420_888:
 		/* Common flexible video format. */
-		return DRM_FORMAT_NV12;
+		*out_format = DRM_FORMAT_NV12;
+		break;
+	case DRM_FORMAT_YVU420_ANDROID:
+		*out_use_flags &= ~BO_USE_SCANOUT;
+		break;
 	default:
-		return format;
+		break;
 	}
-}
-
-uint64_t drv_resolve_use_flags_helper(struct driver *drv, uint32_t format, uint64_t use_flags)
-{
-	if (format == DRM_FORMAT_YVU420_ANDROID)
-		return use_flags & ~BO_USE_SCANOUT;
-
-	return use_flags;
 }

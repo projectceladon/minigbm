@@ -384,7 +384,6 @@ const struct backend backend_msm = {
 	.bo_import = drv_prime_bo_import,
 	.bo_map = msm_bo_map,
 	.bo_unmap = drv_bo_munmap,
-	.resolve_format = drv_resolve_format_helper,
-	.resolve_use_flags = drv_resolve_use_flags_helper,
+	.resolve_format_and_use_flags = drv_resolve_format_and_use_flags_helper,
 };
 #endif /* DRV_MSM */

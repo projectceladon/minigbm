@@ -131,6 +131,7 @@ const struct backend backend_vc4 = {
 	.bo_destroy = drv_gem_bo_destroy,
 	.bo_map = vc4_bo_map,
 	.bo_unmap = drv_bo_munmap,
+	.resolve_format_and_use_flags = drv_resolve_format_and_use_flags_helper,
 };
 
 #endif
