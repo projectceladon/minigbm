@@ -313,7 +313,10 @@ static void mediatek_resolve_format_and_use_flags(struct driver *drv, uint32_t f
 			*out_format = DRM_FORMAT_NV12;
 			break;
 		}
+
+		/* HACK: See b/139714614 */
 		*out_format = DRM_FORMAT_YVU420;
+		*out_use_flags &= ~BO_USE_SCANOUT;
 		break;
 	case DRM_FORMAT_YVU420_ANDROID:
 		*out_use_flags &= ~BO_USE_SCANOUT;
