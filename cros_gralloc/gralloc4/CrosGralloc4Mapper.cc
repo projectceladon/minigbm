@@ -392,13 +392,7 @@ Return<void> CrosGralloc4Mapper::isSupported(const BufferDescriptorInfo& descrip
         return Void();
     }
 
-    bool supported = mDriver->is_supported(&crosDescriptor);
-    if (!supported) {
-        crosDescriptor.use_flags &= ~BO_USE_SCANOUT;
-        supported = mDriver->is_supported(&crosDescriptor);
-    }
-
-    hidlCb(Error::NONE, supported);
+    hidlCb(Error::NONE, mDriver->is_supported(&crosDescriptor));
     return Void();
 }
 
