@@ -252,7 +252,7 @@ static int cross_domain_init(struct driver *drv)
 		return -ENOMEM;
 
 	ret = pthread_mutex_init(&priv->metadata_cache_lock, NULL);
-	if (!ret) {
+	if (ret) {
 		free(priv);
 		return ret;
 	}
