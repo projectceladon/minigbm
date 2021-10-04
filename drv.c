@@ -262,6 +262,8 @@ static void drv_bo_mapping_destroy(struct bo *bo)
 			if (!--mapping->vma->refcount) {
 				int ret = drv->backend->bo_unmap(bo, mapping->vma);
 				if (ret) {
+					pthread_mutex_unlock(&drv->mappings_lock);
+					assert(ret);
 					drv_log("munmap failed\n");
 					return;
 				}
@@ -302,24 +304,31 @@ static void drv_bo_acquire(struct bo *bo)
 static bool drv_bo_release(struct bo *bo)
 {
 	struct driver *drv = bo->drv;
-	bool unreferenced = true;
+	uintptr_t num;
 
 	pthread_mutex_lock(&drv->buffer_table_lock);
 	for (size_t plane = 0; plane < bo->meta.num_planes; plane++) {
-		uintptr_t num = 0;
-
 		if (!drmHashLookup(drv->buffer_table, bo->handles[plane].u32, (void **)&num)) {
 			drmHashDelete(drv->buffer_table, bo->handles[plane].u32);
-		}
 
-		if (num > 1) {
-			drmHashInsert(drv->buffer_table, bo->handles[plane].u32, (void *)(num - 1));
-			unreferenced = false;
+			if (num > 1) {
+				drmHashInsert(drv->buffer_table, bo->handles[plane].u32,
+					      (void *)(num - 1));
+			}
+		}
+	}
+
+	/* The same buffer can back multiple planes with different offsets. */
+	for (size_t plane = 0; plane < bo->meta.num_planes; plane++) {
+		if (!drmHashLookup(drv->buffer_table, bo->handles[plane].u32, (void **)&num)) {
+			/* num is positive if found in the hashmap. */
+			pthread_mutex_unlock(&drv->buffer_table_lock);
+			return false;
 		}
 	}
 	pthread_mutex_unlock(&drv->buffer_table_lock);
 
-	return unreferenced;
+	return true;
 }
 
 struct bo *drv_bo_create(struct driver *drv, uint32_t width, uint32_t height, uint32_t format,
