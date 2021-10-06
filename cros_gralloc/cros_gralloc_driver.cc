@@ -174,8 +174,7 @@ bool cros_gralloc_driver::is_supported(const struct cros_gralloc_buffer_descript
 	if (descriptor->droid_format == HAL_PIXEL_FORMAT_BLOB)
 		return true;
 
-	return descriptor->width <= max_texture_size &&
-	       descriptor->height <= max_texture_size;
+	return descriptor->width <= max_texture_size && descriptor->height <= max_texture_size;
 }
 
 int32_t create_reserved_region(const std::string &buffer_name, uint64_t reserved_region_size)

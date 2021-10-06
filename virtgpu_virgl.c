@@ -27,6 +27,16 @@
 #define MESA_LLVMPIPE_TILE_ORDER 6
 #define MESA_LLVMPIPE_TILE_SIZE (1 << MESA_LLVMPIPE_TILE_ORDER)
 
+// This comes from a combination of SwiftShader's VkPhysicalDeviceLimits::maxFramebufferWidth and
+// VkPhysicalDeviceLimits::maxImageDimension2D (see https://crrev.com/c/1917130).
+#define ANGLE_ON_SWIFTSHADER_MAX_TEXTURE_2D_SIZE 8192
+
+#ifndef MIN
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#endif
+#define VIRGL_2D_MAX_TEXTURE_2D_SIZE                                                               \
+	MIN(ANGLE_ON_SWIFTSHADER_MAX_TEXTURE_2D_SIZE, MESA_LLVMPIPE_MAX_TEXTURE_2D_SIZE)
+
 static const uint32_t render_target_formats[] = { DRM_FORMAT_ABGR8888, DRM_FORMAT_ARGB8888,
 						  DRM_FORMAT_RGB565, DRM_FORMAT_XBGR8888,
 						  DRM_FORMAT_XRGB8888 };
@@ -365,8 +375,8 @@ static void virgl_add_combinations(struct driver *drv, const uint32_t *drm_forma
 		virgl_add_combination(drv, drm_formats[i], metadata, use_flags);
 }
 
-static int virtio_dumb_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint32_t format,
-				 uint64_t use_flags)
+static int virgl_2d_dumb_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint32_t format,
+				   uint64_t use_flags)
 {
 	if (bo->meta.format != DRM_FORMAT_R8) {
 		width = ALIGN(width, MESA_LLVMPIPE_TILE_SIZE);
@@ -754,7 +764,7 @@ static int virgl_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint3
 	if (params[param_3d].value)
 		return virgl_3d_bo_create(bo, width, height, format, use_flags);
 	else
-		return virtio_dumb_bo_create(bo, width, height, format, use_flags);
+		return virgl_2d_dumb_bo_create(bo, width, height, format, use_flags);
 }
 
 static int virgl_bo_destroy(struct bo *bo)
@@ -1074,7 +1084,7 @@ static uint32_t virgl_get_max_texture_2d_size(struct driver *drv)
 	if (params[param_3d].value)
 		return virgl_3d_get_max_texture_2d_size(drv);
 	else
-		return MESA_LLVMPIPE_MAX_TEXTURE_2D_SIZE;
+		return VIRGL_2D_MAX_TEXTURE_2D_SIZE;
 }
 
 const struct backend virtgpu_virgl = { .name = "virtgpu_virgl",
