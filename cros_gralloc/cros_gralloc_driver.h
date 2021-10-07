@@ -39,7 +39,7 @@ class cros_gralloc_driver
 	int32_t get_reserved_region(buffer_handle_t handle, void **reserved_region_addr,
 				    uint64_t *reserved_region_size);
 
-	uint32_t get_resolved_drm_format(uint32_t drm_format, uint64_t usage);
+	uint32_t get_resolved_drm_format(uint32_t drm_format, uint64_t use_flags);
 
 	void for_each_handle(const std::function<void(cros_gralloc_handle_t)> &function);
 

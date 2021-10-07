@@ -9,10 +9,10 @@
 #include <sys/mman.h>
 #include <xf86drm.h>
 
+#include "drv_helpers.h"
 #include "drv_priv.h"
 #include "external/virtgpu_cross_domain_protocol.h"
 #include "external/virtgpu_drm.h"
-#include "helpers.h"
 #include "util.h"
 #include "virtgpu.h"
 
@@ -252,7 +252,7 @@ static int cross_domain_init(struct driver *drv)
 		return -ENOMEM;
 
 	ret = pthread_mutex_init(&priv->metadata_cache_lock, NULL);
-	if (!ret) {
+	if (ret) {
 		free(priv);
 		return ret;
 	}
@@ -422,6 +422,5 @@ const struct backend virtgpu_cross_domain = {
 	.bo_destroy = drv_gem_bo_destroy,
 	.bo_map = cross_domain_bo_map,
 	.bo_unmap = drv_bo_munmap,
-	.resolve_format = drv_resolve_format_helper,
-	.resolve_use_flags = drv_resolve_use_flags_helper,
+	.resolve_format_and_use_flags = drv_resolve_format_and_use_flags_helper,
 };
