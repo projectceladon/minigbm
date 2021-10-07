@@ -18,8 +18,8 @@
 #include <sys/mman.h>
 #include <xf86drm.h>
 
+#include "drv_helpers.h"
 #include "drv_priv.h"
-#include "helpers.h"
 #include "util.h"
 
 /* Alignment values are based on SDM845 Gfx IP */
@@ -260,12 +260,10 @@ static int msm_init(struct driver *drv)
 
 	/*
 	 * Android also frequently requests YV12 formats for some camera implementations
-	 * (including the external provider implmenetation). So mark it as well as valid
-	 * for camera display and encoding.
+	 * (including the external provider implmenetation).
 	 */
 	drv_modify_combination(drv, DRM_FORMAT_YVU420_ANDROID, &LINEAR_METADATA,
-			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SCANOUT |
-				   BO_USE_HW_VIDEO_ENCODER);
+			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE);
 
 	/* Android CTS tests require this. */
 	drv_add_combination(drv, DRM_FORMAT_BGR888, &LINEAR_METADATA, BO_USE_SW_MASK);
@@ -386,6 +384,6 @@ const struct backend backend_msm = {
 	.bo_import = drv_prime_bo_import,
 	.bo_map = msm_bo_map,
 	.bo_unmap = drv_bo_munmap,
-	.resolve_format = drv_resolve_format_helper,
+	.resolve_format_and_use_flags = drv_resolve_format_and_use_flags_helper,
 };
 #endif /* DRV_MSM */

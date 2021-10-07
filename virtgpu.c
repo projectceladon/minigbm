@@ -13,7 +13,6 @@
 
 #include "drv_priv.h"
 #include "external/virtgpu_drm.h"
-#include "helpers.h"
 #include "util.h"
 #include "virtgpu.h"
 
