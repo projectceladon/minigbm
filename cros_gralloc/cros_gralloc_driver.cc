@@ -13,8 +13,6 @@
 #include <syscall.h>
 #include <xf86drm.h>
 
-#include "../drv_priv.h"
-#include "../helpers.h"
 #include "../util.h"
 
 // Constants taken from pipe_loader_drm.c in Mesa
@@ -138,19 +136,8 @@ bool cros_gralloc_driver::get_resolved_format_and_use_flags(
 	uint64_t resolved_use_flags;
 	struct combination *combo;
 
-	resolved_format = drv_resolve_format(drv_, descriptor->drm_format, descriptor->use_flags);
-	if (resolved_format == DRM_FORMAT_NONE)
-		return false;
-
-	resolved_use_flags = drv_resolve_use_flags(drv_, resolved_format, descriptor->use_flags);
-	/*
-	 * This unmask is a backup in the case DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED is resolved
-	 * to non-YUV formats.
-	 */
-	if (descriptor->drm_format == DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED &&
-	    (resolved_format == DRM_FORMAT_XBGR8888 || resolved_format == DRM_FORMAT_ABGR8888)) {
-		resolved_use_flags &= ~BO_USE_HW_VIDEO_ENCODER;
-	}
+	drv_resolve_format_and_use_flags(drv_, descriptor->drm_format, descriptor->use_flags,
+					 &resolved_format, &resolved_use_flags);
 
 	combo = drv_get_combination(drv_, resolved_format, resolved_use_flags);
 	if (!combo && (descriptor->droid_usage & GRALLOC_USAGE_HW_VIDEO_ENCODER) &&
@@ -187,8 +174,7 @@ bool cros_gralloc_driver::is_supported(const struct cros_gralloc_buffer_descript
 	if (descriptor->droid_format == HAL_PIXEL_FORMAT_BLOB)
 		return true;
 
-	return descriptor->width <= max_texture_size &&
-	       descriptor->height <= max_texture_size;
+	return descriptor->width <= max_texture_size && descriptor->height <= max_texture_size;
 }
 
 int32_t create_reserved_region(const std::string &buffer_name, uint64_t reserved_region_size)
@@ -564,9 +550,15 @@ int32_t cros_gralloc_driver::get_reserved_region(buffer_handle_t handle,
 	return buffer->get_reserved_region(reserved_region_addr, reserved_region_size);
 }
 
-uint32_t cros_gralloc_driver::get_resolved_drm_format(uint32_t drm_format, uint64_t usage)
+uint32_t cros_gralloc_driver::get_resolved_drm_format(uint32_t drm_format, uint64_t use_flags)
 {
-	return drv_resolve_format(drv_, drm_format, usage);
+	uint32_t resolved_format;
+	uint64_t resolved_use_flags;
+
+	drv_resolve_format_and_use_flags(drv_, drm_format, use_flags, &resolved_format,
+					 &resolved_use_flags);
+
+	return resolved_format;
 }
 
 cros_gralloc_buffer *cros_gralloc_driver::get_buffer(cros_gralloc_handle_t hnd)
