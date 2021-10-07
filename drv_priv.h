@@ -91,8 +91,9 @@ struct backend {
 	int (*bo_unmap)(struct bo *bo, struct vma *vma);
 	int (*bo_invalidate)(struct bo *bo, struct mapping *mapping);
 	int (*bo_flush)(struct bo *bo, struct mapping *mapping);
-	uint32_t (*resolve_format)(uint32_t format, uint64_t use_flags);
-	uint64_t (*resolve_use_flags)(struct driver *drv, uint32_t format, uint64_t use_flags);
+	void (*resolve_format_and_use_flags)(struct driver *drv, uint32_t format,
+					     uint64_t use_flags, uint32_t *out_format,
+					     uint64_t *out_use_flags);
 	size_t (*num_planes_from_modifier)(struct driver *drv, uint32_t format, uint64_t modifier);
 	int (*resource_info)(struct bo *bo, uint32_t strides[DRV_MAX_PLANES],
 			     uint32_t offsets[DRV_MAX_PLANES], uint64_t *format_modifier);

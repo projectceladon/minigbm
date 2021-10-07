@@ -15,9 +15,9 @@
 #include <unistd.h>
 #include <xf86drm.h>
 
+#include "drv_helpers.h"
 #include "drv_priv.h"
 #include "external/i915_drm.h"
-#include "helpers.h"
 #include "util.h"
 
 #define I915_CACHELINE_SIZE 64
@@ -684,8 +684,7 @@ const struct backend backend_i915 = {
 	.bo_unmap = drv_bo_munmap,
 	.bo_invalidate = i915_bo_invalidate,
 	.bo_flush = i915_bo_flush,
-	.resolve_format = drv_resolve_format_helper,
-	.resolve_use_flags = drv_resolve_use_flags_helper,
+	.resolve_format_and_use_flags = drv_resolve_format_and_use_flags_helper,
 };
 
 #endif
