@@ -4,8 +4,8 @@
  * found in the LICENSE file.
  */
 
+#include "drv_helpers.h"
 #include "drv_priv.h"
-#include "helpers.h"
 #include "util.h"
 
 #define INIT_DUMB_DRIVER(driver)                                                                   \
@@ -17,6 +17,7 @@
 		.bo_import = drv_prime_bo_import,                                                  \
 		.bo_map = drv_dumb_bo_map,                                                         \
 		.bo_unmap = drv_bo_munmap,                                                         \
+		.resolve_format_and_use_flags = drv_resolve_format_and_use_flags_helper,           \
 	};
 
 static const uint32_t scanout_render_formats[] = { DRM_FORMAT_ARGB8888, DRM_FORMAT_XRGB8888,
