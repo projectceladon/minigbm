@@ -4,6 +4,11 @@
  * found in the LICENSE file.
  */
 
+#ifndef DRV_ARRAY_HELPERS_H
+#define DRV_ARRAY_HELPERS_H
+
+#include <stdint.h>
+
 struct drv_array;
 
 struct drv_array *drv_array_init(uint32_t item_size);
@@ -20,3 +25,5 @@ uint32_t drv_array_size(struct drv_array *array);
 
 /* The array and all associated data will be freed. */
 void drv_array_destroy(struct drv_array *array);
+
+#endif

@@ -12,11 +12,11 @@
 #include <sys/mman.h>
 #include <xf86drm.h>
 
+#include "drv_helpers.h"
 #include "drv_priv.h"
 #include "external/virgl_hw.h"
 #include "external/virgl_protocol.h"
 #include "external/virtgpu_drm.h"
-#include "helpers.h"
 #include "util.h"
 #include "virtgpu.h"
 
@@ -26,6 +26,16 @@
 #define MESA_LLVMPIPE_MAX_TEXTURE_2D_SIZE (1 << (MESA_LLVMPIPE_MAX_TEXTURE_2D_LEVELS - 1))
 #define MESA_LLVMPIPE_TILE_ORDER 6
 #define MESA_LLVMPIPE_TILE_SIZE (1 << MESA_LLVMPIPE_TILE_ORDER)
+
+// This comes from a combination of SwiftShader's VkPhysicalDeviceLimits::maxFramebufferWidth and
+// VkPhysicalDeviceLimits::maxImageDimension2D (see https://crrev.com/c/1917130).
+#define ANGLE_ON_SWIFTSHADER_MAX_TEXTURE_2D_SIZE 8192
+
+#ifndef MIN
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#endif
+#define VIRGL_2D_MAX_TEXTURE_2D_SIZE                                                               \
+	MIN(ANGLE_ON_SWIFTSHADER_MAX_TEXTURE_2D_SIZE, MESA_LLVMPIPE_MAX_TEXTURE_2D_SIZE)
 
 static const uint32_t render_target_formats[] = { DRM_FORMAT_ABGR8888, DRM_FORMAT_ARGB8888,
 						  DRM_FORMAT_RGB565, DRM_FORMAT_XBGR8888,
@@ -365,8 +375,8 @@ static void virgl_add_combinations(struct driver *drv, const uint32_t *drm_forma
 		virgl_add_combination(drv, drm_formats[i], metadata, use_flags);
 }
 
-static int virtio_dumb_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint32_t format,
-				 uint64_t use_flags)
+static int virgl_2d_dumb_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint32_t format,
+				   uint64_t use_flags)
 {
 	if (bo->meta.format != DRM_FORMAT_R8) {
 		width = ALIGN(width, MESA_LLVMPIPE_TILE_SIZE);
@@ -754,7 +764,7 @@ static int virgl_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint3
 	if (params[param_3d].value)
 		return virgl_3d_bo_create(bo, width, height, format, use_flags);
 	else
-		return virtio_dumb_bo_create(bo, width, height, format, use_flags);
+		return virgl_2d_dumb_bo_create(bo, width, height, format, use_flags);
 }
 
 static int virgl_bo_destroy(struct bo *bo)
@@ -945,66 +955,95 @@ static int virgl_bo_flush(struct bo *bo, struct mapping *mapping)
 	return 0;
 }
 
-static uint32_t virgl_resolve_format(uint32_t format, uint64_t use_flags)
+static void virgl_3d_resolve_format_and_use_flags(struct driver *drv, uint32_t format,
+						  uint64_t use_flags, uint32_t *out_format,
+						  uint64_t *out_use_flags)
 {
+	*out_format = format;
+	*out_use_flags = use_flags;
 	switch (format) {
 	case DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED:
 		/* Camera subsystem requires NV12. */
-		if (use_flags & (BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE))
-			return DRM_FORMAT_NV12;
-		/*HACK: See b/28671744 */
-		return DRM_FORMAT_XBGR8888;
+		if (use_flags & (BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE)) {
+			*out_format = DRM_FORMAT_NV12;
+		} else {
+			/* HACK: See b/28671744 */
+			*out_format = DRM_FORMAT_XBGR8888;
+			*out_use_flags &= ~BO_USE_HW_VIDEO_ENCODER;
+		}
+		break;
 	case DRM_FORMAT_FLEX_YCbCr_420_888:
-		/*
-		 * All of our host drivers prefer NV12 as their flexible media format.
-		 * If that changes, this will need to be modified.
-		 */
-		if (params[param_3d].value)
-			return DRM_FORMAT_NV12;
-		else
-			return DRM_FORMAT_YVU420_ANDROID;
+		/* All of our host drivers prefer NV12 as their flexible media format.
+		 * If that changes, this will need to be modified. */
+		*out_format = DRM_FORMAT_NV12;
+		/* fallthrough */
+	case DRM_FORMAT_NV12:
+	case DRM_FORMAT_ABGR8888:
+	case DRM_FORMAT_ARGB8888:
+	case DRM_FORMAT_RGB565:
+	case DRM_FORMAT_XBGR8888:
+	case DRM_FORMAT_XRGB8888:
+		/* These are the scanout capable formats to the guest. Strip scanout use_flag if the
+		 * host does not natively support scanout on the requested format. */
+		if ((use_flags & BO_USE_SCANOUT) &&
+		    !virgl_supports_combination_natively(drv, format, BO_USE_SCANOUT))
+			*out_use_flags &= ~BO_USE_SCANOUT;
+		break;
+	case DRM_FORMAT_YVU420_ANDROID:
+		*out_use_flags &= ~BO_USE_SCANOUT;
+		/* HACK: See b/172389166. Also see gbm_bo_create. */
+		*out_use_flags |= BO_USE_LINEAR;
+		break;
 	default:
-		return format;
+		break;
 	}
 }
 
-static uint64_t virgl_resolve_use_flags(struct driver *drv, uint32_t format, uint64_t use_flags)
+static void virgl_2d_resolve_format_and_use_flags(uint32_t format, uint64_t use_flags,
+						  uint32_t *out_format, uint64_t *out_use_flags)
 {
-	if (format == DRM_FORMAT_YVU420_ANDROID) {
-		use_flags &= ~BO_USE_SCANOUT;
-		/*
-		 * HACK: See b/172389166. This is for HAL_PIXEL_FORMAT_YV12 buffers allocated by
-		 * arcvm. None of our platforms can display YV12, so we can treat as a SW buffer.
-		 * Remove once this can be intelligently resolved in the guest. Also see
-		 * gbm_bo_create.
-		 */
-		use_flags |= BO_USE_LINEAR;
-		return use_flags;
-	}
+	*out_format = format;
+	*out_use_flags = use_flags;
 
-	if (params[param_3d].value) {
-		switch (format) {
-		/* formats need to support scanout */
-		case DRM_FORMAT_ABGR8888:
-		case DRM_FORMAT_ARGB8888:
-		case DRM_FORMAT_RGB565:
-		case DRM_FORMAT_XBGR8888:
-		case DRM_FORMAT_XRGB8888:
-		case DRM_FORMAT_NV12:
-			/* strip scanout use_flag if necessary */
-			if ((use_flags & BO_USE_SCANOUT) &&
-			    !virgl_supports_combination_natively(drv, format, BO_USE_SCANOUT))
-				return use_flags & ~BO_USE_SCANOUT;
-			break;
-		default:
-			break;
+	/* HACK: See crrev/c/1849773 */
+	if (format != DRM_FORMAT_XRGB8888)
+		*out_use_flags &= ~BO_USE_SCANOUT;
+
+	switch (format) {
+	case DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED:
+		/* Camera subsystem requires NV12. */
+		if (use_flags & (BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE)) {
+			*out_format = DRM_FORMAT_NV12;
+		} else {
+			/* HACK: See b/28671744 */
+			*out_format = DRM_FORMAT_XBGR8888;
+			*out_use_flags &= ~BO_USE_HW_VIDEO_ENCODER;
 		}
-	} else {
-		if (format != DRM_FORMAT_XRGB8888)
-			return use_flags & ~BO_USE_SCANOUT;
+		break;
+	case DRM_FORMAT_FLEX_YCbCr_420_888:
+		*out_format = DRM_FORMAT_YVU420_ANDROID;
+		/* fallthrough */
+	case DRM_FORMAT_YVU420_ANDROID:
+		*out_use_flags &= ~BO_USE_SCANOUT;
+		/* HACK: See b/172389166. Also see gbm_bo_create. */
+		*out_use_flags |= BO_USE_LINEAR;
+		break;
+	default:
+		break;
 	}
+}
 
-	return use_flags;
+static void virgl_resolve_format_and_use_flags(struct driver *drv, uint32_t format,
+					       uint64_t use_flags, uint32_t *out_format,
+					       uint64_t *out_use_flags)
+{
+	if (params[param_3d].value) {
+		return virgl_3d_resolve_format_and_use_flags(drv, format, use_flags, out_format,
+							     out_use_flags);
+	} else {
+		return virgl_2d_resolve_format_and_use_flags(format, use_flags, out_format,
+							     out_use_flags);
+	}
 }
 
 static int virgl_resource_info(struct bo *bo, uint32_t strides[DRV_MAX_PLANES],
@@ -1045,7 +1084,7 @@ static uint32_t virgl_get_max_texture_2d_size(struct driver *drv)
 	if (params[param_3d].value)
 		return virgl_3d_get_max_texture_2d_size(drv);
 	else
-		return MESA_LLVMPIPE_MAX_TEXTURE_2D_SIZE;
+		return VIRGL_2D_MAX_TEXTURE_2D_SIZE;
 }
 
 const struct backend virtgpu_virgl = { .name = "virtgpu_virgl",
@@ -1058,7 +1097,7 @@ const struct backend virtgpu_virgl = { .name = "virtgpu_virgl",
 				       .bo_unmap = drv_bo_munmap,
 				       .bo_invalidate = virgl_bo_invalidate,
 				       .bo_flush = virgl_bo_flush,
-				       .resolve_format = virgl_resolve_format,
-				       .resolve_use_flags = virgl_resolve_use_flags,
+				       .resolve_format_and_use_flags =
+					   virgl_resolve_format_and_use_flags,
 				       .resource_info = virgl_resource_info,
 				       .get_max_texture_2d_size = virgl_get_max_texture_2d_size };

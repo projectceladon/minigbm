@@ -4,7 +4,6 @@
  * found in the LICENSE file.
  */
 
-#include "../../helpers.h"
 #include "../../util.h"
 #include "../cros_gralloc_driver.h"
 
