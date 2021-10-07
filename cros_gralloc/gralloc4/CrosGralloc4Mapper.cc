@@ -16,8 +16,6 @@
 #include "cros_gralloc/cros_gralloc_helpers.h"
 #include "cros_gralloc/gralloc4/CrosGralloc4Utils.h"
 
-#include "helpers.h"
-
 using aidl::android::hardware::graphics::common::BlendMode;
 using aidl::android::hardware::graphics::common::Dataspace;
 using aidl::android::hardware::graphics::common::PlaneLayout;

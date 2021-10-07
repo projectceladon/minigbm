@@ -19,8 +19,8 @@
 #include <mediatek_drm.h>
 // clang-format on
 
+#include "drv_helpers.h"
 #include "drv_priv.h"
-#include "helpers.h"
 #include "util.h"
 
 #define TILE_TYPE_LINEAR 0
@@ -275,36 +275,55 @@ static int mediatek_bo_flush(struct bo *bo, struct mapping *mapping)
 	return 0;
 }
 
-static uint32_t mediatek_resolve_format(uint32_t format, uint64_t use_flags)
+static void mediatek_resolve_format_and_use_flags(struct driver *drv, uint32_t format,
+						  uint64_t use_flags, uint32_t *out_format,
+						  uint64_t *out_use_flags)
 {
+	*out_format = format;
+	*out_use_flags = use_flags;
 	switch (format) {
 	case DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED:
 #ifdef MTK_MT8183
 		/* Only MT8183 Camera subsystem offers private reprocessing
 		 * capability. CAMERA_READ indicates the buffer is intended for
 		 * reprocessing and hence given the private format for MTK. */
-		if (use_flags & BO_USE_CAMERA_READ)
-			return DRM_FORMAT_MTISP_SXYZW10;
+		if (use_flags & BO_USE_CAMERA_READ) {
+			*out_format = DRM_FORMAT_MTISP_SXYZW10;
+			break;
+		}
 #endif
-		if (use_flags & BO_USE_CAMERA_WRITE)
-			return DRM_FORMAT_NV12;
+		if (use_flags & BO_USE_CAMERA_WRITE) {
+			*out_format = DRM_FORMAT_NV12;
+			break;
+		}
 
-		/*HACK: See b/28671744 */
-		return DRM_FORMAT_XBGR8888;
+		/* HACK: See b/28671744 */
+		*out_format = DRM_FORMAT_XBGR8888;
+		*out_use_flags &= ~BO_USE_HW_VIDEO_ENCODER;
+		break;
 	case DRM_FORMAT_FLEX_YCbCr_420_888:
 #if defined(MTK_MT8183) || defined(MTK_MT8192) || defined(MTK_MT8195)
 		// TODO(hiroh): Switch to use NV12 for video decoder on MT8173 as well.
 		if (use_flags & (BO_USE_HW_VIDEO_DECODER)) {
-			return DRM_FORMAT_NV12;
+			*out_format = DRM_FORMAT_NV12;
+			break;
 		}
 #endif
 		if (use_flags &
 		    (BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_ENCODER)) {
-			return DRM_FORMAT_NV12;
+			*out_format = DRM_FORMAT_NV12;
+			break;
 		}
-		return DRM_FORMAT_YVU420;
+
+		/* HACK: See b/139714614 */
+		*out_format = DRM_FORMAT_YVU420;
+		*out_use_flags &= ~BO_USE_SCANOUT;
+		break;
+	case DRM_FORMAT_YVU420_ANDROID:
+		*out_use_flags &= ~BO_USE_SCANOUT;
+		break;
 	default:
-		return format;
+		break;
 	}
 }
 
@@ -319,8 +338,7 @@ const struct backend backend_mediatek = {
 	.bo_unmap = mediatek_bo_unmap,
 	.bo_invalidate = mediatek_bo_invalidate,
 	.bo_flush = mediatek_bo_flush,
-	.resolve_format = mediatek_resolve_format,
-	.resolve_use_flags = drv_resolve_use_flags_helper,
+	.resolve_format_and_use_flags = mediatek_resolve_format_and_use_flags,
 };
 
 #endif

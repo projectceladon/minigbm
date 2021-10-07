@@ -18,8 +18,8 @@
 #include <xf86drm.h>
 
 #include "dri.h"
+#include "drv_helpers.h"
 #include "drv_priv.h"
-#include "helpers.h"
 #include "util.h"
 
 static const struct {
