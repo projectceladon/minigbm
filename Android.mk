@@ -14,7 +14,6 @@ MINIGBM_SRC := \
 	drv_array_helpers.c \
 	drv_helpers.c \
 	dumb_driver.c \
-	exynos.c \
 	i915.c \
 	mediatek.c \
 	meson.c \
