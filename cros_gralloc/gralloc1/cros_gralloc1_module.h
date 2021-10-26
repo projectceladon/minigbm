@@ -238,6 +238,13 @@ class CrosGralloc1 : public gralloc1_device_t
 		return getAdapter(device)->getBufferInfo(buffer, outInfo);
 	}
 
+	int32_t importBuffer(const buffer_handle_t rawHandle, buffer_handle_t *outBuffer);
+	static int32_t importBufferHook(gralloc1_device_t *device, const buffer_handle_t rawHandle,
+									buffer_handle_t *outBuffer)
+	{
+		return getAdapter(device)->importBuffer(rawHandle, outBuffer);
+	}
+
 	// Buffer Management functions
 	int32_t allocate(struct cros_gralloc_buffer_descriptor *descriptor,
 			 buffer_handle_t *outBufferHandle);

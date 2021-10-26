@@ -463,6 +463,8 @@ gralloc1_function_pointer_t CrosGralloc1::doGetFunction(int32_t intDescriptor)
 		    lockHook<struct android_flex_layout, &CrosGralloc1::lockFlex>);
 	case GRALLOC1_FUNCTION_UNLOCK:
 		return asFP<GRALLOC1_PFN_UNLOCK>(unlockHook);
+        case GRALLOC1_FUNCTION_IMPORT_BUFFER:
+		return asFP<GRALLOC1_PFN_IMPORT_BUFFER>(importBufferHook);
 	case GRALLOC1_FUNCTION_SET_MODIFIER:
 		return asFP<GRALLOC1_PFN_SET_MODIFIER>(setModifierHook);
         case GRALLOC1_FUNCTION_SET_INTERLACE:
@@ -1027,6 +1029,21 @@ int32_t CrosGralloc1::getModifier(buffer_handle_t buffer, uint32_t *outModifier,
     return CROS_GRALLOC_ERROR_NONE;
 }
 
+int32_t CrosGralloc1::importBuffer(const buffer_handle_t rawHandle, buffer_handle_t *outBuffer)
+{
+	if (!rawHandle) {
+		*outBuffer = NULL;
+        return GRALLOC1_ERROR_BAD_HANDLE;
+    }
+    auto error = driver->retain(rawHandle);
+    if (error != GRALLOC1_ERROR_NONE) {
+        *outBuffer = NULL;
+        return error;
+    }
+
+    *outBuffer = rawHandle;
+    return GRALLOC1_ERROR_NONE;
+}
 
 // static
 int CrosGralloc1::HookGrallocClose(hw_device_t * dev)
