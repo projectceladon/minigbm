@@ -21,6 +21,15 @@
 #include "util.h"
 #include "i915_private.h"
 
+// PRELIM DRM interface definitions
+// we should use prelim uapi for ATS-M alpha release BKC. but still fallback to legacy uapi for back compatible
+#define PRELIM_DRM_I915_QUERY			(1 << 16)
+#define PRELIM_DRM_I915_QUERY_MEMORY_REGIONS	(PRELIM_DRM_I915_QUERY | 4)
+#define PRELIM_I915_OBJECT_PARAM  (1ull << 48)
+#define PRELIM_I915_PARAM_MEMORY_REGIONS ((1 << 16) | 0x1)
+#define PRELIM_I915_USER_EXT		(1 << 16)
+#define PRELIM_I915_GEM_CREATE_EXT_SETPARAM		(PRELIM_I915_USER_EXT | 1)
+
 #define I915_CACHELINE_SIZE 64
 #define I915_CACHELINE_MASK (I915_CACHELINE_SIZE - 1)
 /* Mmap offset ioctl */
@@ -533,7 +542,7 @@ static void i915_bo_update_meminfo(struct i915_device *i915_dev,
 static bool i915_bo_query_meminfo(struct driver *drv, struct i915_device *i915_dev)
 {
 	struct drm_i915_query_item item = {
-		.query_id = DRM_I915_QUERY_MEMORY_REGIONS,
+		.query_id = PRELIM_DRM_I915_QUERY_MEMORY_REGIONS,
 	};
 
 	struct drm_i915_query query = {
@@ -541,8 +550,15 @@ static bool i915_bo_query_meminfo(struct driver *drv, struct i915_device *i915_d
 		.items_ptr = (uintptr_t)&item,
 	};
 
-	if (drmIoctl(drv->fd, DRM_IOCTL_I915_QUERY, &query))
-		return false;
+	if (drmIoctl(drv->fd, DRM_IOCTL_I915_QUERY, &query)) {
+		ALOGD("drv: Failed to DRM_IOCTL_I915_QUERY with prelim interface, use legacy drm uapi");
+
+		item.query_id = DRM_I915_QUERY_MEMORY_REGIONS;
+		if (drmIoctl(drv->fd, DRM_IOCTL_I915_QUERY, &query)) {
+			ALOGE("drv: Failed to DRM_IOCTL_I915_QUERY");
+			return false;
+		}
+	}
 
 	struct drm_i915_query_memory_regions *meminfo = calloc(1, item.length);
         if (!meminfo) return -ENOMEM;
@@ -756,11 +772,11 @@ static int i915_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t h
 		struct drm_i915_gem_object_param region_param = {
 			.size = nregions,
 			.data = (uintptr_t)regions,
-			.param = I915_OBJECT_PARAM | I915_PARAM_MEMORY_REGIONS,
+			.param = PRELIM_I915_OBJECT_PARAM | PRELIM_I915_PARAM_MEMORY_REGIONS,
 		};
 
 		struct drm_i915_gem_create_ext_setparam setparam_region = {
-			.base = { .name = I915_GEM_CREATE_EXT_SETPARAM },
+			.base = { .name = PRELIM_I915_GEM_CREATE_EXT_SETPARAM },
 			.param = region_param,
 		};
 
@@ -775,9 +791,18 @@ static int i915_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t h
 		 */
 		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_CREATE_EXT, &create);
 		if (ret) {
-			ALOGE("drv: DRM_IOCTL_I915_GEM_CREATE_EXT failed (size=%llu)\n",
-				  create.size);
-			return ret;
+			ALOGE("drv: DRM_IOCTL_I915_GEM_CREATE_EXT with PRELIM interface failed (size=%llu), use legacy uapi\n",
+			          create.size);
+
+			// Try to fallback to legacy uapi
+			setparam_region.param.param = I915_OBJECT_PARAM | I915_PARAM_MEMORY_REGIONS;
+			setparam_region.base.name = I915_GEM_CREATE_EXT_SETPARAM;
+			ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_CREATE_EXT, &create);
+			if (ret) {
+			    ALOGE("drv: DRM_IOCTL_I915_GEM_CREATE_EXT lagacy interface failed (size=%llu)\n",
+				      create.size);
+			    return ret;
+			}
 		}
 		gem_handle = create.handle;
 	} else {
