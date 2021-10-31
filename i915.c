@@ -36,9 +36,11 @@ enum drm_i915_gem_memory_class {
 	I915_MEMORY_CLASS_STOLEN_DEVICE,
 };
 
-#define DRM_IOCTL_I915_QUERY			DRM_IOWR(DRM_COMMAND_BASE + DRM_I915_QUERY, struct drm_i915_query)
-#define DRM_IOCTL_I915_GEM_CREATE	DRM_IOWR(DRM_COMMAND_BASE + DRM_I915_GEM_CREATE, struct drm_i915_gem_create)
-#define DRM_IOCTL_I915_GEM_CREATE_EXT	DRM_IOWR(DRM_COMMAND_BASE + DRM_I915_GEM_CREATE, struct drm_i915_gem_create_ext)
+#define DRM_IOCTL_I915_QUERY DRM_IOWR(DRM_COMMAND_BASE + DRM_I915_QUERY, struct drm_i915_query)
+#define DRM_IOCTL_I915_GEM_CREATE                                                                  \
+	DRM_IOWR(DRM_COMMAND_BASE + DRM_I915_GEM_CREATE, struct drm_i915_gem_create)
+#define DRM_IOCTL_I915_GEM_CREATE_EXT                                                              \
+	DRM_IOWR(DRM_COMMAND_BASE + DRM_I915_GEM_CREATE, struct drm_i915_gem_create_ext)
 
 struct drm_i915_gem_create_ext {
 
@@ -56,8 +58,7 @@ struct drm_i915_gem_create_ext {
 	__u32 handle;
 	__u32 pad;
 #define I915_GEM_CREATE_EXT_SETPARAM (1u << 0)
-#define I915_GEM_CREATE_EXT_FLAGS_UNKNOWN \
-	(-(I915_GEM_CREATE_EXT_SETPARAM << 1))
+#define I915_GEM_CREATE_EXT_FLAGS_UNKNOWN (-(I915_GEM_CREATE_EXT_SETPARAM << 1))
 	__u64 extensions;
 };
 
@@ -101,7 +102,7 @@ struct drm_i915_gem_object_param {
  *
  * Select object namespace for the param.
  */
-#define I915_OBJECT_PARAM  (1ull<<32)
+#define I915_OBJECT_PARAM (1ull << 32)
 
 /*
  * I915_PARAM_MEMORY_REGIONS:
@@ -127,8 +128,6 @@ struct drm_i915_gem_create_ext_setparam {
 	struct drm_i915_gem_object_param param;
 };
 
-
-
 struct drm_i915_query_memory_regions {
 	/** Number of supported regions */
 	__u32 num_regions;
@@ -140,11 +139,10 @@ struct drm_i915_query_memory_regions {
 	struct drm_i915_memory_region_info regions[];
 };
 
-
-static const uint32_t render_target_formats[] = { DRM_FORMAT_ABGR8888,    DRM_FORMAT_ARGB1555,
-						  DRM_FORMAT_ARGB8888,    DRM_FORMAT_RGB565,
+static const uint32_t render_target_formats[] = { DRM_FORMAT_ABGR8888,	  DRM_FORMAT_ARGB1555,
+						  DRM_FORMAT_ARGB8888,	  DRM_FORMAT_RGB565,
 						  DRM_FORMAT_XBGR2101010, DRM_FORMAT_XBGR8888,
-						  DRM_FORMAT_XRGB1555,    DRM_FORMAT_XRGB2101010,
+						  DRM_FORMAT_XRGB1555,	  DRM_FORMAT_XRGB2101010,
 						  DRM_FORMAT_XRGB8888 };
 
 static const uint32_t tileable_texture_source_formats[] = { DRM_FORMAT_GR88, DRM_FORMAT_R8,
@@ -174,13 +172,12 @@ struct drm_i915_gem_mmap_offset {
 #define I915_MMAP_OFFSET_WC (1 << 0)
 #define I915_MMAP_OFFSET_WB (1 << 1)
 #define I915_MMAP_OFFSET_UC (1 << 2)
-#define I915_MMAP_OFFSET_FLAGS \
-        (I915_MMAP_OFFSET_WC | I915_MMAP_OFFSET_WB | I915_MMAP_OFFSET_UC)
+#define I915_MMAP_OFFSET_FLAGS (I915_MMAP_OFFSET_WC | I915_MMAP_OFFSET_WB | I915_MMAP_OFFSET_UC)
 };
 
 struct iris_memregion {
-   struct drm_i915_gem_memory_class_instance region;
-   uint64_t size;
+	struct drm_i915_gem_memory_class_instance region;
+	uint64_t size;
 };
 
 struct i915_device
@@ -277,7 +274,8 @@ static int i915_add_combinations(struct driver *drv)
 
 	drv_modify_combination(drv, DRM_FORMAT_XRGB8888, &metadata, BO_USE_CURSOR | BO_USE_SCANOUT);
 	drv_modify_combination(drv, DRM_FORMAT_ARGB8888, &metadata, BO_USE_CURSOR | BO_USE_SCANOUT);
-	drv_modify_combination(drv, DRM_FORMAT_ABGR8888, &metadata, BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE);
+	drv_modify_combination(drv, DRM_FORMAT_ABGR8888, &metadata,
+			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE);
 
 	/* IPU3 camera ISP supports only NV12 output. */
 	drv_modify_combination(drv, DRM_FORMAT_NV12, &metadata,
@@ -363,14 +361,11 @@ static int i915_align_dimensions(struct bo *bo, uint32_t tiling, uint64_t modifi
 			horizontal_alignment = 128;
 			vertical_alignment = 32;
 		}
-
 		break;
-
 	case I915_TILING_X:
 		horizontal_alignment = 512;
 		vertical_alignment = 8;
 		break;
-
 	case I915_TILING_Y:
 		if (i915->gen == 3) {
 			horizontal_alignment = 512;
@@ -427,29 +422,25 @@ static void i915_clflush(void *start, size_t size)
 	}
 }
 
-
-static inline int
-gen_ioctl(int fd, unsigned long request, void *arg)
+static inline int gen_ioctl(int fd, unsigned long request, void *arg)
 {
-    int ret;
+	int ret;
 
-    do {
-        ret = ioctl(fd, request, arg);
-    } while (ret == -1 && (errno == EINTR || errno == EAGAIN));
-    return ret;
+	do {
+		ret = ioctl(fd, request, arg);
+	} while (ret == -1 && (errno == EINTR || errno == EAGAIN));
+	return ret;
 }
 
-
-static int
-gem_param(int fd, int name)
+static int gem_param(int fd, int name)
 {
-   int v = -1; /* No param uses (yet) the sign bit, reserve it for errors */
+	int v = -1; /* No param uses (yet) the sign bit, reserve it for errors */
 
-   struct drm_i915_getparam gp = { .param = name, .value = &v };
-   if (gen_ioctl(fd, DRM_IOCTL_I915_GETPARAM, &gp))
-      return -1;
+	struct drm_i915_getparam gp = { .param = name, .value = &v };
+	if (gen_ioctl(fd, DRM_IOCTL_I915_GETPARAM, &gp))
+		return -1;
 
-   return v;
+	return v;
 }
 
 #define HAVE___BUILTIN_CLZ 1
@@ -475,53 +466,52 @@ util_last_bit(unsigned u)
 #endif
 }
 
-static void i915_bo_update_meminfo(struct i915_device* i915_dev, const struct drm_i915_query_memory_regions *meminfo)
+static void i915_bo_update_meminfo(struct i915_device *i915_dev,
+				   const struct drm_i915_query_memory_regions *meminfo)
 {
-    for (int i = 0; i < meminfo->num_regions; i++) {
-        const struct drm_i915_memory_region_info *mem = &meminfo->regions[i];
-        switch (mem->region.memory_class) {
-        case I915_MEMORY_CLASS_SYSTEM:
-            i915_dev->sys.region = mem->region;
-            i915_dev->sys.size = mem->probed_size;
-            break;
-        case I915_MEMORY_CLASS_DEVICE:
-            i915_dev->vram.region = mem->region;
-            i915_dev->vram.size = mem->probed_size;
-            break;
-        default:
-            break;
-        }
-    }
+	for (uint32_t i = 0; i < meminfo->num_regions; i++) {
+		const struct drm_i915_memory_region_info *mem = &meminfo->regions[i];
+		switch (mem->region.memory_class) {
+		case I915_MEMORY_CLASS_SYSTEM:
+			i915_dev->sys.region = mem->region;
+			i915_dev->sys.size = mem->probed_size;
+			break;
+		case I915_MEMORY_CLASS_DEVICE:
+			i915_dev->vram.region = mem->region;
+			i915_dev->vram.size = mem->probed_size;
+			break;
+		default:
+			break;
+		}
+	}
 }
 
-static bool i915_bo_query_meminfo(struct driver *drv, struct i915_device* i915_dev)
+static bool i915_bo_query_meminfo(struct driver *drv, struct i915_device *i915_dev)
 {
-    struct drm_i915_query_item item = {
-      .query_id = DRM_I915_QUERY_MEMORY_REGIONS,
-    };
+	struct drm_i915_query_item item = {
+		.query_id = DRM_I915_QUERY_MEMORY_REGIONS,
+	};
 
-    struct drm_i915_query query = {
-      .num_items = 1,
-      .items_ptr = (uintptr_t) &item,
-    };
+	struct drm_i915_query query = {
+		.num_items = 1,
+		.items_ptr = (uintptr_t)&item,
+	};
 
-    if (drmIoctl(drv->fd, DRM_IOCTL_I915_QUERY, &query))
-        return false;
+	if (drmIoctl(drv->fd, DRM_IOCTL_I915_QUERY, &query))
+		return false;
 
-    struct drm_i915_query_memory_regions *meminfo = calloc(1, item.length);
-    item.data_ptr = (uintptr_t)meminfo;
+	struct drm_i915_query_memory_regions *meminfo = calloc(1, item.length);
+	item.data_ptr = (uintptr_t)meminfo;
 
-    if (drmIoctl(drv->fd, DRM_IOCTL_I915_QUERY, &query) ||
-        item.length <= 0)
-        return false;
+	if (drmIoctl(drv->fd, DRM_IOCTL_I915_QUERY, &query) || item.length <= 0)
+		return false;
 
-    i915_bo_update_meminfo(i915_dev, meminfo);
+	i915_bo_update_meminfo(i915_dev, meminfo);
 
-    free(meminfo);
+	free(meminfo);
 
-    return true;
+	return true;
 }
-
 
 static int i915_init(struct driver *drv)
 {
@@ -557,7 +547,7 @@ static int i915_init(struct driver *drv)
 	}
 
 	i915->has_mmap_offset = gem_param(drv->fd, I915_PARAM_MMAP_GTT_VERSION) >= 4;
-	//ALOGI("%s : %d : has_mmap_offset = %d", __func__, __LINE__, i915->has_mmap_offset);
+	// ALOGI("%s : %d : has_mmap_offset = %d", __func__, __LINE__, i915->has_mmap_offset);
 
 	i915_bo_query_meminfo(drv, i915);
 	ALOGI("Gralloc: i915_bo_query_meminfo done");
@@ -575,7 +565,6 @@ static int i915_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t h
 	int ret;
 	size_t plane;
 	uint32_t stride;
-	struct drm_i915_gem_create gem_create;
 	struct drm_i915_gem_set_tiling gem_set_tiling;
 	struct i915_device *i915_dev = (struct i915_device *)bo->drv->priv;
 	bo->format_modifiers[0] = modifier;
@@ -588,8 +577,8 @@ static int i915_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t h
 		break;
 	case I915_FORMAT_MOD_Y_TILED:
 	case I915_FORMAT_MOD_Y_TILED_CCS:
-        case I915_FORMAT_MOD_Yf_TILED:
-        case I915_FORMAT_MOD_Yf_TILED_CCS:
+	case I915_FORMAT_MOD_Yf_TILED:
+	case I915_FORMAT_MOD_Yf_TILED_CCS:
 		bo->tiling = I915_TILING_Y;
 		break;
 	}
@@ -682,9 +671,9 @@ static int i915_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t h
 	if (bo->tiling == I915_TILING_NONE)
 		bo->total_size += 64;
 
-        /*
-         * Ensure we pass aligned width/height.
-         */
+	/*
+	 * Ensure we pass aligned width/height.
+	 */
 	bo->aligned_width = width;
 	bo->aligned_height = height;
 
@@ -719,65 +708,61 @@ static int i915_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t h
 	}
 	uint32_t gem_handle;
 	/* If we have vram size, we have multiple memory regions and should choose
-	* one of them.
-	*/
+	 * one of them.
+	 */
 	if (i915_dev->vram.size > 0) {
-	   /* All new BOs we get from the kernel are zeroed, so we don't need to
-		* worry about that here.
-		*/
-	   struct drm_i915_gem_memory_class_instance regions[2];
-	   uint32_t nregions = 0;
-	   if (local) {
-		  /* For vram allocations, still use system memory as a fallback. */
-		  regions[nregions++] = i915_dev->vram.region;
-		  regions[nregions++] = i915_dev->sys.region;
-	   } else {
-		  regions[nregions++] = i915_dev->sys.region;
-	   }
+		/* All new BOs we get from the kernel are zeroed, so we don't need to
+		 * worry about that here.
+		 */
+		struct drm_i915_gem_memory_class_instance regions[2];
+		uint32_t nregions = 0;
+		if (local) {
+			/* For vram allocations, still use system memory as a fallback. */
+			regions[nregions++] = i915_dev->vram.region;
+			regions[nregions++] = i915_dev->sys.region;
+		} else {
+			regions[nregions++] = i915_dev->sys.region;
+		}
 
-	   struct drm_i915_gem_object_param region_param = {
-		  .size = nregions,
-		  .data = (uintptr_t)regions,
-		  .param = I915_OBJECT_PARAM | I915_PARAM_MEMORY_REGIONS,
-	   };
+		struct drm_i915_gem_object_param region_param = {
+			.size = nregions,
+			.data = (uintptr_t)regions,
+			.param = I915_OBJECT_PARAM | I915_PARAM_MEMORY_REGIONS,
+		};
 
-	   struct drm_i915_gem_create_ext_setparam setparam_region = {
-		  .base = { .name = I915_GEM_CREATE_EXT_SETPARAM },
-		  .param = region_param,
-	   };
+		struct drm_i915_gem_create_ext_setparam setparam_region = {
+			.base = { .name = I915_GEM_CREATE_EXT_SETPARAM },
+			.param = region_param,
+		};
 
-	   struct drm_i915_gem_create_ext create = {
-		  .size = bo->total_size,
-		  .extensions = (uintptr_t)&setparam_region,
-	   };
+		struct drm_i915_gem_create_ext create = {
+			.size = bo->total_size,
+			.extensions = (uintptr_t)&setparam_region,
+		};
 
-	   /* It should be safe to use GEM_CREATE_EXT without checking, since we are
-		* in the side of the branch where discrete memory is available. So we
-		* can assume GEM_CREATE_EXT is supported already.
-		*/
-	   ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_CREATE_EXT, &create);
-	   if (ret) {
-		   ALOGE( "drv: DRM_IOCTL_I915_GEM_CREATE_EXT failed (size=%llu)\n",
-                  create.size);
-           return ret;
-	   }
-	   gem_handle = create.handle;
-	   ALOGI("Rachel: DRM_IOCTL_I915_GEM_CREATE_EXT handle");
+		/* It should be safe to use GEM_CREATE_EXT without checking, since we are
+		 * in the side of the branch where discrete memory is available. So we
+		 * can assume GEM_CREATE_EXT is supported already.
+		 */
+		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_CREATE_EXT, &create);
+		if (ret) {
+			ALOGE("drv: DRM_IOCTL_I915_GEM_CREATE_EXT failed (size=%llu)\n",
+				  create.size);
+			return ret;
+		}
+		gem_handle = create.handle;
 	} else {
-	   struct drm_i915_gem_create create = { .size = bo->total_size };
-	   /* All new BOs we get from the kernel are zeroed, so we don't need to
-		* worry about that here.
-		*/
-	   ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_CREATE, &create);
-	   if (ret) {
-		   ALOGE( "drv: DRM_IOCTL_I915_GEM_CREATE failed (size=%llu)\n",
-                  create.size);
-           return ret;
-	   }
-	   gem_handle = create.handle;
-	   ALOGI("Rachel: DRM_IOCTL_I915_GEM_CREATE handle");
+		struct drm_i915_gem_create create = { .size = bo->total_size };
+		/* All new BOs we get from the kernel are zeroed, so we don't need to
+		 * worry about that here.
+		 */
+		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_CREATE, &create);
+		if (ret) {
+			ALOGE("drv: DRM_IOCTL_I915_GEM_CREATE failed (size=%llu)\n", create.size);
+			return ret;
+		}
+		gem_handle = create.handle;
 	}
-
 
 	for (plane = 0; plane < bo->num_planes; plane++)
 		bo->handles[plane].u32 = gem_handle;
@@ -794,10 +779,10 @@ static int i915_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t h
 			gem_close.handle = bo->handles[0].u32;
 			drmIoctl(bo->drv->fd, DRM_IOCTL_GEM_CLOSE, &gem_close);
 
-			ALOGE( "drv: DRM_IOCTL_I915_GEM_SET_TILING failed with %d", errno);
+			ALOGE("drv: DRM_IOCTL_I915_GEM_SET_TILING failed with %d", errno);
 			return -errno;
 		}
-        }
+	}
 
 	return 0;
 }
@@ -817,9 +802,9 @@ static int i915_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint32
 static int i915_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint32_t height,
 					 uint32_t format, const uint64_t *modifiers, uint32_t count)
 {
-	static const uint64_t modifier_order[] = {
+	static uint64_t modifier_order[] = {
 		I915_FORMAT_MOD_Y_TILED,      I915_FORMAT_MOD_Yf_TILED, I915_FORMAT_MOD_Y_TILED_CCS,
-		I915_FORMAT_MOD_Yf_TILED_CCS, I915_FORMAT_MOD_X_TILED,  DRM_FORMAT_MOD_LINEAR,
+		I915_FORMAT_MOD_Yf_TILED_CCS, I915_FORMAT_MOD_X_TILED,	DRM_FORMAT_MOD_LINEAR,
 	};
 	uint64_t modifier;
 
@@ -847,20 +832,19 @@ static int i915_bo_import(struct bo *bo, struct drv_import_fd_data *data)
 
 	struct i915_device *i915_dev = (struct i915_device *)(bo->drv->priv);
 	if (i915_dev->gen < 12) {
-	/* TODO(gsingh): export modifiers and get rid of backdoor tiling. */
+		/* TODO(gsingh): export modifiers and get rid of backdoor tiling. */
 		memset(&gem_get_tiling, 0, sizeof(gem_get_tiling));
 		gem_get_tiling.handle = bo->handles[0].u32;
 
 		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_GET_TILING, &gem_get_tiling);
 		if (ret) {
 			drv_gem_bo_destroy(bo);
-			ALOGE( "drv: DRM_IOCTL_I915_GEM_GET_TILING failed.");
+			ALOGE("drv: DRM_IOCTL_I915_GEM_GET_TILING failed.");
 			return ret;
 		}
 
 		bo->tiling = gem_get_tiling.tiling_mode;
-        }
-	else {
+	} else {
 		bo->tiling = data->tiling;
 	}
 
@@ -874,30 +858,29 @@ static void *i915_bo_map(struct bo *bo, struct map_info *data, size_t plane, uin
 
 	struct i915_device *i915 = (struct i915_device *)(bo->drv->priv);
 
-	if(i915->has_mmap_offset) {
+	if (i915->has_mmap_offset) {
 
 		bool wc = true;
-			
+
 		struct drm_i915_gem_mmap_offset mmap_arg = {
-			.handle =  bo->handles[0].u32,
+			.handle = bo->handles[0].u32,
 			.flags = wc ? I915_MMAP_OFFSET_WC : I915_MMAP_OFFSET_WB,
 		};
-			
+
 		/* Get the fake offset back */
 		int ret = gen_ioctl(bo->drv->fd, DRM_IOCTL_I915_GEM_MMAP_OFFSET, &mmap_arg);
 		if (ret != 0) {
-			ALOGE( "drv: DRM_IOCTL_I915_GEM_MMAP_OFFSET failed\n");
+			ALOGE("drv: DRM_IOCTL_I915_GEM_MMAP_OFFSET failed\n");
 			return MAP_FAILED;
 		}
 
-		ALOGI("%s : %d : handle = %x, size = %d, mmpa_arg.offset = %x",  
-				__func__, __LINE__, mmap_arg.handle, bo->total_size, mmap_arg.offset);
-				
+		//ALOGI("%s : %d : handle = %x, size = %zd, mmpa_arg.offset = %llx", __func__,
+		//      __LINE__, mmap_arg.handle, bo->total_size, mmap_arg.offset);
+
 		/* And map it */
-		addr = mmap(0, bo->total_size, PROT_READ | PROT_WRITE, MAP_SHARED,
-							 bo->drv->fd, mmap_arg.offset);
-	}
-	else if (bo->tiling == I915_TILING_NONE) {
+		addr = mmap(0, bo->total_size, PROT_READ | PROT_WRITE, MAP_SHARED, bo->drv->fd,
+			    mmap_arg.offset);
+	} else if (bo->tiling == I915_TILING_NONE) {
 		struct drm_i915_gem_mmap gem_map;
 		memset(&gem_map, 0, sizeof(gem_map));
 
@@ -910,7 +893,7 @@ static void *i915_bo_map(struct bo *bo, struct map_info *data, size_t plane, uin
 
 		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_MMAP, &gem_map);
 		if (ret) {
-			ALOGE( "drv: DRM_IOCTL_I915_GEM_MMAP failed\n");
+			ALOGE("drv: DRM_IOCTL_I915_GEM_MMAP failed\n");
 			return MAP_FAILED;
 		}
 
@@ -923,16 +906,17 @@ static void *i915_bo_map(struct bo *bo, struct map_info *data, size_t plane, uin
 
 		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_MMAP_GTT, &gem_map);
 		if (ret) {
-			ALOGE( "drv: DRM_IOCTL_I915_GEM_MMAP_GTT failed\n");
+			ALOGE("drv: DRM_IOCTL_I915_GEM_MMAP_GTT failed\n");
 			return MAP_FAILED;
 		}
 
 		addr = mmap(0, bo->total_size, drv_get_prot(map_flags), MAP_SHARED, bo->drv->fd,
-				    gem_map.offset);
+			    gem_map.offset);
 	}
 
 	if (addr == MAP_FAILED) {
-		ALOGE( "%s : %d : i915 GEM mmap failed : %d(%s)", __func__, __LINE__, errno, strerror(errno));
+		ALOGE("%s : %d : i915 GEM mmap failed : %d(%s)", __func__, __LINE__, errno,
+		      strerror(errno));
 		return addr;
 	}
 
@@ -959,7 +943,7 @@ static int i915_bo_invalidate(struct bo *bo, struct map_info *data)
 
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_SET_DOMAIN, &set_domain);
 	if (ret) {
-		ALOGE( "drv: DRM_IOCTL_I915_GEM_SET_DOMAIN with %d\n", ret);
+		ALOGE("drv: DRM_IOCTL_I915_GEM_SET_DOMAIN with %d\n", ret);
 		return ret;
 	}
 
@@ -979,7 +963,7 @@ static uint32_t i915_resolve_format(uint32_t format, uint64_t use_flags)
 {
 	uint32_t resolved_format;
 	if (i915_private_resolve_format(format, use_flags, &resolved_format)) {
-	    return resolved_format;
+		return resolved_format;
 	}
 
 	switch (format) {

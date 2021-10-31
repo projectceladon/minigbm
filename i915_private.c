@@ -110,9 +110,9 @@ int i915_private_add_combinations(struct driver *drv)
 	drv_add_combinations(drv, private_source_formats, ARRAY_SIZE(private_source_formats),
 			     &metadata, texture_flags | BO_USE_CAMERA_MASK);
 
-        /* Android CTS tests require this. */
-        drv_add_combinations(drv, private_rgb24_formats, ARRAY_SIZE(private_rgb24_formats),
-                             &metadata, BO_USE_SW_MASK);
+	/* Android CTS tests require this. */
+	drv_add_combinations(drv, private_rgb24_formats, ARRAY_SIZE(private_rgb24_formats),
+			     &metadata, BO_USE_SW_MASK);
 
 	texture_flags &= ~BO_USE_RENDERSCRIPT;
 	texture_flags &= ~BO_USE_SW_WRITE_OFTEN;
@@ -203,8 +203,8 @@ uint32_t i915_private_resolve_format(uint32_t format, uint64_t usage, uint32_t *
 		/* KBL camera subsystem requires NV12. */
 		if (usage & (BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE)) {
 			*resolved_format = DRM_FORMAT_NV12;
-                        return 1;
-                }
+			return 1;
+		}
 
 		if (usage & BO_USE_TEXTURE) {
 			*resolved_format = DRM_FORMAT_ABGR8888;

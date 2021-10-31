@@ -3,7 +3,7 @@
  * Use of this source code is governed by a BSD-style license that can be
  * found in the LICENSE file.
  */
-
+// #define LOG_NDEBUG 0
 #include "cros_gralloc_driver.h"
 #include "../util.h"
 
@@ -44,14 +44,14 @@ int32_t cros_gralloc_driver::init()
 
 	int fd;
 	drmVersionPtr version;
-        
+
 #if 1
 	char const *str = "%s/renderD%d";
 	const char *undesired[2] = { "vgem", nullptr };
 	uint32_t num_nodes = 63;
 	uint32_t min_node = 128;
 #else
-	char const *str = "%s/card%d";	
+	char const *str = "%s/card%d";
     const char *undesired[2] = { "vgem", nullptr };
 	uint32_t num_nodes = 1;
 	uint32_t min_node = 0;
@@ -194,10 +194,10 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 	handles_.emplace(hnd, std::make_pair(buffer, 1));
 	*out_handle = &hnd->base;
 
-	ALOGI("%s : %d : hnd = %p", __FUNCTION__, __LINE__, *out_handle);
-	ALOGI("\t width = %d, height = %d, stride = %d", hnd->width, hnd->height, hnd->pixel_stride);
-	ALOGI("\t usage = %x, format = %x, droid_format = %x, tiling = %d", hnd->usage, hnd->format, hnd->droid_format, hnd->tiling_mode);
-	ALOGI("\t aligned_width = %d, aligned_height = %d", hnd->aligned_width, hnd->aligned_height);
+	ALOGV("%s : %d : hnd = %p", __FUNCTION__, __LINE__, *out_handle);
+	ALOGV("\t width = %d, height = %d, stride = %d", hnd->width, hnd->height, hnd->pixel_stride);
+	ALOGV("\t usage = %x, format = %x, droid_format = %x, tiling = %d", hnd->usage, hnd->format, hnd->droid_format, hnd->tiling_mode);
+	ALOGV("\t aligned_width = %d, aligned_height = %d", hnd->aligned_width, hnd->aligned_height);
 
 	return 0;
 }
@@ -258,11 +258,11 @@ int32_t cros_gralloc_driver::retain(buffer_handle_t handle)
 		buffer = new cros_gralloc_buffer(id, bo, nullptr);
 		buffers_.emplace(id, buffer);
 
-		ALOGI("%s : %d : hnd = %p", __FUNCTION__, __LINE__, hnd);
-		ALOGI("\t width = %d, height = %d, stride = %d", hnd->width, hnd->height, hnd->pixel_stride);
-		ALOGI("\t usage = %x, format = %x, droid_format = %x, tiling = %d", hnd->usage, hnd->format, hnd->droid_format, hnd->tiling_mode);
-		ALOGI("\t aligned_width = %d, aligned_height = %d, total_size = %d", hnd->aligned_width, hnd->aligned_height, drv_bo_get_total_size(bo));;
-		ALOGI("\t bo = %p, id = %d, buffer = %p", bo, id, buffer);
+		ALOGV("%s : %d : hnd = %p", __FUNCTION__, __LINE__, hnd);
+		ALOGV("\t width = %d, height = %d, stride = %d", hnd->width, hnd->height, hnd->pixel_stride);
+		ALOGV("\t usage = %x, format = %x, droid_format = %x, tiling = %d", hnd->usage, hnd->format, hnd->droid_format, hnd->tiling_mode);
+		ALOGV("\t aligned_width = %d, aligned_height = %d, total_size = %d", hnd->aligned_width, hnd->aligned_height, drv_bo_get_total_size(bo));;
+		ALOGV("\t bo = %p, id = %d, buffer = %p", bo, id, buffer);
 
 	}
 
@@ -387,22 +387,22 @@ int cros_gralloc_driver::init_kms()
 {
     int ret = 0;
 
-    ALOGI("%s:%d", __func__, __LINE__);
-    
+    ALOGV("%s:%d", __func__, __LINE__);
+
     ret = drv_init_kms(drv_);
     if(ret) {
-        cros_gralloc_error("Init kms failed");        
+        cros_gralloc_error("Init kms failed");
     }
     return ret;
 }
 
-int cros_gralloc_driver::get_kms_info(kms_info_t* info) 
+int cros_gralloc_driver::get_kms_info(kms_info_t* info)
 {
     int ret = 0;
-    
+
     ret = drv_get_kms_info(drv_, info);
     if(ret) {
-       cros_gralloc_error("Get kms info failed");  
+       cros_gralloc_error("Get kms info failed");
     }
 
     return ret;
@@ -432,6 +432,6 @@ int cros_gralloc_driver::kms_present(buffer_handle_t handle)
 
 void cros_gralloc_driver::fini_kms()
 {
-    ALOGI("%s:%d", __func__, __LINE__);
+    ALOGV("%s:%d", __func__, __LINE__);
     drv_fini_kms(drv_);
 }
