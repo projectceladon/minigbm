@@ -104,9 +104,15 @@ int i915_private_add_combinations(struct driver *drv)
 			     ARRAY_SIZE(private_linear_source_formats), &metadata,
 			     texture_flags | BO_USE_CAMERA_MASK);
 
-	metadata.tiling = I915_TILING_Y;
-	metadata.priority = 3;
-	metadata.modifier = I915_FORMAT_MOD_Y_TILED;
+	if (i915_has_tile4(drv)) {
+		metadata.tiling = I915_TILING_F;
+		metadata.priority = 3;
+		metadata.modifier = I915_FORMAT_MOD_F_TILED;
+	} else {
+		metadata.tiling = I915_TILING_Y;
+		metadata.priority = 3;
+		metadata.modifier = I915_FORMAT_MOD_Y_TILED;
+	}
 	drv_add_combinations(drv, private_source_formats, ARRAY_SIZE(private_source_formats),
 			     &metadata, texture_flags | BO_USE_CAMERA_MASK);
 

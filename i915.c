@@ -180,17 +180,18 @@ struct iris_memregion {
 	uint64_t size;
 };
 
-struct i915_device
-{
-	uint32_t gen;
+struct i915_device {
+	uint32_t genx10;
 	int32_t has_llc;
 	uint64_t cursor_width;
 	uint64_t cursor_height;
 	int32_t has_mmap_offset;
+	bool has_fence_reg;
+	bool force_mem_local;
 	struct iris_memregion vram, sys;
 };
 
-static uint32_t i915_get_gen(int device_id)
+static uint32_t i915_get_genx10(int device_id)
 {
         ALOGI("%s : %d : device_id = %x", __func__, __LINE__, device_id);
 	const uint16_t gen3_ids[] = { 0x2582, 0x2592, 0x2772, 0x27A2, 0x27AE,
@@ -207,15 +208,23 @@ static uint32_t i915_get_gen(int device_id)
 	unsigned i;
 	for (i = 0; i < ARRAY_SIZE(gen3_ids); i++)
 		if (gen3_ids[i] == device_id)
-			return 3;
+			return 30;
 	for (i = 0; i < ARRAY_SIZE(gen12_ids); i++)
 		if (gen12_ids[i] == device_id)
-			return 12;
+			return 120;
 	for (i = 0; i < ARRAY_SIZE(dg2_ids); i++)
 		if (dg2_ids[i] == device_id)
-			return 12;
+			return 125;
 
-	return 4;
+	ALOGE("%s : %d :unknown gen device_id = %x, fallback to Gen4", __func__, __LINE__,
+	      device_id);
+	return 40;
+}
+
+bool i915_has_tile4(struct driver *drv)
+{
+	struct i915_device *i915 = drv->priv;
+	return i915->genx10 >= 125;
 }
 
 static int i915_add_kms_item(struct driver *drv, const struct kms_item *item)
@@ -321,9 +330,15 @@ static int i915_add_combinations(struct driver *drv)
 	if (ret)
 		return ret;
 
-	metadata.tiling = I915_TILING_Y;
-	metadata.priority = 3;
-	metadata.modifier = I915_FORMAT_MOD_Y_TILED;
+	if (i915_has_tile4(drv)) {
+		metadata.tiling = I915_TILING_F;
+		metadata.priority = 3;
+		metadata.modifier = I915_FORMAT_MOD_F_TILED;
+	} else {
+		metadata.tiling = I915_TILING_Y;
+		metadata.priority = 3;
+		metadata.modifier = I915_FORMAT_MOD_Y_TILED;
+	}
 
 	ret = drv_add_combinations(drv, render_target_formats, ARRAY_SIZE(render_target_formats),
 				   &metadata, render_use_flags);
@@ -376,13 +391,17 @@ static int i915_align_dimensions(struct bo *bo, uint32_t tiling, uint64_t modifi
 		vertical_alignment = 8;
 		break;
 	case I915_TILING_Y:
-		if (i915->gen == 3) {
+		if (i915->genx10 == 30) {
 			horizontal_alignment = 512;
 			vertical_alignment = 8;
 		} else {
-                       horizontal_alignment = 128;
-                       vertical_alignment = 32;
+			horizontal_alignment = 128;
+			vertical_alignment = 32;
 		}
+		break;
+	case I915_TILING_F:
+		horizontal_alignment = 128;
+		vertical_alignment = 32;
 		break;
 	}
 
@@ -404,7 +423,7 @@ static int i915_align_dimensions(struct bo *bo, uint32_t tiling, uint64_t modifi
 	i915_private_align_dimensions(bo->format, &vertical_alignment);
 
 	*aligned_height = ALIGN(bo->height, vertical_alignment);
-	if (i915->gen > 3) {
+	if (i915->genx10 > 30) {
 		*stride = ALIGN(*stride, horizontal_alignment);
 	} else {
 		while (*stride > horizontal_alignment)
@@ -413,7 +432,7 @@ static int i915_align_dimensions(struct bo *bo, uint32_t tiling, uint64_t modifi
 		*stride = horizontal_alignment;
 	}
 
-	if (i915->gen <= 3 && *stride > 8192)
+	if (i915->genx10 <= 30 && *stride > 8192)
 		return -EINVAL;
 
 	return 0;
@@ -545,7 +564,7 @@ static int i915_init(struct driver *drv)
 		return -EINVAL;
 	}
 
-	i915->gen = i915_get_gen(device_id);
+	i915->genx10 = i915_get_genx10(device_id);
 
 	memset(&get_param, 0, sizeof(get_param));
 	get_param.param = I915_PARAM_HAS_LLC;
@@ -558,11 +577,20 @@ static int i915_init(struct driver *drv)
 	}
 
 	i915->has_mmap_offset = gem_param(drv->fd, I915_PARAM_MMAP_GTT_VERSION) >= 4;
+	i915->has_fence_reg = gem_param(drv->fd, I915_PARAM_NUM_FENCES_AVAIL) > 0;
 	// ALOGI("%s : %d : has_mmap_offset = %d", __func__, __LINE__, i915->has_mmap_offset);
 
 	i915_bo_query_meminfo(drv, i915);
 	ALOGI("Gralloc: i915_bo_query_meminfo done");
 
+#define FORCE_MEM_PROP "sys.icr.gralloc.force_mem"
+	char prop[PROPERTY_VALUE_MAX];
+	i915->force_mem_local = (i915->vram.size > 0) &&
+				property_get(FORCE_MEM_PROP, prop, "local") > 0 &&
+				!strcmp(prop, "local");
+	if (i915->force_mem_local) {
+		ALOGI("Gralloc: force to use local memory");
+	}
 	drv->priv = i915;
 
 	i915_private_init(drv, &i915->cursor_width, &i915->cursor_height);
@@ -591,6 +619,9 @@ static int i915_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t h
 	case I915_FORMAT_MOD_Yf_TILED:
 	case I915_FORMAT_MOD_Yf_TILED_CCS:
 		bo->tiling = I915_TILING_Y;
+		break;
+	case I915_FORMAT_MOD_F_TILED:
+		bo->tiling = I915_TILING_F;
 		break;
 	}
 
@@ -688,35 +719,6 @@ static int i915_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t h
 	bo->aligned_width = width;
 	bo->aligned_height = height;
 
-	static bool force_mem_type = false;
-	static bool force_mem_local = false;
-	static bool force_mem_read = false;
-
-	if (!force_mem_read) {
-#define FORCE_MEM_PROP "sys.icr.gralloc.force_mem"
-	    char mem_prop_buf[PROPERTY_VALUE_MAX];
-	    if (property_get(FORCE_MEM_PROP, mem_prop_buf, "local") > 0) {
-	        const char *force_mem_property = mem_prop_buf;
-	        if (!strcmp(force_mem_property, "local")) {
-	            force_mem_local = true; /* always use local memory */
-	            force_mem_type = true;
-	        } else if (!strcmp(force_mem_property, "system")) {
-	            force_mem_local = false; /* always use system memory */
-	            force_mem_type = true;
-	        }
-	    }
-	    force_mem_read = true;
-
-	    if (force_mem_type) {
-	        ALOGI("Gralloc: Forcing all memory allocation to come from: %s",
-	          force_mem_local ? "local" : "system");
-	    }
-	}
-
-	bool local = true;
-	if (force_mem_type) {
-	       local = force_mem_local;
-	}
 	uint32_t gem_handle;
 	/* If we have vram size, we have multiple memory regions and should choose
 	 * one of them.
@@ -727,7 +729,7 @@ static int i915_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t h
 		 */
 		struct drm_i915_gem_memory_class_instance regions[2];
 		uint32_t nregions = 0;
-		if (local) {
+		if (i915_dev->force_mem_local) {
 			/* For vram allocations, still use system memory as a fallback. */
 			regions[nregions++] = i915_dev->vram.region;
 			regions[nregions++] = i915_dev->sys.region;
@@ -777,7 +779,7 @@ static int i915_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t h
 
 	for (plane = 0; plane < bo->num_planes; plane++)
 		bo->handles[plane].u32 = gem_handle;
-	if (i915_dev->gen < 12) {
+	if (i915_dev->has_fence_reg) {
 		memset(&gem_set_tiling, 0, sizeof(gem_set_tiling));
 		gem_set_tiling.handle = bo->handles[0].u32;
 		gem_set_tiling.tiling_mode = bo->tiling;
@@ -819,6 +821,9 @@ static int i915_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint32_t
 	};
 	uint64_t modifier;
 
+	if (i915_has_tile4(bo->drv)) {
+		modifier_order[0] = I915_FORMAT_MOD_F_TILED;
+	}
 	modifier = drv_pick_modifier(modifiers, count, modifier_order, ARRAY_SIZE(modifier_order));
 
 	bo->format_modifiers[0] = modifier;
@@ -842,7 +847,7 @@ static int i915_bo_import(struct bo *bo, struct drv_import_fd_data *data)
 		return ret;
 
 	struct i915_device *i915_dev = (struct i915_device *)(bo->drv->priv);
-	if (i915_dev->gen < 12) {
+	if (i915_dev->has_fence_reg) {
 		/* TODO(gsingh): export modifiers and get rid of backdoor tiling. */
 		memset(&gem_get_tiling, 0, sizeof(gem_get_tiling));
 		gem_get_tiling.handle = bo->handles[0].u32;
