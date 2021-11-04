@@ -241,3 +241,16 @@ cc_library_shared {
     defaults: ["minigbm_cros_gralloc0_defaults"],
     shared_libs: ["libminigbm_gralloc_msm"],
 }
+
+// VirGL
+cc_library_shared {
+    name: "libminigbm_gralloc_virgl",
+    defaults: ["minigbm_cros_gralloc_library_defaults"],
+    cflags: ["-DVIRTIO_GPU_NEXT"],
+}
+
+cc_library_shared {
+    name: "gralloc.minigbm_virgl",
+    defaults: ["minigbm_cros_gralloc0_defaults"],
+    shared_libs: ["libminigbm_gralloc_virgl"],
+}
