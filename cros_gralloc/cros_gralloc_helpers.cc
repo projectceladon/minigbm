@@ -15,6 +15,9 @@
 /* Define to match AIDL BufferUsage::GPU_DATA_BUFFER. */
 #define BUFFER_USAGE_GPU_DATA_BUFFER (1 << 24)
 
+/* Define to match AIDL BufferUsage::GPU_MIPMAP_COMPLETE. */
+#define BUFFER_USAGE_GPU_MIPMAP_COMPLETE (1 << 26)
+
 uint32_t cros_gralloc_convert_format(int format)
 {
 	/*
@@ -70,6 +73,9 @@ uint32_t cros_gralloc_convert_format(int format)
 uint64_t cros_gralloc_convert_usage(uint64_t usage)
 {
 	uint64_t use_flags = BO_USE_NONE;
+
+	if (usage & BUFFER_USAGE_GPU_MIPMAP_COMPLETE)
+		return BO_USE_NONE;
 
 	if (usage & GRALLOC_USAGE_CURSOR)
 		use_flags |= BO_USE_NONE;
