@@ -56,11 +56,18 @@ static uint32_t i915_get_gen(int device_id)
 {
 	const uint16_t gen3_ids[] = { 0x2582, 0x2592, 0x2772, 0x27A2, 0x27AE,
 				      0x29C2, 0x29B2, 0x29D2, 0xA001, 0xA011 };
+#ifdef USE_GRALLOC1
+	const uint16_t gen12_ids[] = { 0x46A0 };
+#endif
 	unsigned i;
 	for (i = 0; i < ARRAY_SIZE(gen3_ids); i++)
 		if (gen3_ids[i] == device_id)
 			return 3;
-
+#ifdef USE_GRALLOC1
+	for (i = 0; i < ARRAY_SIZE(gen12_ids); i++)
+		if (gen12_ids[i] == device_id)
+			return 12;
+#endif
 	return 4;
 }
 
@@ -72,6 +79,9 @@ static uint64_t unset_flags(uint64_t current_flags, uint64_t mask)
 
 static int i915_add_combinations(struct driver *drv)
 {
+#ifdef USE_GRALLOC1
+	struct i915_device *i915;
+#endif
 	struct format_metadata metadata;
 	uint64_t render, scanout_and_render, texture_only;
 
@@ -129,6 +139,11 @@ static int i915_add_combinations(struct driver *drv)
 	metadata.priority = 2;
 	metadata.modifier = I915_FORMAT_MOD_X_TILED;
 
+#ifdef USE_GRALLOC1
+	i915 = drv->priv;
+	if (i915->gen == 12)
+		scanout_and_render = unset_flags(scanout_and_render, BO_USE_SCANOUT);
+#endif
 	drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats), &metadata, render);
 	drv_add_combinations(drv, scanout_render_formats, ARRAY_SIZE(scanout_render_formats),
 			     &metadata, scanout_and_render);
