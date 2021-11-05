@@ -56,11 +56,18 @@ static uint32_t i915_get_gen(int device_id)
 {
 	const uint16_t gen3_ids[] = { 0x2582, 0x2592, 0x2772, 0x27A2, 0x27AE,
 				      0x29C2, 0x29B2, 0x29D2, 0xA001, 0xA011 };
+#ifdef USE_GRALLOC1
+	const uint16_t gen12_ids[] = { 0x46A0 };
+#endif
 	unsigned i;
 	for (i = 0; i < ARRAY_SIZE(gen3_ids); i++)
 		if (gen3_ids[i] == device_id)
 			return 3;
-
+#ifdef USE_GRALLOC1
+	for (i = 0; i < ARRAY_SIZE(gen12_ids); i++)
+		if (gen12_ids[i] == device_id)
+			return 12;
+#endif
 	return 4;
 }
 
@@ -200,9 +207,17 @@ static int i915_align_dimensions(struct bo *bo, uint32_t tiling, uint32_t *strid
 	*aligned_height = ALIGN(*aligned_height, vertical_alignment);
 	if (i915->gen > 3) {
 #ifdef USE_GRALLOC1
-		if(DRM_FORMAT_R8 != bo->meta.format)
-#endif
+		if (DRM_FORMAT_R8 != bo->meta.format)
+			*stride = ALIGN(*stride, horizontal_alignment);
+		if (i915->gen == 12) {
+			while (*stride > horizontal_alignment)
+				horizontal_alignment <<= 1;
+			*stride = horizontal_alignment;
+		}
+
+#else
 		*stride = ALIGN(*stride, horizontal_alignment);
+#endif
 	} else {
 		while (*stride > horizontal_alignment)
 			horizontal_alignment <<= 1;
