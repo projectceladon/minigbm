@@ -242,15 +242,15 @@ cc_library_shared {
     shared_libs: ["libminigbm_gralloc_msm"],
 }
 
-// VirGL
+// ARCVM
 cc_library_shared {
-    name: "libminigbm_gralloc_virgl",
+    name: "libminigbm_gralloc_arcvm",
     defaults: ["minigbm_cros_gralloc_library_defaults"],
     cflags: ["-DVIRTIO_GPU_NEXT"],
 }
 
 cc_library_shared {
-    name: "gralloc.minigbm_virgl",
+    name: "gralloc.minigbm_arcvm",
     defaults: ["minigbm_cros_gralloc0_defaults"],
-    shared_libs: ["libminigbm_gralloc_virgl"],
+    shared_libs: ["libminigbm_gralloc_arcvm"],
 }
