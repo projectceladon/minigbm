@@ -300,6 +300,9 @@ static bool drv_bo_release(struct bo *bo)
 	struct driver *drv = bo->drv;
 	uintptr_t num;
 
+	if (drv->backend->bo_release)
+		drv->backend->bo_release(bo);
+
 	pthread_mutex_lock(&drv->buffer_table_lock);
 	for (size_t plane = 0; plane < bo->meta.num_planes; plane++) {
 		if (!drmHashLookup(drv->buffer_table, bo->handles[plane].u32, (void **)&num)) {
