@@ -71,6 +71,11 @@ extern "C" {
 #define DRM_FORMAT_P010 fourcc_code('P', '0', '1', '0')
 #endif
 
+//TODO: remove this defination once drm_fourcc.h contains it.
+#ifndef I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS
+#define I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS fourcc_mod_code(INTEL, 6)
+#endif
+
 // clang-format on
 struct driver;
 struct bo;
