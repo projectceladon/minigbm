@@ -16,9 +16,6 @@ ifdef DRV_AMDGPU
 	CFLAGS += $(shell $(PKG_CONFIG) --cflags libdrm_amdgpu)
 	LDLIBS += -ldrm_amdgpu -ldl
 endif
-ifdef DRV_EXYNOS
-	CFLAGS += $(shell $(PKG_CONFIG) --cflags libdrm_exynos)
-endif
 ifdef DRV_I915
 	CFLAGS += $(shell $(PKG_CONFIG) --cflags libdrm_intel)
 endif
