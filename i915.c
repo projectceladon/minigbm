@@ -37,6 +37,10 @@ static const uint32_t texture_only_formats[] = { DRM_FORMAT_R8, DRM_FORMAT_NV12,
 static const uint64_t gen_modifier_order[] = { I915_FORMAT_MOD_Y_TILED_CCS, I915_FORMAT_MOD_Y_TILED,
 					       I915_FORMAT_MOD_X_TILED, DRM_FORMAT_MOD_LINEAR };
 
+static const uint64_t gen12_modifier_order[] = { I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS,
+						 I915_FORMAT_MOD_Y_TILED, I915_FORMAT_MOD_X_TILED,
+						 DRM_FORMAT_MOD_LINEAR };
+
 struct modifier_support_t {
 	const uint64_t *order;
 	uint32_t count;
@@ -88,8 +92,13 @@ static void i915_info_from_device_id(struct i915_device *i915)
 
 static void i915_get_modifier_order(struct i915_device *i915)
 {
-	i915->modifier.order = gen_modifier_order;
-	i915->modifier.count = ARRAY_SIZE(gen_modifier_order);
+	if (i915->gen == 12) {
+		i915->modifier.order = gen12_modifier_order;
+		i915->modifier.count = ARRAY_SIZE(gen12_modifier_order);
+	} else {
+		i915->modifier.order = gen_modifier_order;
+		i915->modifier.count = ARRAY_SIZE(gen_modifier_order);
+	}
 }
 
 static uint64_t unset_flags(uint64_t current_flags, uint64_t mask)
@@ -419,6 +428,10 @@ static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t heig
 		break;
 	case I915_FORMAT_MOD_Y_TILED:
 	case I915_FORMAT_MOD_Y_TILED_CCS:
+	/* For now support only I915_TILING_Y as this works with all
+	 * IPs(render/media/display)
+	 */
+	case I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS:
 		bo->meta.tiling = I915_TILING_Y;
 		break;
 	}
@@ -477,6 +490,41 @@ static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t heig
 
 		bo->meta.num_planes = 2;
 		bo->meta.total_size = offset;
+	} else if (modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS) {
+
+		/*
+		 * considering only 128 byte compression and one cache line of
+		 * aux buffer(64B) contains compression status of 4-Y tiles.
+		 * Which is 4 * (128B * 32L).
+		 * line stride(bytes) is 4 * 128B
+		 * and tile stride(lines) is 32L
+		 */
+		uint32_t stride = ALIGN(drv_stride_from_format(format, width, 0), 512);
+
+		height = ALIGN(drv_height_from_format(format, height, 0), 32);
+
+		if (i915->is_adlp && (stride > 1)) {
+			stride = 1 << (32 - __builtin_clz(stride - 1));
+			height = ALIGN(drv_height_from_format(format, height, 0), 128);
+		}
+
+		bo->meta.strides[0] = stride;
+		/* size calculation and alignment are 64KB aligned
+		 * size as per spec
+		 */
+		bo->meta.sizes[0] = ALIGN(stride * height, 65536);
+		bo->meta.offsets[0] = 0;
+
+		/* Aux buffer is linear and page aligned. It is placed after
+		 * other planes and aligned to main buffer stride.
+		 */
+		bo->meta.strides[1] = bo->meta.strides[0] / 8;
+		/* Aligned to page size */
+		bo->meta.sizes[1] = ALIGN(bo->meta.sizes[0] / 256, getpagesize());
+		bo->meta.offsets[1] = bo->meta.sizes[0];
+		/* Total number of planes & sizes */
+		bo->meta.num_planes = 2;
+		bo->meta.total_size = bo->meta.sizes[0] + bo->meta.sizes[1];
 	} else {
 		i915_bo_from_format(bo, width, height, format);
 	}
@@ -492,25 +540,20 @@ static int i915_bo_create_from_metadata(struct bo *bo)
 	struct i915_device *i915 = bo->drv->priv;
 
 	if (i915->has_hw_protection && (bo->meta.use_flags & BO_USE_PROTECTED)) {
-		struct drm_i915_gem_object_param protected_param = {
-			.param = I915_OBJECT_PARAM | I915_PARAM_PROTECTED_CONTENT,
-			.data = 1,
-		};
-
-		struct drm_i915_gem_create_ext_setparam setparam_protected = {
-			.base = { .name = I915_GEM_CREATE_EXT_SETPARAM },
-			.param = protected_param,
+		struct drm_i915_gem_create_ext_protected_content protected_content = {
+			.base = { .name = I915_GEM_CREATE_EXT_PROTECTED_CONTENT },
+			.flags = 0,
 		};
 
 		struct drm_i915_gem_create_ext create_ext = {
 			.size = bo->meta.total_size,
-			.extensions = (uintptr_t)&setparam_protected,
+			.extensions = (uintptr_t)&protected_content,
 		};
 
 		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_CREATE_EXT, &create_ext);
 		if (ret) {
-			drv_log("DRM_IOCTL_I915_GEM_CREATE_EXT failed (size=%llu)\n",
-				create_ext.size);
+			drv_log("DRM_IOCTL_I915_GEM_CREATE_EXT failed (size=%llu) (ret=%d) \n",
+				create_ext.size, ret);
 			return -errno;
 		}
 
@@ -582,6 +625,9 @@ static void *i915_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t 
 	void *addr = MAP_FAILED;
 
 	if (bo->meta.format_modifier == I915_FORMAT_MOD_Y_TILED_CCS)
+		return MAP_FAILED;
+
+	if (bo->meta.format_modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS)
 		return MAP_FAILED;
 
 	if (bo->meta.tiling == I915_TILING_NONE) {
