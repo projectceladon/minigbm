@@ -36,9 +36,11 @@ static const uint32_t render_target_formats[] = { DRM_FORMAT_ABGR8888, DRM_FORMA
 						  DRM_FORMAT_XRGB8888 };
 
 #ifdef MTK_MT8183
-static const uint32_t texture_source_formats[] = { DRM_FORMAT_NV21, DRM_FORMAT_NV12,
-						   DRM_FORMAT_YUYV, DRM_FORMAT_YVU420,
-						   DRM_FORMAT_YVU420_ANDROID };
+static const uint32_t texture_source_formats[] = {
+	DRM_FORMAT_NV21,	 DRM_FORMAT_NV12,	    DRM_FORMAT_YUYV,
+	DRM_FORMAT_YVU420,	 DRM_FORMAT_YVU420_ANDROID, DRM_FORMAT_ABGR2101010,
+	DRM_FORMAT_ABGR16161616F
+};
 #else
 static const uint32_t texture_source_formats[] = { DRM_FORMAT_YVU420, DRM_FORMAT_YVU420_ANDROID,
 						   DRM_FORMAT_NV12 };
