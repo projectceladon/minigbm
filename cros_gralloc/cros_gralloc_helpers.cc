@@ -67,57 +67,56 @@ uint32_t cros_gralloc_convert_format(int format)
 	return DRM_FORMAT_NONE;
 }
 
+static inline void handle_usage(uint64_t *gralloc_usage, uint64_t gralloc_mask,
+				uint64_t *bo_use_flags, uint64_t bo_mask)
+{
+	if ((*gralloc_usage) & gralloc_mask) {
+		(*gralloc_usage) &= ~gralloc_mask;
+		(*bo_use_flags) |= bo_mask;
+	}
+}
+
 uint64_t cros_gralloc_convert_usage(uint64_t usage)
 {
 	uint64_t use_flags = BO_USE_NONE;
 
-	if (usage & GRALLOC_USAGE_CURSOR)
-		use_flags |= BO_USE_NONE;
-	if ((usage & GRALLOC_USAGE_SW_READ_MASK) == GRALLOC_USAGE_SW_READ_RARELY)
-		use_flags |= BO_USE_SW_READ_RARELY;
-	if ((usage & GRALLOC_USAGE_SW_READ_MASK) == GRALLOC_USAGE_SW_READ_OFTEN)
-		use_flags |= BO_USE_SW_READ_OFTEN;
-	if ((usage & GRALLOC_USAGE_SW_WRITE_MASK) == GRALLOC_USAGE_SW_WRITE_RARELY)
-		use_flags |= BO_USE_SW_WRITE_RARELY;
-	if ((usage & GRALLOC_USAGE_SW_WRITE_MASK) == GRALLOC_USAGE_SW_WRITE_OFTEN)
-		use_flags |= BO_USE_SW_WRITE_OFTEN;
-	if (usage & GRALLOC_USAGE_HW_TEXTURE)
-		use_flags |= BO_USE_TEXTURE;
-	if (usage & GRALLOC_USAGE_HW_RENDER)
-		use_flags |= BO_USE_RENDERING;
-	if (usage & GRALLOC_USAGE_HW_2D)
-		use_flags |= BO_USE_RENDERING;
-	if (usage & GRALLOC_USAGE_HW_COMPOSER)
-		/* HWC wants to use display hardware, but can defer to OpenGL. */
-		use_flags |= BO_USE_SCANOUT | BO_USE_TEXTURE;
-	if (usage & GRALLOC_USAGE_HW_FB)
-		use_flags |= BO_USE_NONE;
-	if (usage & GRALLOC_USAGE_EXTERNAL_DISP)
-		/*
-		 * This flag potentially covers external display for the normal drivers (i915,
-		 * rockchip) and usb monitors (evdi/udl). It's complicated so ignore it.
-		 * */
-		use_flags |= BO_USE_NONE;
-	/* Map this flag to linear until real HW protection is available on Android. */
-	if (usage & GRALLOC_USAGE_PROTECTED)
-		use_flags |= BO_USE_LINEAR;
-	if (usage & GRALLOC_USAGE_HW_VIDEO_ENCODER) {
-		use_flags |= BO_USE_HW_VIDEO_ENCODER;
-		/*HACK: See b/30054495 */
-		use_flags |= BO_USE_SW_READ_OFTEN;
+	/*
+	 * GRALLOC_USAGE_SW_READ_OFTEN contains GRALLOC_USAGE_SW_READ_RARELY, thus OFTEN must be
+	 * handled first. The same applies to GRALLOC_USAGE_SW_WRITE_OFTEN.
+	 */
+	handle_usage(&usage, GRALLOC_USAGE_SW_READ_OFTEN, &use_flags, BO_USE_SW_READ_OFTEN);
+	handle_usage(&usage, GRALLOC_USAGE_SW_READ_RARELY, &use_flags, BO_USE_SW_READ_RARELY);
+	handle_usage(&usage, GRALLOC_USAGE_SW_WRITE_OFTEN, &use_flags, BO_USE_SW_WRITE_OFTEN);
+	handle_usage(&usage, GRALLOC_USAGE_SW_WRITE_RARELY, &use_flags, BO_USE_SW_WRITE_RARELY);
+	handle_usage(&usage, GRALLOC_USAGE_HW_TEXTURE, &use_flags, BO_USE_TEXTURE);
+	handle_usage(&usage, GRALLOC_USAGE_HW_RENDER, &use_flags, BO_USE_RENDERING);
+	handle_usage(&usage, GRALLOC_USAGE_HW_2D, &use_flags, BO_USE_RENDERING);
+	/* HWC wants to use display hardware, but can defer to OpenGL. */
+	handle_usage(&usage, GRALLOC_USAGE_HW_COMPOSER, &use_flags,
+		     BO_USE_SCANOUT | BO_USE_TEXTURE);
+	handle_usage(&usage, GRALLOC_USAGE_HW_FB, &use_flags, BO_USE_NONE);
+	/*
+	 * This flag potentially covers external display for the normal drivers (i915/rockchip) and
+	 * usb monitors (evdi/udl). It's complicated so ignore it.
+	 */
+	handle_usage(&usage, GRALLOC_USAGE_EXTERNAL_DISP, &use_flags, BO_USE_NONE);
+	/* Map PROTECTED to linear until real HW protection is available on Android. */
+	handle_usage(&usage, GRALLOC_USAGE_PROTECTED, &use_flags, BO_USE_LINEAR);
+	handle_usage(&usage, GRALLOC_USAGE_CURSOR, &use_flags, BO_USE_NONE);
+	/* HACK: See b/30054495 for BO_USE_SW_READ_OFTEN. */
+	handle_usage(&usage, GRALLOC_USAGE_HW_VIDEO_ENCODER, &use_flags,
+		     BO_USE_HW_VIDEO_ENCODER | BO_USE_SW_READ_OFTEN);
+	handle_usage(&usage, GRALLOC_USAGE_HW_CAMERA_WRITE, &use_flags, BO_USE_CAMERA_WRITE);
+	handle_usage(&usage, GRALLOC_USAGE_HW_CAMERA_READ, &use_flags, BO_USE_CAMERA_READ);
+	handle_usage(&usage, GRALLOC_USAGE_RENDERSCRIPT, &use_flags, BO_USE_RENDERSCRIPT);
+	handle_usage(&usage, BUFFER_USAGE_VIDEO_DECODER, &use_flags, BO_USE_HW_VIDEO_DECODER);
+	handle_usage(&usage, BUFFER_USAGE_GPU_DATA_BUFFER, &use_flags, BO_USE_GPU_DATA_BUFFER);
+	handle_usage(&usage, BUFFER_USAGE_FRONT_RENDERING, &use_flags, BO_USE_FRONT_RENDERING);
+
+	if (usage) {
+		drv_log("Unhandled gralloc usage: %llx\n", (unsigned long long)usage);
+		return BO_USE_NONE;
 	}
-	if (usage & GRALLOC_USAGE_HW_CAMERA_WRITE)
-		use_flags |= BO_USE_CAMERA_WRITE;
-	if (usage & GRALLOC_USAGE_HW_CAMERA_READ)
-		use_flags |= BO_USE_CAMERA_READ;
-	if (usage & GRALLOC_USAGE_RENDERSCRIPT)
-		use_flags |= BO_USE_RENDERSCRIPT;
-	if (usage & BUFFER_USAGE_VIDEO_DECODER)
-		use_flags |= BO_USE_HW_VIDEO_DECODER;
-	if (usage & BUFFER_USAGE_FRONT_RENDERING)
-		use_flags |= BO_USE_FRONT_RENDERING;
-	if (usage & BUFFER_USAGE_GPU_DATA_BUFFER)
-		use_flags |= BO_USE_GPU_DATA_BUFFER;
 
 	return use_flags;
 }
