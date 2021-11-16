@@ -249,10 +249,6 @@ static int i915_align_dimensions(struct bo *bo, uint32_t tiling, uint32_t *strid
 		*stride = horizontal_alignment;
 	}
 
-	/* stride must be power-of-two aligned for ADL-P tiled buffers*/
-	if (i915->is_adlp && (*stride > 1) && (tiling != I915_TILING_NONE))
-		*stride = 1 << (32 - __builtin_clz(*stride - 1));
-
 	if (i915->gen <= 3 && *stride > 8192)
 		return -EINVAL;
 
