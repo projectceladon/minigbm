@@ -4,6 +4,8 @@
  * found in the LICENSE file.
  */
 
+#include <errno.h>
+
 #include "drv_helpers.h"
 #include "drv_priv.h"
 #include "util.h"
@@ -13,6 +15,7 @@
 		.name = #driver,                                                                   \
 		.init = dumb_driver_init,                                                          \
 		.bo_create = drv_dumb_bo_create,                                                   \
+		.bo_create_with_modifiers = dumb_bo_create_with_modifiers,                         \
 		.bo_destroy = drv_dumb_bo_destroy,                                                 \
 		.bo_import = drv_prime_bo_import,                                                  \
 		.bo_map = drv_dumb_bo_map,                                                         \
@@ -41,6 +44,18 @@ static int dumb_driver_init(struct driver *drv)
 	drv_modify_combination(drv, DRM_FORMAT_NV21, &LINEAR_METADATA, BO_USE_HW_VIDEO_ENCODER);
 
 	return drv_modify_linear_combinations(drv);
+}
+
+static int dumb_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint32_t height,
+					 uint32_t format, const uint64_t *modifiers, uint32_t count)
+{
+	for (uint32_t i = 0; i < count; i++) {
+		if (modifiers[i] == DRM_FORMAT_MOD_LINEAR) {
+			return drv_dumb_bo_create(bo, width, height, format, 0);
+		}
+	}
+
+	return -EINVAL;
 }
 
 INIT_DUMB_DRIVER(evdi)
