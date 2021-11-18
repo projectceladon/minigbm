@@ -25,7 +25,7 @@
 
 static const uint32_t scanout_render_formats[] = { DRM_FORMAT_ARGB8888, DRM_FORMAT_XRGB8888,
 						   DRM_FORMAT_ABGR8888, DRM_FORMAT_XBGR8888,
-						   DRM_FORMAT_BGR888,	DRM_FORMAT_BGR565 };
+						   DRM_FORMAT_BGR888,	DRM_FORMAT_RGB565 };
 
 static const uint32_t texture_only_formats[] = { DRM_FORMAT_NV12, DRM_FORMAT_NV21,
 						 DRM_FORMAT_YVU420, DRM_FORMAT_YVU420_ANDROID };
