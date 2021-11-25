@@ -40,6 +40,7 @@ cc_defaults {
         "-Wno-format",
         "-Wno-unused-variable",
         "-DDRV_I915",
+        "-DDRV_VIRTIO_GPU",
         "-DUSE_GRALLOC1",
         "-Wno-cast-qual",
     ],

@@ -381,22 +381,32 @@ int32_t CrosGralloc1::allocate(struct cros_gralloc_buffer_descriptor *descriptor
 	// If this function is being called, it's because we handed out its function
 	// pointer, which only occurs when mDevice has been loaded successfully and
 	// we are permitted to allocate
+
 	uint64_t usage =
 	    cros_gralloc1_convert_usage(descriptor->producer_usage, descriptor->consumer_usage);
 	descriptor->use_flags = usage;
 	bool supported = driver->is_supported(descriptor);
 	if (!supported && (descriptor->consumer_usage & GRALLOC1_CONSUMER_USAGE_HWCOMPOSER)) {
-		descriptor->use_flags &= ~BO_USE_SCANOUT;
-		supported = driver->is_supported(descriptor);
+		/* when alloc BO_USE_SCANOUT buffer for kmsro, use BO_USE_SCANOUT for dev
+		 * dintinguish */
+		if (driver->is_kmsro_enabled() && (descriptor->use_flags & BO_USE_SCANOUT)) {
+			struct cros_gralloc_buffer_descriptor tmpdescriptor = *descriptor;
+			tmpdescriptor.use_flags &= ~BO_USE_SCANOUT;
+			supported = driver->is_supported(&tmpdescriptor);
+		} else {
+			descriptor->use_flags &= ~BO_USE_SCANOUT;
+			supported = driver->is_supported(descriptor);
+		}
 	}
 
 	if (!supported) {
 		drv_log("Unsupported combination -- HAL format: %u, HAL flags: %u, "
-				   "drv_format: %u, drv_flags: %llu",
-				   descriptor->droid_format, usage, descriptor->drm_format,
-				   static_cast<unsigned long long>(descriptor->use_flags));
+			"drv_format: %u, drv_flags: %llu",
+			descriptor->droid_format, usage, descriptor->drm_format,
+			static_cast<unsigned long long>(descriptor->use_flags));
 		return CROS_GRALLOC_ERROR_UNSUPPORTED;
 	}
+
 	if (driver->allocate(descriptor, outBufferHandle))
 		return CROS_GRALLOC_ERROR_NO_RESOURCES;
 

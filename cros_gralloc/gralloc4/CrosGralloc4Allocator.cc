@@ -48,8 +48,16 @@ Error CrosGralloc4Allocator::allocate(const BufferDescriptorInfo& descriptor, ui
 
     bool supported = mDriver->is_supported(&crosDescriptor);
     if (!supported && (descriptor.usage & BufferUsage::COMPOSER_OVERLAY)) {
-        crosDescriptor.use_flags &= ~BO_USE_SCANOUT;
-        supported = mDriver->is_supported(&crosDescriptor);
+        /* when alloc BO_USE_SCANOUT buffer for kmsro, use BO_USE_SCANOUT for dev
+         * dintinguish */
+        if (mDriver->is_kmsro_enabled() && (crosDescriptor.use_flags & BO_USE_SCANOUT)) {
+            struct cros_gralloc_buffer_descriptor tmpDescriptor = crosDescriptor;
+            tmpDescriptor.use_flags &= ~BO_USE_SCANOUT;
+            supported = mDriver->is_supported(&tmpDescriptor);
+        } else {
+            crosDescriptor.use_flags &= ~BO_USE_SCANOUT;
+            supported = mDriver->is_supported(&crosDescriptor);
+        }
     }
 
     if (!supported) {
