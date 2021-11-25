@@ -68,8 +68,10 @@ extern const struct backend backend_udl;
 #ifdef DRV_VC4
 extern const struct backend backend_vc4;
 #endif
-extern const struct backend backend_vgem;
+#ifdef DRV_VIRTIO_GPU
 extern const struct backend backend_virtio_gpu;
+#endif
+extern const struct backend backend_vgem;
 
 static const struct backend *drv_get_backend(int fd)
 {
@@ -121,7 +123,10 @@ static const struct backend *drv_get_backend(int fd)
 #ifdef DRV_VC4
 		&backend_vc4,
 #endif
-		&backend_vgem,	    &backend_virtio_gpu,
+#ifdef DRV_VIRTIO_GPU
+		&backend_virtio_gpu,
+#endif
+		&backend_vgem,
 	};
 
 	for (i = 0; i < ARRAY_SIZE(backend_list); i++) {
