@@ -283,13 +283,13 @@ const std::unordered_map<uint32_t, std::vector<PlaneLayout>>& GetPlaneLayoutsMap
 
                     {DRM_FORMAT_RGB565,
                      {{
-                             .components = {{.type = android::gralloc4::PlaneLayoutComponentType_R,
+                             .components = {{.type = android::gralloc4::PlaneLayoutComponentType_B,
                                              .offsetInBits = 0,
                                              .sizeInBits = 5},
                                             {.type = android::gralloc4::PlaneLayoutComponentType_G,
                                              .offsetInBits = 5,
                                              .sizeInBits = 6},
-                                            {.type = android::gralloc4::PlaneLayoutComponentType_B,
+                                            {.type = android::gralloc4::PlaneLayoutComponentType_R,
                                              .offsetInBits = 11,
                                              .sizeInBits = 5}},
                              .sampleIncrementInBits = 16,
@@ -297,7 +297,7 @@ const std::unordered_map<uint32_t, std::vector<PlaneLayout>>& GetPlaneLayoutsMap
                              .verticalSubsampling = 1,
                      }}},
 
-                    {DRM_FORMAT_RGB888,
+                    {DRM_FORMAT_BGR888,
                      {{
                              .components = {{.type = android::gralloc4::PlaneLayoutComponentType_R,
                                              .offsetInBits = 0,

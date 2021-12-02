@@ -85,6 +85,9 @@ struct backend {
 	int (*bo_compute_metadata)(struct bo *bo, uint32_t width, uint32_t height, uint32_t format,
 				   uint64_t use_flags, const uint64_t *modifiers, uint32_t count);
 	int (*bo_create_from_metadata)(struct bo *bo);
+	/* Called for every non-test-buffer BO on free */
+	int (*bo_release)(struct bo *bo);
+	/* Called on free if this bo is the last object referencing the contained GEM BOs */
 	int (*bo_destroy)(struct bo *bo);
 	int (*bo_import)(struct bo *bo, struct drv_import_fd_data *data);
 	void *(*bo_map)(struct bo *bo, struct vma *vma, size_t plane, uint32_t map_flags);
