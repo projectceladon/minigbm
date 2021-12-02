@@ -164,7 +164,9 @@ static bool is_ubwc_fmt(uint32_t format)
 	case DRM_FORMAT_ABGR8888:
 	case DRM_FORMAT_XRGB8888:
 	case DRM_FORMAT_ARGB8888:
+#ifndef QCOM_DISABLE_COMPRESSED_NV12
 	case DRM_FORMAT_NV12:
+#endif
 		return 1;
 	default:
 		return 0;
