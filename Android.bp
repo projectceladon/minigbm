@@ -233,7 +233,10 @@ cc_library_shared {
 cc_library_shared {
     name: "libminigbm_gralloc_msm",
     defaults: ["minigbm_cros_gralloc_library_defaults"],
-    cflags: ["-DDRV_MSM"],
+    cflags: [
+        "-DDRV_MSM",
+        "-DQCOM_DISABLE_COMPRESSED_NV12",
+    ],
 }
 
 cc_library_shared {
