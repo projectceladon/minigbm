@@ -29,6 +29,15 @@ uint32_t cros_gralloc_convert_format(int format)
 		return DRM_FORMAT_XBGR8888;
 	case HAL_PIXEL_FORMAT_RGB_888:
 		return DRM_FORMAT_BGR888;
+	/*
+	 * Confusingly, HAL_PIXEL_FORMAT_RGB_565 is defined as:
+	 *
+	 * "16-bit packed format that has 5-bit R, 6-bit G, and 5-bit B components, in that
+	 *  order, from the  most-sigfinicant bits to the least-significant bits."
+	 *
+	 * so the order of the components is intentionally not flipped between the pixel
+	 * format and the DRM format.
+	 */
 	case HAL_PIXEL_FORMAT_RGB_565:
 		return DRM_FORMAT_RGB565;
 	case HAL_PIXEL_FORMAT_BGRA_8888:
