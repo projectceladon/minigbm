@@ -631,6 +631,14 @@ static int amdgpu_import_bo(struct bo *bo, struct drv_import_fd_data *data)
 		return drv_prime_bo_import(bo, data);
 }
 
+static int amdgpu_release_bo(struct bo *bo)
+{
+	if (bo->priv)
+		return dri_bo_release(bo);
+
+	return 0;
+}
+
 static int amdgpu_destroy_bo(struct bo *bo)
 {
 	if (bo->priv)
@@ -780,6 +788,7 @@ const struct backend backend_amdgpu = {
 	.close = amdgpu_close,
 	.bo_create = amdgpu_create_bo,
 	.bo_create_with_modifiers = amdgpu_create_bo_with_modifiers,
+	.bo_release = amdgpu_release_bo,
 	.bo_destroy = amdgpu_destroy_bo,
 	.bo_import = amdgpu_import_bo,
 	.bo_map = amdgpu_map_bo,
