@@ -389,13 +389,20 @@ int dri_bo_import(struct bo *bo, struct drv_import_fd_data *data)
 	return 0;
 }
 
-int dri_bo_destroy(struct bo *bo)
+int dri_bo_release(struct bo *bo)
 {
 	struct dri_driver *dri = bo->drv->priv;
 
 	assert(bo->priv);
-	close_gem_handle(bo->handles[0].u32, bo->drv->fd);
 	dri->image_extension->destroyImage(bo->priv);
+	/* Not clearing bo->priv as we still use it to determine which destroy to call. */
+	return 0;
+}
+
+int dri_bo_destroy(struct bo *bo)
+{
+	assert(bo->priv);
+	close_gem_handle(bo->handles[0].u32, bo->drv->fd);
 	bo->priv = NULL;
 	return 0;
 }
