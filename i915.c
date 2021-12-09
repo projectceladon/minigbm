@@ -215,9 +215,17 @@ static int i915_align_dimensions(struct bo *bo, uint32_t tiling, uint32_t *strid
 	*aligned_height = ALIGN(*aligned_height, vertical_alignment);
 	if (i915->gen > 3) {
 #ifdef USE_GRALLOC1
-		if(DRM_FORMAT_R8 != bo->meta.format)
-#endif
+		if (DRM_FORMAT_R8 != bo->meta.format)
+			*stride = ALIGN(*stride, horizontal_alignment);
+		if (i915->gen == 12) {
+			while (*stride > horizontal_alignment)
+				horizontal_alignment <<= 1;
+			*stride = horizontal_alignment;
+		}
+
+#else
 		*stride = ALIGN(*stride, horizontal_alignment);
+#endif
 	} else {
 		while (*stride > horizontal_alignment)
 			horizontal_alignment <<= 1;
