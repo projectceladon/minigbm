@@ -57,7 +57,7 @@ static uint32_t i915_get_gen(int device_id)
 	const uint16_t gen3_ids[] = { 0x2582, 0x2592, 0x2772, 0x27A2, 0x27AE,
 				      0x29C2, 0x29B2, 0x29D2, 0xA001, 0xA011 };
 #ifdef USE_GRALLOC1
-	const uint16_t gen12_ids[] = { 0x46A0 };
+	const uint16_t gen12_ids[] = { 0x46A0, 0x46A6 };
 #endif
 	unsigned i;
 	for (i = 0; i < ARRAY_SIZE(gen3_ids); i++)
