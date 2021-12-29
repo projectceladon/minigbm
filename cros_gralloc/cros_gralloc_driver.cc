@@ -200,7 +200,7 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 	}
 
 	num_bytes = sizeof(struct cros_gralloc_handle);
-	num_bytes += (descriptor->name.size() + 1);
+	num_bytes += (descriptor->name.size() + 1 + 4);
 	/*
 	 * Ensure that the total number of bytes is a multiple of sizeof(int) as
 	 * native_handle_clone() copies data based on hnd->base.numInts.
@@ -257,6 +257,8 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 
 	name = (char *)(&hnd->base.data[hnd->name_offset]);
 	snprintf(name, descriptor->name.size() + 1, "%s", descriptor->name.c_str());
+	char* res_id = (char *)(&hnd->base.data[hnd->name_offset]) + strlen(name) + 1;
+	memcpy(res_id, &bo->resource_id, sizeof(uint32_t));
 
 	id = drv_bo_get_plane_handle(bo, 0).u32;
 	auto buffer = new cros_gralloc_buffer(id, bo, hnd, hnd->fds[hnd->num_planes],

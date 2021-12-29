@@ -35,6 +35,7 @@ struct bo {
 	bool is_test_buffer;
 	union bo_handle handles[DRV_MAX_PLANES];
 	void *priv;
+	uint32_t resource_id;
 };
 
 struct format_metadata {

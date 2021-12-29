@@ -209,6 +209,13 @@ class CrosGralloc1 : public gralloc1_device_t
 		return getAdapter(device)->getTransportSize(buffer, outNumFds, outNumInts);
 	}
 
+	int32_t getResourceId(const buffer_handle_t rawHandle, uint32_t *resource_id);
+	static int32_t getResourceIdHook(gralloc1_device_t *device, const buffer_handle_t rawHandle,
+					uint32_t *resource_id)
+	{
+		return getAdapter(device)->getResourceId(rawHandle, resource_id);
+	}
+
 	int32_t importBuffer(const buffer_handle_t rawHandle, buffer_handle_t *outBuffer);
 	static int32_t importBufferHook(gralloc1_device_t *device, const buffer_handle_t rawHandle,
 					buffer_handle_t *outBuffer)

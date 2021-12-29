@@ -496,6 +496,7 @@ static int virtio_virgl_bo_create(struct bo *bo, uint32_t width, uint32_t height
 	for (uint32_t plane = 0; plane < bo->meta.num_planes; plane++)
 		bo->handles[plane].u32 = res_create.bo_handle;
 
+	bo->resource_id = res_create.res_handle;
 	return 0;
 }
 
