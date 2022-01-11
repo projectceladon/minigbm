@@ -231,6 +231,8 @@ gralloc1_function_pointer_t CrosGralloc1::doGetFunction(int32_t intDescriptor)
 		return asFP<GRALLOC1_PFN_GET_TRANSPORT_SIZE>(getTransportSizeHook);
 	case GRALLOC1_FUNCTION_IMPORT_BUFFER:
 		return asFP<GRALLOC1_PFN_IMPORT_BUFFER>(importBufferHook);
+	case GRALLOC1_FUNCTION_GET_RESOURCE_ID:
+		return asFP<GRALLOC1_PFN_GET_RESOURCE_ID>(getResourceIdHook);
 	case GRALLOC1_FUNCTION_INVALID:
 		drv_log("Invalid function descriptor");
 		return nullptr;
@@ -371,6 +373,19 @@ int32_t CrosGralloc1::importBuffer(const buffer_handle_t rawHandle, buffer_handl
 	}
 
 	*outBuffer = rawHandle;
+	return GRALLOC1_ERROR_NONE;
+}
+
+int32_t CrosGralloc1::getResourceId(const buffer_handle_t rawHandle, uint32_t *resource_id)
+{
+	auto hnd = cros_gralloc_convert_handle(rawHandle);
+	if (!hnd) {
+		drv_log("Invalid handle.\n");
+		return -EINVAL;
+	}
+	char* name = (char *)(&hnd->base.data[hnd->name_offset]);
+	char* res_id = (char *)(&hnd->base.data[hnd->name_offset]) + strlen(name) + 1;
+	memcpy(resource_id, res_id, sizeof(uint32_t));
 	return GRALLOC1_ERROR_NONE;
 }
 
