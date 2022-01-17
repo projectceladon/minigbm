@@ -33,6 +33,9 @@ cros_gralloc_driver::~cros_gralloc_driver()
 	if (drv_kms_) {
 		int fd = drv_get_fd(drv_kms_);
 		drv_destroy(drv_kms_);
+		if (!is_kmsro_enabled()) {
+			drv_render_ = nullptr;
+		}
 		drv_kms_ = nullptr;
 		close(fd);
 	}
@@ -68,6 +71,9 @@ int32_t cros_gralloc_driver::init()
 	if (drv_kms_) {
 		int fd = drv_get_fd(drv_kms_);
 		drv_destroy(drv_kms_);
+		if (!is_kmsro_enabled()) {
+			drv_render_ = nullptr;
+		}
 		drv_kms_ = nullptr;
 		close(fd);
 	}
