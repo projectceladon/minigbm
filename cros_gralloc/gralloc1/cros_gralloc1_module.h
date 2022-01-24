@@ -19,6 +19,7 @@
 
 #include <memory.h>
 
+#include <vector>
 #include "../cros_gralloc_driver.h"
 
 #include <hardware/gralloc1.h>
@@ -243,6 +244,12 @@ class CrosGralloc1 : public gralloc1_device_t
 									buffer_handle_t *outBuffer)
 	{
 		return getAdapter(device)->importBuffer(rawHandle, outBuffer);
+	}
+        int32_t addCallback(void* cb, void* ctx) {
+		return driver->addCallback((cros_gralloc_cb)cb, ctx);
+	}
+	static int32_t addCallbackHook(gralloc1_device_t *device, void* cb, void* ctx) {
+		return getAdapter(device)->addCallback(cb, ctx);
 	}
 
 	// Buffer Management functions

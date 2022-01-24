@@ -475,6 +475,8 @@ gralloc1_function_pointer_t CrosGralloc1::doGetFunction(int32_t intDescriptor)
 		return asFP<GRALLOC1_PFN_GET_MODIFIER>(getModifierHook);
 	case GRALLOC1_FUNCTION_GET_BUFFER_INFO:
 		return asFP<GRALLOC1_PFN_GET_BUFFER_INFO>(getBufferInfoHook);
+        case GRALLOC1_FUNCTION_ADD_CALLBACK:
+		return asFP<GRALLOC1_PFN_ADD_CALLBACK>(addCallbackHook);
 	case GRALLOC1_FUNCTION_INVALID:
 		ALOGE("Invalid function descriptor");
 		return nullptr;

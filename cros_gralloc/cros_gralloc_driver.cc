@@ -26,6 +26,7 @@ cros_gralloc_driver::~cros_gralloc_driver()
 {
 	buffers_.clear();
 	handles_.clear();
+	cbs_.clear();
 
 	if (drv_) {
 		drv_destroy(drv_);
@@ -194,6 +195,9 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 	handles_.emplace(hnd, std::make_pair(buffer, 1));
 	*out_handle = &hnd->base;
 
+	for (auto cb : cbs_) {
+		cb.first(cb.second, GRALLOC_EVENT_ALLOCATE, *out_handle);
+	}
 	ALOGV("%s : %d : hnd = %p", __FUNCTION__, __LINE__, *out_handle);
 	ALOGV("\t width = %d, height = %d, stride = %d", hnd->width, hnd->height, hnd->pixel_stride);
 	ALOGV("\t usage = %x, format = %x, droid_format = %x, tiling = %d", hnd->usage, hnd->format, hnd->droid_format, hnd->tiling_mode);
@@ -267,6 +271,9 @@ int32_t cros_gralloc_driver::retain(buffer_handle_t handle)
 	}
 
 	handles_.emplace(hnd, std::make_pair(buffer, 1));
+	for (auto cb : cbs_) {
+		cb.first(cb.second, GRALLOC_EVENT_RETAIN, handle);
+	}
 	return 0;
 }
 
@@ -294,8 +301,13 @@ int32_t cros_gralloc_driver::release(buffer_handle_t handle)
 			cros_gralloc_error("Could not found reference");
 			return -EINVAL;
 		}
-	} else if (!--handles_[hnd].second)
+	} else if (!--handles_[hnd].second) {
 		handles_.erase(hnd);
+		for (auto cb : cbs_) {
+			cb.first(cb.second, GRALLOC_EVENT_RELEASE, handle);
+		}
+	}
+
 
 	if (buffer->decrease_refcount() == 0) {
 		buffers_.erase(buffer->get_id());
@@ -434,4 +446,11 @@ void cros_gralloc_driver::fini_kms()
 {
     ALOGV("%s:%d", __func__, __LINE__);
     drv_fini_kms(drv_);
+}
+
+int32_t cros_gralloc_driver::addCallback(cros_gralloc_cb cb, void* ctx) {
+	if (cb) {
+		cbs_.emplace(cb, ctx);
+	}
+	return 0;
 }

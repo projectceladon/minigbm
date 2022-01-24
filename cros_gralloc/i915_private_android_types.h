@@ -71,6 +71,7 @@ enum { GRALLOC1_FUNCTION_SET_MODIFIER = 101,
        GRALLOC1_FUNCTION_SET_PROTECTIONINFO = 105,
        GRALLOC1_FUNCTION_GET_MODIFIER = 106,
        GRALLOC1_FUNCTION_GET_BUFFER_INFO = 107,
+       GRALLOC1_FUNCTION_ADD_CALLBACK = 108,
        GRALLOC1_LAST_CUSTOM = 500 };
 
 typedef int32_t /*gralloc1_error_t*/ (*GRALLOC1_PFN_SET_MODIFIER)(
@@ -94,6 +95,9 @@ typedef int32_t /*gralloc1_error_t*/ (*GRALLOC1_PFN_GET_MODIFIER)(
 struct cros_gralloc_buffer_info;
 typedef int32_t /*gralloc1_error_t*/ (*GRALLOC1_PFN_GET_BUFFER_INFO)(
     gralloc1_device_t *device, buffer_handle_t buffer, cros_gralloc_buffer_info *outInfo);
+
+typedef int32_t /*gralloc1_error_t*/ (*GRALLOC1_PFN_ADD_CALLBACK)(
+    gralloc1_device_t *device,  void *cb, void* ctx);
 
 typedef union intel_protection_info_type_t {
        uint32_t value;

@@ -10,8 +10,17 @@
 #include "cros_gralloc_buffer.h"
 
 #include <unordered_map>
+#include <vector>
 
 #include "cros_gralloc_spinlock.h"
+
+enum {
+  GRALLOC_EVENT_ALLOCATE  = 0,
+  GRALLOC_EVENT_RETAIN    = 1,
+  GRALLOC_EVENT_RELEASE   = 2,
+};
+typedef void (*cros_gralloc_cb)(void* ctx, int event, const buffer_handle_t buffer);
+
 
 class cros_gralloc_driver
 {
@@ -37,7 +46,8 @@ class cros_gralloc_driver
     int get_kms_info(kms_info_t* info);
     int kms_present(buffer_handle_t handle);
     void fini_kms();
-    
+    int32_t addCallback(cros_gralloc_cb cb, void* ctx);
+
       private:
 	cros_gralloc_driver(cros_gralloc_driver const &);
 	cros_gralloc_driver operator=(cros_gralloc_driver const &);
@@ -48,6 +58,7 @@ class cros_gralloc_driver
 	std::unordered_map<uint32_t, cros_gralloc_buffer *> buffers_;
 	std::unordered_map<cros_gralloc_handle_t, std::pair<cros_gralloc_buffer *, int32_t>>
 	    handles_;
+	std::unordered_map<cros_gralloc_cb, void*> cbs_;
 };
 
 #endif
