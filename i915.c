@@ -431,6 +431,15 @@ static int i915_bo_from_format(struct bo *bo, uint32_t width, uint32_t height, u
 			plane_height = ALIGN(plane_height, 64);
 		}
 
+		if (i915->gen >= 12 && bo->meta.tiling == I915_TILING_Y) {
+			/* When Y-tiled with CCS, the hardware requires offset alignment 64K. When
+			 * Y-tiled without CCS, the hardware requires 4K, as usual for a Y tile.
+			 * Mesa requires 64K either way, because Mesa wants to privately enable CCS
+			 * even when using I915_FORMAT_MOD_Y_TILED.
+			 */
+			offset = ALIGN(offset, 64 * 1024);
+		}
+
 		bo->meta.strides[plane] = stride;
 		bo->meta.sizes[plane] = stride * plane_height;
 		bo->meta.offsets[plane] = offset;
