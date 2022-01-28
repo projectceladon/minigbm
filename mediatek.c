@@ -25,6 +25,15 @@
 
 #define TILE_TYPE_LINEAR 0
 
+#if defined(MTK_MT8183) || defined(MTK_MT8186)
+#define SUPPORTS_YUV422_AND_HIGH_BIT_DEPTH_TEXTURING
+#endif
+
+// All platforms except MT8173 should USE_NV12_FOR_HW_VIDEO_DECODING.
+#if defined(MTK_MT8183) || defined(MTK_MT8186) || defined(MTK_MT8192) || defined(MTK_MT8195)
+#define USE_NV12_FOR_HW_VIDEO_DECODING
+#endif
+
 struct mediatek_private_map_data {
 	void *cached_addr;
 	void *gem_addr;
@@ -35,16 +44,19 @@ static const uint32_t render_target_formats[] = { DRM_FORMAT_ABGR8888, DRM_FORMA
 						  DRM_FORMAT_RGB565, DRM_FORMAT_XBGR8888,
 						  DRM_FORMAT_XRGB8888 };
 
-#ifdef MTK_MT8183
+// clang-format off
 static const uint32_t texture_source_formats[] = {
-	DRM_FORMAT_NV21,	 DRM_FORMAT_NV12,	    DRM_FORMAT_YUYV,
-	DRM_FORMAT_YVU420,	 DRM_FORMAT_YVU420_ANDROID, DRM_FORMAT_ABGR2101010,
-	DRM_FORMAT_ABGR16161616F
-};
-#else
-static const uint32_t texture_source_formats[] = { DRM_FORMAT_YVU420, DRM_FORMAT_YVU420_ANDROID,
-						   DRM_FORMAT_NV12 };
+#ifdef SUPPORTS_YUV422_AND_HIGH_BIT_DEPTH_TEXTURING
+	DRM_FORMAT_NV21,
+	DRM_FORMAT_YUYV,
+	DRM_FORMAT_ABGR2101010,
+	DRM_FORMAT_ABGR16161616F,
 #endif
+	DRM_FORMAT_NV12,
+	DRM_FORMAT_YVU420,
+	DRM_FORMAT_YVU420_ANDROID
+};
+// clang-format on
 
 static int mediatek_init(struct driver *drv)
 {
@@ -67,7 +79,7 @@ static int mediatek_init(struct driver *drv)
 	metadata.modifier = DRM_FORMAT_MOD_LINEAR;
 	drv_modify_combination(drv, DRM_FORMAT_YVU420, &metadata, BO_USE_HW_VIDEO_DECODER);
 	drv_modify_combination(drv, DRM_FORMAT_YVU420_ANDROID, &metadata, BO_USE_HW_VIDEO_DECODER);
-#if defined(MTK_MT8183) || defined(MTK_MT8192) || defined(MTK_MT8195)
+#ifdef USE_NV12_FOR_HW_VIDEO_DECODING
 	// TODO(hiroh): Switch to use NV12 for video decoder on MT8173 as well.
 	drv_modify_combination(drv, DRM_FORMAT_NV12, &metadata, BO_USE_HW_VIDEO_DECODER);
 #endif
@@ -135,7 +147,7 @@ static int mediatek_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint
 
 		drv_bo_from_format_and_padding(bo, stride, aligned_height, format, padding);
 	} else {
-#ifdef MTK_MT8183
+#ifdef SUPPORTS_YUV422_AND_HIGH_BIT_DEPTH_TEXTURING
 		/*
 		 * JPEG Encoder Accelerator requires 16x16 alignment. We want the buffer
 		 * from camera can be put in JEA directly so align the height to 16
@@ -304,7 +316,7 @@ static void mediatek_resolve_format_and_use_flags(struct driver *drv, uint32_t f
 		*out_use_flags &= ~BO_USE_HW_VIDEO_ENCODER;
 		break;
 	case DRM_FORMAT_FLEX_YCbCr_420_888:
-#if defined(MTK_MT8183) || defined(MTK_MT8192) || defined(MTK_MT8195)
+#ifdef USE_NV12_FOR_HW_VIDEO_DECODING
 		// TODO(hiroh): Switch to use NV12 for video decoder on MT8173 as well.
 		if (use_flags & (BO_USE_HW_VIDEO_DECODER)) {
 			*out_format = DRM_FORMAT_NV12;
