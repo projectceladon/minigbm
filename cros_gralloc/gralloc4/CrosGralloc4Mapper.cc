@@ -440,6 +440,19 @@ Return<void> CrosGralloc4Mapper::get(const cros_gralloc_buffer* crosBuffer,
         return Void();
     }
 
+    const CrosGralloc4Metadata* crosMetadata = nullptr;
+    if (metadataType == android::gralloc4::MetadataType_BlendMode ||
+        metadataType == android::gralloc4::MetadataType_Cta861_3 ||
+        metadataType == android::gralloc4::MetadataType_Dataspace ||
+        metadataType == android::gralloc4::MetadataType_Smpte2086) {
+        Error error = getMetadata(crosBuffer, &crosMetadata);
+        if (error != Error::NONE) {
+            drv_log("Failed to get. Failed to get buffer metadata.\n");
+            hidlCb(Error::NO_RESOURCES, encodedMetadata);
+            return Void();
+        }
+    }
+
     android::status_t status = android::NO_ERROR;
     if (metadataType == android::gralloc4::MetadataType_BufferId) {
         status = android::gralloc4::encodeBufferId(crosBuffer->get_id(), &encodedMetadata);
@@ -510,13 +523,13 @@ Return<void> CrosGralloc4Mapper::get(const cros_gralloc_buffer* crosBuffer,
 
         status = android::gralloc4::encodeCrop(crops, &encodedMetadata);
     } else if (metadataType == android::gralloc4::MetadataType_Dataspace) {
-        status = android::gralloc4::encodeDataspace(Dataspace::UNKNOWN, &encodedMetadata);
+        status = android::gralloc4::encodeDataspace(crosMetadata->dataspace, &encodedMetadata);
     } else if (metadataType == android::gralloc4::MetadataType_BlendMode) {
-        status = android::gralloc4::encodeBlendMode(BlendMode::INVALID, &encodedMetadata);
+        status = android::gralloc4::encodeBlendMode(crosMetadata->blendMode, &encodedMetadata);
     } else if (metadataType == android::gralloc4::MetadataType_Smpte2086) {
-        status = android::gralloc4::encodeSmpte2086(std::nullopt, &encodedMetadata);
+        status = android::gralloc4::encodeSmpte2086(crosMetadata->smpte2086, &encodedMetadata);
     } else if (metadataType == android::gralloc4::MetadataType_Cta861_3) {
-        status = android::gralloc4::encodeCta861_3(std::nullopt, &encodedMetadata);
+        status = android::gralloc4::encodeCta861_3(crosMetadata->cta861_3, &encodedMetadata);
     } else if (metadataType == android::gralloc4::MetadataType_Smpte2094_40) {
         status = android::gralloc4::encodeSmpte2094_40(std::nullopt, &encodedMetadata);
     } else {
@@ -535,7 +548,7 @@ Return<void> CrosGralloc4Mapper::get(const cros_gralloc_buffer* crosBuffer,
 }
 
 Return<Error> CrosGralloc4Mapper::set(void* rawHandle, const MetadataType& metadataType,
-                                      const hidl_vec<uint8_t>& /*metadata*/) {
+                                      const hidl_vec<uint8_t>& encodedMetadata) {
     if (!mDriver) {
         drv_log("Failed to set. Driver is uninitialized.\n");
         return Error::NO_RESOURCES;
@@ -569,7 +582,68 @@ Return<Error> CrosGralloc4Mapper::set(void* rawHandle, const MetadataType& metad
         return Error::BAD_VALUE;
     }
 
-    return Error::UNSUPPORTED;
+    if (metadataType != android::gralloc4::MetadataType_BlendMode &&
+        metadataType != android::gralloc4::MetadataType_Cta861_3 &&
+        metadataType != android::gralloc4::MetadataType_Dataspace &&
+        metadataType != android::gralloc4::MetadataType_Smpte2086) {
+        return Error::UNSUPPORTED;
+    }
+
+    Error error = Error::NONE;
+    mDriver->with_buffer(crosHandle, [&, this](cros_gralloc_buffer* crosBuffer) {
+        error = set(crosBuffer, metadataType, encodedMetadata);
+    });
+
+    return error;
+}
+
+Error CrosGralloc4Mapper::set(cros_gralloc_buffer* crosBuffer, const MetadataType& metadataType,
+                              const android::hardware::hidl_vec<uint8_t>& encodedMetadata) {
+    if (!mDriver) {
+        drv_log("Failed to set. Driver is uninitialized.\n");
+        return Error::NO_RESOURCES;
+    }
+
+    if (!crosBuffer) {
+        drv_log("Failed to set. Invalid buffer.\n");
+        return Error::BAD_BUFFER;
+    }
+
+    CrosGralloc4Metadata* crosMetadata = nullptr;
+
+    Error error = getMutableMetadata(crosBuffer, &crosMetadata);
+    if (error != Error::NONE) {
+        drv_log("Failed to set. Failed to get buffer metadata.\n");
+        return Error::UNSUPPORTED;
+    }
+
+    if (metadataType == android::gralloc4::MetadataType_BlendMode) {
+        auto status = android::gralloc4::decodeBlendMode(encodedMetadata, &crosMetadata->blendMode);
+        if (status != android::NO_ERROR) {
+            drv_log("Failed to set. Failed to decode blend mode.\n");
+            return Error::UNSUPPORTED;
+        }
+    } else if (metadataType == android::gralloc4::MetadataType_Cta861_3) {
+        auto status = android::gralloc4::decodeCta861_3(encodedMetadata, &crosMetadata->cta861_3);
+        if (status != android::NO_ERROR) {
+            drv_log("Failed to set. Failed to decode cta861_3.\n");
+            return Error::UNSUPPORTED;
+        }
+    } else if (metadataType == android::gralloc4::MetadataType_Dataspace) {
+        auto status = android::gralloc4::decodeDataspace(encodedMetadata, &crosMetadata->dataspace);
+        if (status != android::NO_ERROR) {
+            drv_log("Failed to set. Failed to decode dataspace.\n");
+            return Error::UNSUPPORTED;
+        }
+    } else if (metadataType == android::gralloc4::MetadataType_Smpte2086) {
+        auto status = android::gralloc4::decodeSmpte2086(encodedMetadata, &crosMetadata->smpte2086);
+        if (status != android::NO_ERROR) {
+            drv_log("Failed to set. Failed to decode smpte2086.\n");
+            return Error::UNSUPPORTED;
+        }
+    }
+
+    return Error::NONE;
 }
 
 int CrosGralloc4Mapper::getResolvedDrmFormat(PixelFormat pixelFormat, uint64_t bufferUsage,
@@ -794,25 +868,25 @@ Return<void> CrosGralloc4Mapper::listSupportedMetadataTypes(listSupportedMetadat
                     android::gralloc4::MetadataType_Dataspace,
                     "",
                     /*isGettable=*/true,
-                    /*isSettable=*/false,
+                    /*isSettable=*/true,
             },
             {
                     android::gralloc4::MetadataType_BlendMode,
                     "",
                     /*isGettable=*/true,
-                    /*isSettable=*/false,
+                    /*isSettable=*/true,
             },
             {
                     android::gralloc4::MetadataType_Smpte2086,
                     "",
                     /*isGettable=*/true,
-                    /*isSettable=*/false,
+                    /*isSettable=*/true,
             },
             {
                     android::gralloc4::MetadataType_Cta861_3,
                     "",
                     /*isGettable=*/true,
-                    /*isSettable=*/false,
+                    /*isSettable=*/true,
             },
             {
                     android::gralloc4::MetadataType_Smpte2094_40,
@@ -956,6 +1030,75 @@ Return<void> CrosGralloc4Mapper::dumpBuffers(dumpBuffers_cb hidlCb) {
     return Void();
 }
 
+Error CrosGralloc4Mapper::getReservedRegionArea(const cros_gralloc_buffer* crosBuffer,
+                                                ReservedRegionArea area, void** outAddr,
+                                                uint64_t* outSize) {
+    if (!mDriver) {
+        drv_log("Failed to getReservedRegionArea. Driver is uninitialized.\n");
+        return Error::NO_RESOURCES;
+    }
+
+    if (!crosBuffer) {
+        drv_log("Failed to getReservedRegionArea. Invalid buffer.\n");
+        return Error::BAD_BUFFER;
+    }
+
+    int ret = crosBuffer->get_reserved_region(outAddr, outSize);
+    if (ret) {
+        drv_log("Failed to getReservedRegionArea.\n");
+        *outAddr = nullptr;
+        *outSize = 0;
+        return Error::NO_RESOURCES;
+    }
+
+    switch (area) {
+        case ReservedRegionArea::MAPPER4_METADATA: {
+            // CrosGralloc4Metadata resides at the beginning reserved region.
+            *outSize = sizeof(CrosGralloc4Metadata);
+            break;
+        }
+        case ReservedRegionArea::USER_METADATA: {
+            // User metadata resides after the CrosGralloc4Metadata.
+            *outAddr = reinterpret_cast<void*>(reinterpret_cast<char*>(*outAddr) +
+                                               sizeof(CrosGralloc4Metadata));
+            *outSize = *outSize - sizeof(CrosGralloc4Metadata);
+            break;
+        }
+    }
+
+    return Error::NONE;
+}
+
+Error CrosGralloc4Mapper::getMetadata(const cros_gralloc_buffer* crosBuffer,
+                                      const CrosGralloc4Metadata** outMetadata) {
+    void* addr = nullptr;
+    uint64_t size;
+
+    Error error =
+            getReservedRegionArea(crosBuffer, ReservedRegionArea::MAPPER4_METADATA, &addr, &size);
+    if (error != Error::NONE) {
+        return error;
+    }
+
+    *outMetadata = reinterpret_cast<const CrosGralloc4Metadata*>(addr);
+    return Error::NONE;
+}
+
+Error CrosGralloc4Mapper::getMutableMetadata(cros_gralloc_buffer* crosBuffer,
+                                             CrosGralloc4Metadata** outMetadata) {
+    void* addr = nullptr;
+    uint64_t size;
+
+    Error error =
+            getReservedRegionArea(crosBuffer, ReservedRegionArea::MAPPER4_METADATA, &addr, &size);
+    if (error != Error::NONE) {
+        return error;
+    }
+
+    *outMetadata = reinterpret_cast<CrosGralloc4Metadata*>(addr);
+    return Error::NONE;
+}
+
 Return<void> CrosGralloc4Mapper::getReservedRegion(void* rawHandle, getReservedRegion_cb hidlCb) {
     if (!mDriver) {
         drv_log("Failed to getReservedRegion. Driver is uninitialized.\n");
@@ -979,9 +1122,15 @@ Return<void> CrosGralloc4Mapper::getReservedRegion(void* rawHandle, getReservedR
 
     void* reservedRegionAddr = nullptr;
     uint64_t reservedRegionSize = 0;
-    int ret = mDriver->get_reserved_region(bufferHandle, &reservedRegionAddr, &reservedRegionSize);
-    if (ret) {
-        drv_log("Failed to getReservedRegion.\n");
+
+    Error error = Error::NONE;
+    mDriver->with_buffer(crosHandle, [&, this](cros_gralloc_buffer* crosBuffer) {
+        error = getReservedRegionArea(crosBuffer, ReservedRegionArea::USER_METADATA,
+                                      &reservedRegionAddr, &reservedRegionSize);
+    });
+
+    if (error != Error::NONE) {
+        drv_log("Failed to getReservedRegion. Failed to getReservedRegionArea.\n");
         hidlCb(Error::BAD_BUFFER, nullptr, 0);
         return Void();
     }
