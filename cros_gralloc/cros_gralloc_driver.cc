@@ -334,21 +334,19 @@ int32_t cros_gralloc_driver::retain(buffer_handle_t handle)
 		return 0;
 	}
 
-	struct bo *bo;
-	struct drv_import_fd_data data;
-	data.format = hnd->format;
-	data.tiling = hnd->tiling;
-
-	data.width = hnd->width;
-	data.height = hnd->height;
-	data.use_flags = hnd->use_flags;
-
+	struct drv_import_fd_data data = {
+		.format_modifier = hnd->format_modifier,
+		.width = hnd->width,
+		.height = hnd->height,
+		.format = hnd->format,
+		.tiling = hnd->tiling,
+		.use_flags = hnd->use_flags,
+	};
 	memcpy(data.fds, hnd->fds, sizeof(data.fds));
 	memcpy(data.strides, hnd->strides, sizeof(data.strides));
 	memcpy(data.offsets, hnd->offsets, sizeof(data.offsets));
-	data.format_modifier = hnd->format_modifier;
 
-	bo = drv_bo_import(drv_, &data);
+	struct bo *bo = drv_bo_import(drv_, &data);
 	if (!bo)
 		return -EFAULT;
 
