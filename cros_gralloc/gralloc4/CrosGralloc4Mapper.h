@@ -65,10 +65,10 @@ class CrosGralloc4Mapper : public android::hardware::graphics::mapper::V4_0::IMa
                                                       getReservedRegion_cb hidlCb) override;
 
   private:
-    android::hardware::Return<void> get(cros_gralloc_handle_t crosHandle,
+    android::hardware::Return<void> get(const cros_gralloc_buffer* crosBuffer,
                                         const MetadataType& metadataType, get_cb hidlCb);
 
-    android::hardware::Return<void> dumpBuffer(cros_gralloc_handle_t crosHandle,
+    android::hardware::Return<void> dumpBuffer(const cros_gralloc_buffer* crosBuffer,
                                                dumpBuffer_cb hidlCb);
 
     int getResolvedDrmFormat(android::hardware::graphics::common::V1_2::PixelFormat pixelFormat,

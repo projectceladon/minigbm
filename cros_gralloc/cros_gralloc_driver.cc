@@ -563,11 +563,25 @@ uint32_t cros_gralloc_driver::get_resolved_drm_format(uint32_t drm_format, uint6
 	return resolved_format;
 }
 
-void cros_gralloc_driver::for_each_handle(
-    const std::function<void(cros_gralloc_handle_t)> &function)
+void cros_gralloc_driver::with_buffer(cros_gralloc_handle_t hnd,
+				      const std::function<void(cros_gralloc_buffer *)> &function)
+{
+	std::lock_guard<std::mutex> lock(mutex_);
+
+	auto buffer_it = buffers_.find(hnd->id);
+	if (buffer_it == buffers_.end()) {
+		return;
+	}
+
+	auto buffer = buffer_it->second;
+	function(buffer);
+}
+
+void cros_gralloc_driver::with_each_buffer(
+    const std::function<void(cros_gralloc_buffer *)> &function)
 {
 	std::lock_guard<std::mutex> lock(mutex_);
 
 	for (const auto &pair : buffers_)
-		function(pair.second->hnd_);
+		function(pair.second);
 }

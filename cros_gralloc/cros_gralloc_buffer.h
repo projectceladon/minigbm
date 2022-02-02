@@ -46,9 +46,6 @@ class cros_gralloc_buffer
 	int32_t get_reserved_region(void **reserved_region_addr, uint64_t *reserved_region_size);
 
       private:
-	// Temporary access to hnd_.
-	friend class cros_gralloc_driver;
-
 	cros_gralloc_buffer(struct bo *acquire_bo, struct cros_gralloc_handle *acquire_handle);
 
 	cros_gralloc_buffer(cros_gralloc_buffer const &);
