@@ -199,11 +199,9 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 	size_t num_planes;
 	size_t num_fds;
 	size_t num_ints;
-	size_t num_bytes;
 	uint32_t resolved_format;
 	uint32_t bytes_per_pixel;
 	uint64_t resolved_use_flags;
-	char *name;
 	struct bo *bo;
 	struct cros_gralloc_handle *hnd;
 	cros_gralloc_buffer *buffer;
@@ -236,14 +234,8 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 	if (descriptor->reserved_region_size > 0)
 		num_fds += 1;
 
-	num_bytes = sizeof(struct cros_gralloc_handle);
-	num_bytes += (descriptor->name.size() + 1);
-	/*
-	 * Ensure that the total number of bytes is a multiple of sizeof(int) as
-	 * native_handle_clone() copies data based on hnd->base.numInts.
-	 */
-	num_bytes = ALIGN(num_bytes, sizeof(int));
-	num_ints = ((num_bytes - sizeof(native_handle_t)) / sizeof(int)) - num_fds;
+	num_ints = ((sizeof(struct cros_gralloc_handle) - sizeof(native_handle_t)) / sizeof(int)) -
+		   num_fds;
 
 	hnd =
 	    reinterpret_cast<struct cros_gralloc_handle *>(native_handle_create(num_fds, num_ints));
@@ -286,10 +278,6 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 	hnd->droid_format = descriptor->droid_format;
 	hnd->usage = descriptor->droid_usage;
 	hnd->total_size = descriptor->reserved_region_size + drv_bo_get_total_size(bo);
-	hnd->name_offset = handle_data_size;
-
-	name = (char *)(&hnd->data[hnd->name_offset]);
-	snprintf(name, descriptor->name.size() + 1, "%s", descriptor->name.c_str());
 
 	buffer = cros_gralloc_buffer::create(bo, hnd);
 	if (!buffer) {

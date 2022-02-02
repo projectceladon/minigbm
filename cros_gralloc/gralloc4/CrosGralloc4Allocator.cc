@@ -31,7 +31,9 @@ Error CrosGralloc4Allocator::init() {
     return mDriver ? Error::NONE : Error::NO_RESOURCES;
 }
 
-Error CrosGralloc4Allocator::initializeMetadata(cros_gralloc_handle_t crosHandle) {
+Error CrosGralloc4Allocator::initializeMetadata(
+        cros_gralloc_handle_t crosHandle,
+        const struct cros_gralloc_buffer_descriptor& crosDescriptor) {
     if (!mDriver) {
         drv_log("Failed to initializeMetadata. Driver is uninitialized.\n");
         return Error::NO_RESOURCES;
@@ -52,6 +54,8 @@ Error CrosGralloc4Allocator::initializeMetadata(cros_gralloc_handle_t crosHandle
 
     CrosGralloc4Metadata* crosMetadata = reinterpret_cast<CrosGralloc4Metadata*>(addr);
 
+    snprintf(crosMetadata->name, CROS_GRALLOC4_METADATA_MAX_NAME_SIZE, "%s",
+             crosDescriptor.name.c_str());
     crosMetadata->dataspace = Dataspace::UNKNOWN;
     crosMetadata->blendMode = BlendMode::INVALID;
 
@@ -98,7 +102,7 @@ Error CrosGralloc4Allocator::allocate(const BufferDescriptorInfo& descriptor, ui
         return Error::NO_RESOURCES;
     }
 
-    Error error = initializeMetadata(crosHandle);
+    Error error = initializeMetadata(crosHandle, crosDescriptor);
     if (error != Error::NONE) {
         return error;
     }

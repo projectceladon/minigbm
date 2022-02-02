@@ -113,11 +113,6 @@ uint64_t cros_gralloc_buffer::get_android_usage() const
 	return static_cast<uint64_t>(hnd_->usage);
 }
 
-const char *cros_gralloc_buffer::get_name() const
-{
-	return (const char *)(&hnd_->data[hnd_->name_offset]);
-}
-
 int32_t cros_gralloc_buffer::increase_refcount()
 {
 	return ++refcount_;

@@ -444,6 +444,7 @@ Return<void> CrosGralloc4Mapper::get(const cros_gralloc_buffer* crosBuffer,
     if (metadataType == android::gralloc4::MetadataType_BlendMode ||
         metadataType == android::gralloc4::MetadataType_Cta861_3 ||
         metadataType == android::gralloc4::MetadataType_Dataspace ||
+        metadataType == android::gralloc4::MetadataType_Name ||
         metadataType == android::gralloc4::MetadataType_Smpte2086) {
         Error error = getMetadata(crosBuffer, &crosMetadata);
         if (error != Error::NONE) {
@@ -457,7 +458,7 @@ Return<void> CrosGralloc4Mapper::get(const cros_gralloc_buffer* crosBuffer,
     if (metadataType == android::gralloc4::MetadataType_BufferId) {
         status = android::gralloc4::encodeBufferId(crosBuffer->get_id(), &encodedMetadata);
     } else if (metadataType == android::gralloc4::MetadataType_Name) {
-        status = android::gralloc4::encodeName(crosBuffer->get_name(), &encodedMetadata);
+        status = android::gralloc4::encodeName(crosMetadata->name, &encodedMetadata);
     } else if (metadataType == android::gralloc4::MetadataType_Width) {
         status = android::gralloc4::encodeWidth(crosBuffer->get_width(), &encodedMetadata);
     } else if (metadataType == android::gralloc4::MetadataType_Height) {
