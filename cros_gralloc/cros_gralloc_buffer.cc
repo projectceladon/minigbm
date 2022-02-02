@@ -9,34 +9,53 @@
 #include <assert.h>
 #include <sys/mman.h>
 
-cros_gralloc_buffer::cros_gralloc_buffer(uint32_t id, struct bo *acquire_bo,
-					 struct cros_gralloc_handle *acquire_handle,
-					 int32_t reserved_region_fd, uint64_t reserved_region_size)
-    : id_(id), bo_(acquire_bo), hnd_(acquire_handle), refcount_(1), lockcount_(0),
-      reserved_region_fd_(reserved_region_fd), reserved_region_size_(reserved_region_size),
-      reserved_region_addr_(nullptr)
+#include <cutils/native_handle.h>
+
+/*static*/
+cros_gralloc_buffer *cros_gralloc_buffer::create(struct bo *acquire_bo,
+						 const struct cros_gralloc_handle *borrowed_handle)
+{
+	auto acquire_hnd =
+	    reinterpret_cast<struct cros_gralloc_handle *>(native_handle_clone(borrowed_handle));
+	if (!acquire_hnd) {
+		drv_log("Failed to create cros_gralloc_buffer: failed to clone handle.\n");
+		return nullptr;
+	}
+
+	auto buffer = new cros_gralloc_buffer(acquire_bo, acquire_hnd);
+	if (!buffer) {
+		drv_log("Failed to create cros_gralloc_buffer: failed to allocate.\n");
+		native_handle_close(acquire_hnd);
+		native_handle_delete(acquire_hnd);
+		return nullptr;
+	}
+
+	return buffer;
+}
+
+cros_gralloc_buffer::cros_gralloc_buffer(struct bo *acquire_bo,
+					 struct cros_gralloc_handle *acquire_handle)
+    : bo_(acquire_bo), hnd_(acquire_handle)
 {
 	assert(bo_);
-	num_planes_ = drv_bo_get_num_planes(bo_);
-	for (uint32_t plane = 0; plane < num_planes_; plane++)
+	assert(hnd_);
+	for (uint32_t plane = 0; plane < DRV_MAX_PLANES; plane++)
 		lock_data_[plane] = nullptr;
 }
 
 cros_gralloc_buffer::~cros_gralloc_buffer()
 {
 	drv_bo_destroy(bo_);
-	if (hnd_) {
-		native_handle_close(hnd_);
-		native_handle_delete(hnd_);
-	}
 	if (reserved_region_addr_) {
-		munmap(reserved_region_addr_, reserved_region_size_);
+		munmap(reserved_region_addr_, hnd_->reserved_region_size);
 	}
+	native_handle_close(hnd_);
+	native_handle_delete(hnd_);
 }
 
 uint32_t cros_gralloc_buffer::get_id() const
 {
-	return id_;
+	return hnd_->id;
 }
 
 int32_t cros_gralloc_buffer::increase_refcount()
@@ -91,7 +110,7 @@ int32_t cros_gralloc_buffer::lock(const struct rectangle *rect, uint32_t map_fla
 		}
 	}
 
-	for (uint32_t plane = 0; plane < num_planes_; plane++)
+	for (uint32_t plane = 0; plane < hnd_->num_planes; plane++)
 		addr[plane] = static_cast<uint8_t *>(vaddr) + drv_bo_get_plane_offset(bo_, plane);
 
 	lockcount_++;
@@ -150,14 +169,16 @@ int32_t cros_gralloc_buffer::flush()
 
 int32_t cros_gralloc_buffer::get_reserved_region(void **addr, uint64_t *size)
 {
-	if (reserved_region_fd_ == -1) {
+	int32_t reserved_region_fd = hnd_->fds[hnd_->num_planes];
+	if (reserved_region_fd == -1) {
 		drv_log("Buffer does not have reserved region.\n");
 		return -EINVAL;
 	}
 
 	if (!reserved_region_addr_) {
-		reserved_region_addr_ = mmap(nullptr, reserved_region_size_, PROT_WRITE | PROT_READ,
-					     MAP_SHARED, reserved_region_fd_, 0);
+		reserved_region_addr_ =
+		    mmap(nullptr, hnd_->reserved_region_size, PROT_WRITE | PROT_READ, MAP_SHARED,
+			 reserved_region_fd, 0);
 		if (reserved_region_addr_ == MAP_FAILED) {
 			drv_log("Failed to mmap reserved region: %s.\n", strerror(errno));
 			return -errno;
@@ -165,6 +186,6 @@ int32_t cros_gralloc_buffer::get_reserved_region(void **addr, uint64_t *size)
 	}
 
 	*addr = reserved_region_addr_;
-	*size = reserved_region_size_;
+	*size = hnd_->reserved_region_size;
 	return 0;
 }

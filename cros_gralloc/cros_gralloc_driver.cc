@@ -113,7 +113,6 @@ cros_gralloc_driver::cros_gralloc_driver()
 cros_gralloc_driver::~cros_gralloc_driver()
 {
 	buffers_.clear();
-	handles_.clear();
 
 	if (drv_) {
 		int fd = drv_get_fd(drv_);
@@ -193,18 +192,8 @@ int32_t create_reserved_region(const std::string &buffer_name, uint64_t reserved
 	return reserved_region_fd;
 }
 
-void cros_gralloc_driver::emplace_buffer(struct bo *bo, struct cros_gralloc_handle *hnd)
-{
-	auto buffer = new cros_gralloc_buffer(hnd->id, bo, hnd, hnd->fds[hnd->num_planes],
-					      hnd->reserved_region_size);
-
-	std::lock_guard<std::mutex> lock(mutex_);
-	buffers_.emplace(hnd->id, buffer);
-	handles_.emplace(hnd, std::make_pair(buffer, 1));
-}
-
 int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descriptor *descriptor,
-				      buffer_handle_t *out_handle)
+				      native_handle_t **out_handle)
 {
 	int ret = 0;
 	size_t num_planes;
@@ -217,6 +206,7 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 	char *name;
 	struct bo *bo;
 	struct cros_gralloc_handle *hnd;
+	cros_gralloc_buffer *buffer;
 
 	if (!get_resolved_format_and_use_flags(descriptor, &resolved_format, &resolved_use_flags)) {
 		drv_log("Failed to resolve format and use_flags.\n");
@@ -301,9 +291,19 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 	name = (char *)(&hnd->data[hnd->name_offset]);
 	snprintf(name, descriptor->name.size() + 1, "%s", descriptor->name.c_str());
 
-	emplace_buffer(bo, hnd);
+	buffer = cros_gralloc_buffer::create(bo, hnd);
+	if (!buffer) {
+		drv_log("Failed to allocate: failed to create cros_gralloc_buffer.\n");
+		ret = -1;
+		goto destroy_hnd;
+	}
 
-	*out_handle = reinterpret_cast<buffer_handle_t>(hnd);
+	{
+		std::lock_guard<std::mutex> lock(mutex_);
+		buffers_.emplace(hnd->id, buffer);
+	}
+
+	*out_handle = hnd;
 	return 0;
 
 destroy_hnd:
@@ -317,7 +317,6 @@ destroy_bo:
 
 int32_t cros_gralloc_driver::retain(buffer_handle_t handle)
 {
-	uint32_t id;
 	std::lock_guard<std::mutex> lock(mutex_);
 
 	auto hnd = cros_gralloc_convert_handle(handle);
@@ -326,43 +325,40 @@ int32_t cros_gralloc_driver::retain(buffer_handle_t handle)
 		return -EINVAL;
 	}
 
-	auto buffer = get_buffer(hnd);
-	if (buffer) {
-		handles_[hnd].second++;
+	uint32_t id = hnd->id;
+
+	auto buffer_it = buffers_.find(id);
+	if (buffer_it != buffers_.end()) {
+		auto buffer = buffer_it->second;
 		buffer->increase_refcount();
 		return 0;
 	}
 
-	id = hnd->id;
+	struct bo *bo;
+	struct drv_import_fd_data data;
+	data.format = hnd->format;
+	data.tiling = hnd->tiling;
 
-	if (buffers_.count(id)) {
-		buffer = buffers_[id];
-		buffer->increase_refcount();
-	} else {
-		struct bo *bo;
-		struct drv_import_fd_data data;
-		data.format = hnd->format;
-		data.tiling = hnd->tiling;
+	data.width = hnd->width;
+	data.height = hnd->height;
+	data.use_flags = hnd->use_flags;
 
-		data.width = hnd->width;
-		data.height = hnd->height;
-		data.use_flags = hnd->use_flags;
+	memcpy(data.fds, hnd->fds, sizeof(data.fds));
+	memcpy(data.strides, hnd->strides, sizeof(data.strides));
+	memcpy(data.offsets, hnd->offsets, sizeof(data.offsets));
+	data.format_modifier = hnd->format_modifier;
 
-		memcpy(data.fds, hnd->fds, sizeof(data.fds));
-		memcpy(data.strides, hnd->strides, sizeof(data.strides));
-		memcpy(data.offsets, hnd->offsets, sizeof(data.offsets));
-		data.format_modifier = hnd->format_modifier;
+	bo = drv_bo_import(drv_, &data);
+	if (!bo)
+		return -EFAULT;
 
-		bo = drv_bo_import(drv_, &data);
-		if (!bo)
-			return -EFAULT;
-
-		buffer = new cros_gralloc_buffer(id, bo, nullptr, hnd->fds[hnd->num_planes],
-						 hnd->reserved_region_size);
-		buffers_.emplace(id, buffer);
+	auto buffer = cros_gralloc_buffer::create(bo, hnd);
+	if (!buffer) {
+		drv_log("Failed to import: failed to create cros_gralloc_buffer.\n");
+		return -1;
 	}
 
-	handles_.emplace(hnd, std::make_pair(buffer, 1));
+	buffers_.emplace(id, buffer);
 	return 0;
 }
 
@@ -376,17 +372,15 @@ int32_t cros_gralloc_driver::release(buffer_handle_t handle)
 		return -EINVAL;
 	}
 
-	auto buffer = get_buffer(hnd);
-	if (!buffer) {
+	auto buffer_it = buffers_.find(hnd->id);
+	if (buffer_it == buffers_.end()) {
 		drv_log("Invalid Reference.\n");
 		return -EINVAL;
 	}
 
-	if (!--handles_[hnd].second)
-		handles_.erase(hnd);
-
+	auto buffer = buffer_it->second;
 	if (buffer->decrease_refcount() == 0) {
-		buffers_.erase(buffer->get_id());
+		buffers_.erase(buffer_it);
 		delete buffer;
 	}
 
@@ -402,18 +396,20 @@ int32_t cros_gralloc_driver::lock(buffer_handle_t handle, int32_t acquire_fence,
 		return ret;
 
 	std::lock_guard<std::mutex> lock(mutex_);
+
 	auto hnd = cros_gralloc_convert_handle(handle);
 	if (!hnd) {
 		drv_log("Invalid handle.\n");
 		return -EINVAL;
 	}
 
-	auto buffer = get_buffer(hnd);
-	if (!buffer) {
+	auto buffer_it = buffers_.find(hnd->id);
+	if (buffer_it == buffers_.end()) {
 		drv_log("Invalid Reference.\n");
 		return -EINVAL;
 	}
 
+	auto buffer = buffer_it->second;
 	return buffer->lock(rect, map_flags, addr);
 }
 
@@ -427,11 +423,13 @@ int32_t cros_gralloc_driver::unlock(buffer_handle_t handle, int32_t *release_fen
 		return -EINVAL;
 	}
 
-	auto buffer = get_buffer(hnd);
-	if (!buffer) {
+	auto buffer_it = buffers_.find(hnd->id);
+	if (buffer_it == buffers_.end()) {
 		drv_log("Invalid Reference.\n");
 		return -EINVAL;
 	}
+
+	auto buffer = buffer_it->second;
 
 	/*
 	 * From the ANativeWindow::dequeueBuffer documentation:
@@ -453,12 +451,13 @@ int32_t cros_gralloc_driver::invalidate(buffer_handle_t handle)
 		return -EINVAL;
 	}
 
-	auto buffer = get_buffer(hnd);
-	if (!buffer) {
+	auto buffer_it = buffers_.find(hnd->id);
+	if (buffer_it == buffers_.end()) {
 		drv_log("Invalid Reference.\n");
 		return -EINVAL;
 	}
 
+	auto buffer = buffer_it->second;
 	return buffer->invalidate();
 }
 
@@ -472,11 +471,13 @@ int32_t cros_gralloc_driver::flush(buffer_handle_t handle, int32_t *release_fenc
 		return -EINVAL;
 	}
 
-	auto buffer = get_buffer(hnd);
-	if (!buffer) {
+	auto buffer_it = buffers_.find(hnd->id);
+	if (buffer_it == buffers_.end()) {
 		drv_log("Invalid Reference.\n");
 		return -EINVAL;
 	}
+
+	auto buffer = buffer_it->second;
 
 	/*
 	 * From the ANativeWindow::dequeueBuffer documentation:
@@ -498,12 +499,13 @@ int32_t cros_gralloc_driver::get_backing_store(buffer_handle_t handle, uint64_t 
 		return -EINVAL;
 	}
 
-	auto buffer = get_buffer(hnd);
-	if (!buffer) {
+	auto buffer_it = buffers_.find(hnd->id);
+	if (buffer_it == buffers_.end()) {
 		drv_log("Invalid Reference.\n");
 		return -EINVAL;
 	}
 
+	auto buffer = buffer_it->second;
 	*out_store = static_cast<uint64_t>(buffer->get_id());
 	return 0;
 }
@@ -520,12 +522,13 @@ int32_t cros_gralloc_driver::resource_info(buffer_handle_t handle, uint32_t stri
 		return -EINVAL;
 	}
 
-	auto buffer = get_buffer(hnd);
-	if (!buffer) {
+	auto buffer_it = buffers_.find(hnd->id);
+	if (buffer_it == buffers_.end()) {
 		drv_log("Invalid Reference.\n");
 		return -EINVAL;
 	}
 
+	auto buffer = buffer_it->second;
 	return buffer->resource_info(strides, offsets, format_modifier);
 }
 
@@ -541,12 +544,13 @@ int32_t cros_gralloc_driver::get_reserved_region(buffer_handle_t handle,
 		return -EINVAL;
 	}
 
-	auto buffer = get_buffer(hnd);
-	if (!buffer) {
+	auto buffer_it = buffers_.find(hnd->id);
+	if (buffer_it == buffers_.end()) {
 		drv_log("Invalid Reference.\n");
 		return -EINVAL;
 	}
 
+	auto buffer = buffer_it->second;
 	return buffer->get_reserved_region(reserved_region_addr, reserved_region_size);
 }
 
@@ -561,20 +565,11 @@ uint32_t cros_gralloc_driver::get_resolved_drm_format(uint32_t drm_format, uint6
 	return resolved_format;
 }
 
-cros_gralloc_buffer *cros_gralloc_driver::get_buffer(cros_gralloc_handle_t hnd)
-{
-	/* Assumes driver mutex is held. */
-	if (handles_.count(hnd))
-		return handles_[hnd].first;
-
-	return nullptr;
-}
-
 void cros_gralloc_driver::for_each_handle(
     const std::function<void(cros_gralloc_handle_t)> &function)
 {
 	std::lock_guard<std::mutex> lock(mutex_);
 
-	for (const auto &pair : handles_)
-		function(pair.first);
+	for (const auto &pair : buffers_)
+		function(pair.second->hnd_);
 }
