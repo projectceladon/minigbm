@@ -17,6 +17,18 @@ class cros_gralloc_buffer
 	~cros_gralloc_buffer();
 
 	uint32_t get_id() const;
+	uint32_t get_width() const;
+	uint32_t get_height() const;
+	uint32_t get_format() const;
+	uint64_t get_format_modifier() const;
+	uint64_t get_total_size() const;
+	uint32_t get_num_planes() const;
+	uint32_t get_plane_offset(uint32_t plane) const;
+	uint32_t get_plane_stride(uint32_t plane) const;
+	uint32_t get_plane_size(uint32_t plane) const;
+	int32_t get_android_format() const;
+	uint64_t get_android_usage() const;
+	const char *get_name() const;
 
 	/* The new reference count is returned by both these functions. */
 	int32_t increase_refcount();

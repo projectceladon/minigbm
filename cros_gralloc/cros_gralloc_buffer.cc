@@ -58,6 +58,66 @@ uint32_t cros_gralloc_buffer::get_id() const
 	return hnd_->id;
 }
 
+uint32_t cros_gralloc_buffer::get_width() const
+{
+	return hnd_->width;
+}
+
+uint32_t cros_gralloc_buffer::get_height() const
+{
+	return hnd_->height;
+}
+
+uint32_t cros_gralloc_buffer::get_format() const
+{
+	return hnd_->format;
+}
+
+uint64_t cros_gralloc_buffer::get_format_modifier() const
+{
+	return hnd_->format_modifier;
+}
+
+uint64_t cros_gralloc_buffer::get_total_size() const
+{
+	return hnd_->total_size;
+}
+
+uint32_t cros_gralloc_buffer::get_num_planes() const
+{
+	return hnd_->num_planes;
+}
+
+uint32_t cros_gralloc_buffer::get_plane_offset(uint32_t plane) const
+{
+	return hnd_->offsets[plane];
+}
+
+uint32_t cros_gralloc_buffer::get_plane_stride(uint32_t plane) const
+{
+	return hnd_->strides[plane];
+}
+
+uint32_t cros_gralloc_buffer::get_plane_size(uint32_t plane) const
+{
+	return hnd_->sizes[plane];
+}
+
+int32_t cros_gralloc_buffer::get_android_format() const
+{
+	return hnd_->droid_format;
+}
+
+uint64_t cros_gralloc_buffer::get_android_usage() const
+{
+	return static_cast<uint64_t>(hnd_->usage);
+}
+
+const char *cros_gralloc_buffer::get_name() const
+{
+	return (const char *)(&hnd_->data[hnd_->name_offset]);
+}
+
 int32_t cros_gralloc_buffer::increase_refcount()
 {
 	return ++refcount_;
