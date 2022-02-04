@@ -297,21 +297,12 @@ static int i915_align_dimensions(struct bo *bo, uint32_t tiling, uint32_t *strid
 		break;
 
 	case I915_TILING_Y:
-		if (i915->gen >= 12) {
-			/* When Y-tiled with CCS, the hardware requires halign 512B. When Y-tiled
-			 * without CCS, the hardware requires halign 128B, as usual for a Y tile.
-			 * Mesa requires halign 512B either way, because Mesa wants to privately
-			 * enable CCS even when using I915_FORMAT_MOD_Y_TILED.
-			 */
-			horizontal_alignment = 512;
-			vertical_alignment = 32;
-		} else if (i915->gen >= 4) {
-			/* With or without CCS, the hardware requires halign 128B. */
-			horizontal_alignment = 128;
-			vertical_alignment = 32;
-		} else { /* gen3 */
+		if (i915->gen == 3) {
 			horizontal_alignment = 512;
 			vertical_alignment = 8;
+		} else {
+			horizontal_alignment = 128;
+			vertical_alignment = 32;
 		}
 		break;
 	}
