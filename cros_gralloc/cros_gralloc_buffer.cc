@@ -150,7 +150,7 @@ int32_t cros_gralloc_buffer::flush()
 
 int32_t cros_gralloc_buffer::get_reserved_region(void **addr, uint64_t *size)
 {
-	if (reserved_region_fd_ <= 0) {
+	if (reserved_region_fd_ == -1) {
 		drv_log("Buffer does not have reserved region.\n");
 		return -EINVAL;
 	}
