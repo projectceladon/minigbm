@@ -204,7 +204,7 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 	uint64_t resolved_use_flags;
 	struct bo *bo;
 	struct cros_gralloc_handle *hnd;
-	cros_gralloc_buffer *buffer;
+	std::unique_ptr<cros_gralloc_buffer> buffer;
 
 	if (!get_resolved_format_and_use_flags(descriptor, &resolved_format, &resolved_use_flags)) {
 		drv_log("Failed to resolve format and use_flags.\n");
@@ -288,7 +288,7 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 
 	{
 		std::lock_guard<std::mutex> lock(mutex_);
-		buffers_.emplace(hnd->id, buffer);
+		buffers_.emplace(hnd->id, std::move(buffer));
 	}
 
 	*out_handle = hnd;
@@ -317,7 +317,7 @@ int32_t cros_gralloc_driver::retain(buffer_handle_t handle)
 
 	auto buffer_it = buffers_.find(id);
 	if (buffer_it != buffers_.end()) {
-		auto buffer = buffer_it->second;
+		auto &buffer = buffer_it->second;
 		buffer->increase_refcount();
 		return 0;
 	}
@@ -344,7 +344,7 @@ int32_t cros_gralloc_driver::retain(buffer_handle_t handle)
 		return -1;
 	}
 
-	buffers_.emplace(id, buffer);
+	buffers_.emplace(id, std::move(buffer));
 	return 0;
 }
 
@@ -364,10 +364,9 @@ int32_t cros_gralloc_driver::release(buffer_handle_t handle)
 		return -EINVAL;
 	}
 
-	auto buffer = buffer_it->second;
+	auto &buffer = buffer_it->second;
 	if (buffer->decrease_refcount() == 0) {
 		buffers_.erase(buffer_it);
-		delete buffer;
 	}
 
 	return 0;
@@ -395,7 +394,7 @@ int32_t cros_gralloc_driver::lock(buffer_handle_t handle, int32_t acquire_fence,
 		return -EINVAL;
 	}
 
-	auto buffer = buffer_it->second;
+	auto &buffer = buffer_it->second;
 	return buffer->lock(rect, map_flags, addr);
 }
 
@@ -415,7 +414,7 @@ int32_t cros_gralloc_driver::unlock(buffer_handle_t handle, int32_t *release_fen
 		return -EINVAL;
 	}
 
-	auto buffer = buffer_it->second;
+	auto &buffer = buffer_it->second;
 
 	/*
 	 * From the ANativeWindow::dequeueBuffer documentation:
@@ -443,7 +442,7 @@ int32_t cros_gralloc_driver::invalidate(buffer_handle_t handle)
 		return -EINVAL;
 	}
 
-	auto buffer = buffer_it->second;
+	auto &buffer = buffer_it->second;
 	return buffer->invalidate();
 }
 
@@ -463,7 +462,7 @@ int32_t cros_gralloc_driver::flush(buffer_handle_t handle, int32_t *release_fenc
 		return -EINVAL;
 	}
 
-	auto buffer = buffer_it->second;
+	auto &buffer = buffer_it->second;
 
 	/*
 	 * From the ANativeWindow::dequeueBuffer documentation:
@@ -491,7 +490,7 @@ int32_t cros_gralloc_driver::get_backing_store(buffer_handle_t handle, uint64_t 
 		return -EINVAL;
 	}
 
-	auto buffer = buffer_it->second;
+	auto &buffer = buffer_it->second;
 	*out_store = static_cast<uint64_t>(buffer->get_id());
 	return 0;
 }
@@ -514,7 +513,7 @@ int32_t cros_gralloc_driver::resource_info(buffer_handle_t handle, uint32_t stri
 		return -EINVAL;
 	}
 
-	auto buffer = buffer_it->second;
+	auto &buffer = buffer_it->second;
 	return buffer->resource_info(strides, offsets, format_modifier);
 }
 
@@ -536,7 +535,7 @@ int32_t cros_gralloc_driver::get_reserved_region(buffer_handle_t handle,
 		return -EINVAL;
 	}
 
-	auto buffer = buffer_it->second;
+	auto &buffer = buffer_it->second;
 	return buffer->get_reserved_region(reserved_region_addr, reserved_region_size);
 }
 
@@ -561,8 +560,8 @@ void cros_gralloc_driver::with_buffer(cros_gralloc_handle_t hnd,
 		return;
 	}
 
-	auto buffer = buffer_it->second;
-	function(buffer);
+	auto &buffer = buffer_it->second;
+	function(buffer.get());
 }
 
 void cros_gralloc_driver::with_each_buffer(
@@ -571,5 +570,5 @@ void cros_gralloc_driver::with_each_buffer(
 	std::lock_guard<std::mutex> lock(mutex_);
 
 	for (const auto &pair : buffers_)
-		function(pair.second);
+		function(pair.second.get());
 }

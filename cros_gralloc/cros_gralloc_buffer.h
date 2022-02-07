@@ -7,13 +7,16 @@
 #ifndef CROS_GRALLOC_BUFFER_H
 #define CROS_GRALLOC_BUFFER_H
 
+#include <memory>
+
 #include "cros_gralloc_helpers.h"
 
 class cros_gralloc_buffer
 {
       public:
-	static cros_gralloc_buffer *create(struct bo *acquire_bo,
-					   const struct cros_gralloc_handle *borrowed_handle);
+	static std::unique_ptr<cros_gralloc_buffer>
+	create(struct bo *acquire_bo, const struct cros_gralloc_handle *borrowed_handle);
+
 	~cros_gralloc_buffer();
 
 	uint32_t get_id() const;

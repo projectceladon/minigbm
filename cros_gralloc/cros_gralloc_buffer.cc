@@ -12,22 +12,24 @@
 #include <cutils/native_handle.h>
 
 /*static*/
-cros_gralloc_buffer *cros_gralloc_buffer::create(struct bo *acquire_bo,
-						 const struct cros_gralloc_handle *borrowed_handle)
+std::unique_ptr<cros_gralloc_buffer>
+cros_gralloc_buffer::create(struct bo *acquire_bo,
+			    const struct cros_gralloc_handle *borrowed_handle)
 {
 	auto acquire_hnd =
 	    reinterpret_cast<struct cros_gralloc_handle *>(native_handle_clone(borrowed_handle));
 	if (!acquire_hnd) {
 		drv_log("Failed to create cros_gralloc_buffer: failed to clone handle.\n");
-		return nullptr;
+		return {};
 	}
 
-	auto buffer = new cros_gralloc_buffer(acquire_bo, acquire_hnd);
+	std::unique_ptr<cros_gralloc_buffer> buffer(
+	    new cros_gralloc_buffer(acquire_bo, acquire_hnd));
 	if (!buffer) {
 		drv_log("Failed to create cros_gralloc_buffer: failed to allocate.\n");
 		native_handle_close(acquire_hnd);
 		native_handle_delete(acquire_hnd);
-		return nullptr;
+		return {};
 	}
 
 	return buffer;

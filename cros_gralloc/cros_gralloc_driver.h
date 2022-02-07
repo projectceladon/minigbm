@@ -10,6 +10,7 @@
 #include "cros_gralloc_buffer.h"
 
 #include <functional>
+#include <memory>
 #include <mutex>
 #include <unordered_map>
 
@@ -55,7 +56,7 @@ class cros_gralloc_driver
 
 	struct driver *drv_ = nullptr;
 	std::mutex mutex_;
-	std::unordered_map<uint32_t, cros_gralloc_buffer *> buffers_;
+	std::unordered_map<uint32_t, std::unique_ptr<cros_gralloc_buffer>> buffers_;
 };
 
 #endif
