@@ -44,6 +44,22 @@ int memfd_create_wrapper(const char *name, unsigned int flags)
 	return fd;
 }
 
+int memfd_create_reserved_region(const std::string &buffer_name, uint64_t reserved_region_size)
+{
+	const std::string reserved_region_name = buffer_name + " reserved region";
+
+	int reserved_region_fd = memfd_create_wrapper(reserved_region_name.c_str(), FD_CLOEXEC);
+	if (reserved_region_fd == -1)
+		return -errno;
+
+	if (ftruncate(reserved_region_fd, reserved_region_size)) {
+		drv_log("Failed to set reserved region size: %s.\n", strerror(errno));
+		return -errno;
+	}
+
+	return reserved_region_fd;
+}
+
 cros_gralloc_driver *cros_gralloc_driver::get_instance()
 {
 	static cros_gralloc_driver s_instance;
@@ -183,20 +199,23 @@ bool cros_gralloc_driver::is_supported(const struct cros_gralloc_buffer_descript
 	return descriptor->width <= max_texture_size && descriptor->height <= max_texture_size;
 }
 
-int32_t create_reserved_region(const std::string &buffer_name, uint64_t reserved_region_size)
+int cros_gralloc_driver::create_reserved_region(const std::string &buffer_name,
+						uint64_t reserved_region_size)
 {
-	std::string reserved_region_name = buffer_name + " reserved region";
+	int ret;
 
-	int32_t reserved_region_fd = memfd_create_wrapper(reserved_region_name.c_str(), FD_CLOEXEC);
-	if (reserved_region_fd == -1)
-		return -errno;
+#if ANDROID_API_LEVEL >= 31
+	ret = allocator_.Alloc(kDmabufSystemHeapName, reserved_region_size);
+	if (ret >= 0)
+		return ret;
+#endif
 
-	if (ftruncate(reserved_region_fd, reserved_region_size)) {
-		drv_log("Failed to set reserved region size: %s.\n", strerror(errno));
-		return -errno;
-	}
+	ret = memfd_create_reserved_region(buffer_name, reserved_region_size);
+	if (ret >= 0)
+		return ret;
 
-	return reserved_region_fd;
+	drv_log("Failed to create_reserved_region.\n");
+	return -1;
 }
 
 int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descriptor *descriptor,

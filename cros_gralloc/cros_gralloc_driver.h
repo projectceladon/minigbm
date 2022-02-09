@@ -12,7 +12,12 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <string>
 #include <unordered_map>
+
+#if ANDROID_API_LEVEL >= 31
+#include <BufferAllocator/BufferAllocator.h>
+#endif
 
 class cros_gralloc_driver
 {
@@ -53,6 +58,13 @@ class cros_gralloc_driver
 	bool
 	get_resolved_format_and_use_flags(const struct cros_gralloc_buffer_descriptor *descriptor,
 					  uint32_t *out_format, uint64_t *out_use_flags);
+
+	int create_reserved_region(const std::string &buffer_name, uint64_t reserved_region_size);
+
+#if ANDROID_API_LEVEL >= 31
+	/* For allocating cros_gralloc_buffer reserved regions for metadata. */
+	BufferAllocator allocator_;
+#endif
 
 	std::unique_ptr<struct driver, void (*)(struct driver *)> drv_;
 
