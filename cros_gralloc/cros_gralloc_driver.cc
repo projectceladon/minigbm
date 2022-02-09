@@ -78,7 +78,7 @@ static struct driver *init_try_node(int idx, char const *str)
 	return drv;
 }
 
-cros_gralloc_driver::cros_gralloc_driver()
+static struct driver *init_try_nodes()
 {
 	/*
 	 * Create a driver from render nodes first, then try card
@@ -87,6 +87,7 @@ cros_gralloc_driver::cros_gralloc_driver()
 	 * TODO(gsingh): Enable render nodes on udl/evdi.
 	 */
 
+	struct driver *drv;
 	char const *render_nodes_fmt = "%s/renderD%d";
 	char const *card_nodes_fmt = "%s/card%d";
 	uint32_t num_nodes = DRM_NUM_NODES;
@@ -97,29 +98,35 @@ cros_gralloc_driver::cros_gralloc_driver()
 
 	// Try render nodes...
 	for (uint32_t i = min_render_node; i < max_render_node; i++) {
-		drv_ = init_try_node(i, render_nodes_fmt);
-		if (drv_)
-			return;
+		drv = init_try_node(i, render_nodes_fmt);
+		if (drv)
+			return drv;
 	}
 
 	// Try card nodes... for vkms mostly.
 	for (uint32_t i = min_card_node; i < max_card_node; i++) {
-		drv_ = init_try_node(i, card_nodes_fmt);
-		if (drv_)
-			return;
+		drv = init_try_node(i, card_nodes_fmt);
+		if (drv)
+			return drv;
 	}
+
+	return nullptr;
+}
+
+static void drv_destroy_and_close(struct driver *drv)
+{
+	int fd = drv_get_fd(drv);
+	drv_destroy(drv);
+	close(fd);
+}
+
+cros_gralloc_driver::cros_gralloc_driver() : drv_(init_try_nodes(), drv_destroy_and_close)
+{
 }
 
 cros_gralloc_driver::~cros_gralloc_driver()
 {
 	buffers_.clear();
-
-	if (drv_) {
-		int fd = drv_get_fd(drv_);
-		drv_destroy(drv_);
-		drv_ = nullptr;
-		close(fd);
-	}
 }
 
 bool cros_gralloc_driver::is_initialized()
@@ -135,10 +142,10 @@ bool cros_gralloc_driver::get_resolved_format_and_use_flags(
 	uint64_t resolved_use_flags;
 	struct combination *combo;
 
-	drv_resolve_format_and_use_flags(drv_, descriptor->drm_format, descriptor->use_flags,
+	drv_resolve_format_and_use_flags(drv_.get(), descriptor->drm_format, descriptor->use_flags,
 					 &resolved_format, &resolved_use_flags);
 
-	combo = drv_get_combination(drv_, resolved_format, resolved_use_flags);
+	combo = drv_get_combination(drv_.get(), resolved_format, resolved_use_flags);
 	if (!combo && (descriptor->droid_usage & GRALLOC_USAGE_HW_VIDEO_ENCODER) &&
 	    descriptor->droid_format != HAL_PIXEL_FORMAT_YCbCr_420_888) {
 		// Unmask BO_USE_HW_VIDEO_ENCODER for other formats. They are mostly
@@ -146,12 +153,12 @@ bool cros_gralloc_driver::get_resolved_format_and_use_flags(
 		// camera). YV12 is passed to the encoder component, but it is converted
 		// to YCbCr_420_888 before being passed to the hw encoder.
 		resolved_use_flags &= ~BO_USE_HW_VIDEO_ENCODER;
-		combo = drv_get_combination(drv_, resolved_format, resolved_use_flags);
+		combo = drv_get_combination(drv_.get(), resolved_format, resolved_use_flags);
 	}
 	if (!combo && (descriptor->droid_usage & BUFFER_USAGE_FRONT_RENDERING)) {
 		resolved_use_flags &= ~BO_USE_FRONT_RENDERING;
 		resolved_use_flags |= BO_USE_LINEAR;
-		combo = drv_get_combination(drv_, resolved_format, resolved_use_flags);
+		combo = drv_get_combination(drv_.get(), resolved_format, resolved_use_flags);
 	}
 	if (!combo)
 		return false;
@@ -165,7 +172,7 @@ bool cros_gralloc_driver::is_supported(const struct cros_gralloc_buffer_descript
 {
 	uint32_t resolved_format;
 	uint64_t resolved_use_flags;
-	uint32_t max_texture_size = drv_get_max_texture_2d_size(drv_);
+	uint32_t max_texture_size = drv_get_max_texture_2d_size(drv_.get());
 	if (!get_resolved_format_and_use_flags(descriptor, &resolved_format, &resolved_use_flags))
 		return false;
 
@@ -211,7 +218,7 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 		return -EINVAL;
 	}
 
-	bo = drv_bo_create(drv_, descriptor->width, descriptor->height, resolved_format,
+	bo = drv_bo_create(drv_.get(), descriptor->width, descriptor->height, resolved_format,
 			   resolved_use_flags);
 	if (!bo) {
 		drv_log("Failed to create bo.\n");
@@ -334,7 +341,7 @@ int32_t cros_gralloc_driver::retain(buffer_handle_t handle)
 	memcpy(data.strides, hnd->strides, sizeof(data.strides));
 	memcpy(data.offsets, hnd->offsets, sizeof(data.offsets));
 
-	struct bo *bo = drv_bo_import(drv_, &data);
+	struct bo *bo = drv_bo_import(drv_.get(), &data);
 	if (!bo)
 		return -EFAULT;
 
@@ -544,7 +551,7 @@ uint32_t cros_gralloc_driver::get_resolved_drm_format(uint32_t drm_format, uint6
 	uint32_t resolved_format;
 	uint64_t resolved_use_flags;
 
-	drv_resolve_format_and_use_flags(drv_, drm_format, use_flags, &resolved_format,
+	drv_resolve_format_and_use_flags(drv_.get(), drm_format, use_flags, &resolved_format,
 					 &resolved_use_flags);
 
 	return resolved_format;
