@@ -633,7 +633,7 @@ static int virgl_init(struct driver *drv)
 	/* Android CTS tests require this. */
 	virgl_add_combination(drv, DRM_FORMAT_RGB888, &LINEAR_METADATA, BO_USE_SW_MASK);
 	virgl_add_combination(drv, DRM_FORMAT_BGR888, &LINEAR_METADATA, BO_USE_SW_MASK);
-	virgl_add_combination(drv, DRM_FORMAT_P010, &LINEAR_METADATA,
+	virgl_add_combination(drv, DRM_FORMAT_P010, &LINEAR_METADATA, BO_USE_TEXTURE |
 			      BO_USE_SW_MASK | BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE);
 	drv_modify_combination(drv, DRM_FORMAT_R8, &LINEAR_METADATA,
 			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER |
