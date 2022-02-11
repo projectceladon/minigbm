@@ -227,7 +227,7 @@ int32_t cros_gralloc_buffer::flush()
 int32_t cros_gralloc_buffer::get_reserved_region(void **addr, uint64_t *size) const
 {
 	int32_t reserved_region_fd = hnd_->fds[hnd_->num_planes];
-	if (reserved_region_fd == -1) {
+	if (reserved_region_fd < 0) {
 		drv_log("Buffer does not have reserved region.\n");
 		return -EINVAL;
 	}
