@@ -501,6 +501,8 @@ static bool i915_bo_query_meminfo(struct driver *drv, struct i915_device *i915_d
 		return false;
 
 	struct drm_i915_query_memory_regions *meminfo = calloc(1, item.length);
+        if (!meminfo) return -ENOMEM;
+
 	item.data_ptr = (uintptr_t)meminfo;
 
 	if (drmIoctl(drv->fd, DRM_IOCTL_I915_QUERY, &query) || item.length <= 0)

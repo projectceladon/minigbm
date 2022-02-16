@@ -813,6 +813,7 @@ static drmModeModeInfoPtr generate_mode(int h_pixels, int v_lines, float freq)
     int margins = 0;
 
     drmModeModeInfoPtr m = malloc(sizeof(drmModeModeInfo));
+    if (!m) return NULL;
 
     h_pixels_rnd = rint((float) h_pixels / CELL_GRAN) * CELL_GRAN;
     v_lines_rnd = interlaced ? rint((float) v_lines) / 2.0 : rint((float) v_lines);
