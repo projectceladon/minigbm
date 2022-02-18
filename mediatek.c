@@ -32,6 +32,8 @@
 // All platforms except MT8173 should USE_NV12_FOR_HW_VIDEO_DECODING.
 #if defined(MTK_MT8183) || defined(MTK_MT8186) || defined(MTK_MT8192) || defined(MTK_MT8195)
 #define USE_NV12_FOR_HW_VIDEO_DECODING
+#else
+#define DONT_USE_64_ALIGNMENT_FOR_VIDEO_BUFFERS
 #endif
 
 struct mediatek_private_map_data {
@@ -56,7 +58,26 @@ static const uint32_t texture_source_formats[] = {
 	DRM_FORMAT_YVU420,
 	DRM_FORMAT_YVU420_ANDROID
 };
+
+#ifdef DONT_USE_64_ALIGNMENT_FOR_VIDEO_BUFFERS
+static const uint32_t video_yuv_formats[] = {
+	DRM_FORMAT_NV21,
+	DRM_FORMAT_NV12,
+	DRM_FORMAT_YVU420,
+	DRM_FORMAT_YVU420_ANDROID
+};
 // clang-format on
+
+static bool is_video_yuv_format(uint32_t format)
+{
+	size_t i;
+	for (i = 0; i < ARRAY_SIZE(video_yuv_formats); ++i) {
+		if (format == video_yuv_formats[i])
+			return true;
+	}
+	return false;
+}
+#endif
 
 static int mediatek_init(struct driver *drv)
 {
@@ -130,10 +151,17 @@ static int mediatek_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint
 
 	/*
 	 * Since the ARM L1 cache line size is 64 bytes, align to that as a
-	 * performance optimization.
+	 * performance optimization, except for video buffers on certain platforms,
+	 * these should only be accessed from the GPU and VCODEC subsystems (maybe
+	 * also MDP), so it's better to align to macroblocks.
 	 */
 	stride = drv_stride_from_format(format, width, 0);
+#ifdef DONT_USE_64_ALIGNMENT_FOR_VIDEO_BUFFERS
+	const uint32_t alignment = is_video_yuv_format(format) ? 16 : 64;
+	stride = ALIGN(stride, alignment);
+#else
 	stride = ALIGN(stride, 64);
+#endif
 
 	if (bo->meta.use_flags & BO_USE_HW_VIDEO_ENCODER) {
 		uint32_t aligned_height = ALIGN(height, 32);
