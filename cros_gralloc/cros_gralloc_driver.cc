@@ -143,6 +143,7 @@ cros_gralloc_driver::cros_gralloc_driver() : drv_(init_try_nodes(), drv_destroy_
 cros_gralloc_driver::~cros_gralloc_driver()
 {
 	buffers_.clear();
+	handles_.clear();
 }
 
 bool cros_gralloc_driver::is_initialized()
@@ -314,6 +315,7 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 
 	{
 		std::lock_guard<std::mutex> lock(mutex_);
+		handles_.emplace(hnd, std::make_pair(buffer.get(), 1));
 		buffers_.emplace(hnd->id, std::move(buffer));
 	}
 
@@ -339,38 +341,62 @@ int32_t cros_gralloc_driver::retain(buffer_handle_t handle)
 		return -EINVAL;
 	}
 
-	uint32_t id = hnd->id;
+	auto hnd_it = handles_.find(hnd);
+	if (hnd_it != handles_.end()) {
+		// The underlying buffer (as multiple handles can refer to the same buffer)
+		// has already been imported into this process and the given handle has
+		// already been registered in this process. Increase both the buffer and
+		// handle reference count.
+		auto &hnd_buffer = hnd_it->second.first;
+		hnd_buffer->increase_refcount();
 
-	auto buffer_it = buffers_.find(id);
-	if (buffer_it != buffers_.end()) {
-		auto &buffer = buffer_it->second;
-		buffer->increase_refcount();
+		auto &hnd_refcount = hnd_it->second.second;
+		hnd_refcount++;
+
 		return 0;
 	}
 
-	struct drv_import_fd_data data = {
-		.format_modifier = hnd->format_modifier,
-		.width = hnd->width,
-		.height = hnd->height,
-		.format = hnd->format,
-		.tiling = hnd->tiling,
-		.use_flags = hnd->use_flags,
-	};
-	memcpy(data.fds, hnd->fds, sizeof(data.fds));
-	memcpy(data.strides, hnd->strides, sizeof(data.strides));
-	memcpy(data.offsets, hnd->offsets, sizeof(data.offsets));
+	uint32_t id = hnd->id;
 
-	struct bo *bo = drv_bo_import(drv_.get(), &data);
-	if (!bo)
-		return -EFAULT;
+	cros_gralloc_buffer *buffer = nullptr;
 
-	auto buffer = cros_gralloc_buffer::create(bo, hnd);
-	if (!buffer) {
-		drv_log("Failed to import: failed to create cros_gralloc_buffer.\n");
-		return -1;
+	auto buffer_it = buffers_.find(id);
+	if (buffer_it != buffers_.end()) {
+		// The underlying buffer (as multiple handles can refer to the same buffer)
+		// has already been imported into this process but the given handle has not
+		// yet been registered. Increase the buffer reference count (here) and start
+		// to track the handle (below).
+		buffer = buffer_it->second.get();
+		buffer->increase_refcount();
+	} else {
+		// The underlying buffer has not yet been imported into this process. Import
+		// and start to track the buffer (here) and start to track the handle (below).
+		struct drv_import_fd_data data = {
+			.format_modifier = hnd->format_modifier,
+			.width = hnd->width,
+			.height = hnd->height,
+			.format = hnd->format,
+			.tiling = hnd->tiling,
+			.use_flags = hnd->use_flags,
+		};
+		memcpy(data.fds, hnd->fds, sizeof(data.fds));
+		memcpy(data.strides, hnd->strides, sizeof(data.strides));
+		memcpy(data.offsets, hnd->offsets, sizeof(data.offsets));
+
+		struct bo *bo = drv_bo_import(drv_.get(), &data);
+		if (!bo)
+			return -EFAULT;
+
+		auto scoped_buffer = cros_gralloc_buffer::create(bo, hnd);
+		if (!scoped_buffer) {
+			drv_log("Failed to import: failed to create cros_gralloc_buffer.\n");
+			return -1;
+		}
+		buffer = scoped_buffer.get();
+		buffers_.emplace(id, std::move(scoped_buffer));
 	}
 
-	buffers_.emplace(id, std::move(buffer));
+	handles_.emplace(hnd, std::make_pair(buffer, 1));
 	return 0;
 }
 
@@ -384,15 +410,17 @@ int32_t cros_gralloc_driver::release(buffer_handle_t handle)
 		return -EINVAL;
 	}
 
-	auto buffer_it = buffers_.find(hnd->id);
-	if (buffer_it == buffers_.end()) {
-		drv_log("Invalid Reference.\n");
+	auto buffer = get_buffer(hnd);
+	if (!buffer) {
+		drv_log("Invalid reference (release() called on unregistered handle).\n");
 		return -EINVAL;
 	}
 
-	auto &buffer = buffer_it->second;
+	if (!--handles_[hnd].second)
+		handles_.erase(hnd);
+
 	if (buffer->decrease_refcount() == 0) {
-		buffers_.erase(buffer_it);
+		buffers_.erase(buffer->get_id());
 	}
 
 	return 0;
@@ -414,13 +442,12 @@ int32_t cros_gralloc_driver::lock(buffer_handle_t handle, int32_t acquire_fence,
 		return -EINVAL;
 	}
 
-	auto buffer_it = buffers_.find(hnd->id);
-	if (buffer_it == buffers_.end()) {
-		drv_log("Invalid Reference.\n");
+	auto buffer = get_buffer(hnd);
+	if (!buffer) {
+		drv_log("Invalid reference (lock() called on unregistered handle).\n");
 		return -EINVAL;
 	}
 
-	auto &buffer = buffer_it->second;
 	return buffer->lock(rect, map_flags, addr);
 }
 
@@ -434,13 +461,11 @@ int32_t cros_gralloc_driver::unlock(buffer_handle_t handle, int32_t *release_fen
 		return -EINVAL;
 	}
 
-	auto buffer_it = buffers_.find(hnd->id);
-	if (buffer_it == buffers_.end()) {
-		drv_log("Invalid Reference.\n");
+	auto buffer = get_buffer(hnd);
+	if (!buffer) {
+		drv_log("Invalid reference (unlock() called on unregistered handle).\n");
 		return -EINVAL;
 	}
-
-	auto &buffer = buffer_it->second;
 
 	/*
 	 * From the ANativeWindow::dequeueBuffer documentation:
@@ -462,13 +487,12 @@ int32_t cros_gralloc_driver::invalidate(buffer_handle_t handle)
 		return -EINVAL;
 	}
 
-	auto buffer_it = buffers_.find(hnd->id);
-	if (buffer_it == buffers_.end()) {
-		drv_log("Invalid Reference.\n");
+	auto buffer = get_buffer(hnd);
+	if (!buffer) {
+		drv_log("Invalid reference (invalidate() called on unregistered handle).\n");
 		return -EINVAL;
 	}
 
-	auto &buffer = buffer_it->second;
 	return buffer->invalidate();
 }
 
@@ -482,13 +506,11 @@ int32_t cros_gralloc_driver::flush(buffer_handle_t handle, int32_t *release_fenc
 		return -EINVAL;
 	}
 
-	auto buffer_it = buffers_.find(hnd->id);
-	if (buffer_it == buffers_.end()) {
-		drv_log("Invalid Reference.\n");
+	auto buffer = get_buffer(hnd);
+	if (!buffer) {
+		drv_log("Invalid reference (flush() called on unregistered handle).\n");
 		return -EINVAL;
 	}
-
-	auto &buffer = buffer_it->second;
 
 	/*
 	 * From the ANativeWindow::dequeueBuffer documentation:
@@ -510,13 +532,12 @@ int32_t cros_gralloc_driver::get_backing_store(buffer_handle_t handle, uint64_t 
 		return -EINVAL;
 	}
 
-	auto buffer_it = buffers_.find(hnd->id);
-	if (buffer_it == buffers_.end()) {
-		drv_log("Invalid Reference.\n");
+	auto buffer = get_buffer(hnd);
+	if (!buffer) {
+		drv_log("Invalid reference (get_backing_store() called on unregistered handle).\n");
 		return -EINVAL;
 	}
 
-	auto &buffer = buffer_it->second;
 	*out_store = static_cast<uint64_t>(buffer->get_id());
 	return 0;
 }
@@ -533,13 +554,12 @@ int32_t cros_gralloc_driver::resource_info(buffer_handle_t handle, uint32_t stri
 		return -EINVAL;
 	}
 
-	auto buffer_it = buffers_.find(hnd->id);
-	if (buffer_it == buffers_.end()) {
-		drv_log("Invalid Reference.\n");
+	auto buffer = get_buffer(hnd);
+	if (!buffer) {
+		drv_log("Invalid reference (resource_info() called on unregistered handle).\n");
 		return -EINVAL;
 	}
 
-	auto &buffer = buffer_it->second;
 	return buffer->resource_info(strides, offsets, format_modifier);
 }
 
@@ -555,13 +575,13 @@ int32_t cros_gralloc_driver::get_reserved_region(buffer_handle_t handle,
 		return -EINVAL;
 	}
 
-	auto buffer_it = buffers_.find(hnd->id);
-	if (buffer_it == buffers_.end()) {
-		drv_log("Invalid Reference.\n");
+	auto buffer = get_buffer(hnd);
+	if (!buffer) {
+		drv_log(
+		    "Invalid reference (get_reserved_region() called on unregistered handle).\n");
 		return -EINVAL;
 	}
 
-	auto &buffer = buffer_it->second;
 	return buffer->get_reserved_region(reserved_region_addr, reserved_region_size);
 }
 
@@ -576,18 +596,27 @@ uint32_t cros_gralloc_driver::get_resolved_drm_format(uint32_t drm_format, uint6
 	return resolved_format;
 }
 
+cros_gralloc_buffer *cros_gralloc_driver::get_buffer(cros_gralloc_handle_t hnd)
+{
+	/* Assumes driver mutex is held. */
+	if (handles_.count(hnd))
+		return handles_[hnd].first;
+
+	return nullptr;
+}
+
 void cros_gralloc_driver::with_buffer(cros_gralloc_handle_t hnd,
 				      const std::function<void(cros_gralloc_buffer *)> &function)
 {
 	std::lock_guard<std::mutex> lock(mutex_);
 
-	auto buffer_it = buffers_.find(hnd->id);
-	if (buffer_it == buffers_.end()) {
+	auto buffer = get_buffer(hnd);
+	if (!buffer) {
+		drv_log("Invalid reference (with_buffer() called on unregistered handle).\n");
 		return;
 	}
 
-	auto &buffer = buffer_it->second;
-	function(buffer.get());
+	function(buffer);
 }
 
 void cros_gralloc_driver::with_each_buffer(

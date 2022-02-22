@@ -55,6 +55,7 @@ class cros_gralloc_driver
 	cros_gralloc_driver();
 	~cros_gralloc_driver();
 	bool is_initialized();
+	cros_gralloc_buffer *get_buffer(cros_gralloc_handle_t hnd);
 	bool
 	get_resolved_format_and_use_flags(const struct cros_gralloc_buffer_descriptor *descriptor,
 					  uint32_t *out_format, uint64_t *out_use_flags);
@@ -70,6 +71,12 @@ class cros_gralloc_driver
 
 	std::mutex mutex_;
 	std::unordered_map<uint32_t, std::unique_ptr<cros_gralloc_buffer>> buffers_;
+	/*
+	 * Note that multiple handles can refer to the same underlying buffer and each
+	 * handle could potentially be imported multiple times.
+	 */
+	std::unordered_map<cros_gralloc_handle_t, std::pair<cros_gralloc_buffer *, int32_t>>
+	    handles_;
 };
 
 #endif
