@@ -315,7 +315,12 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 
 	{
 		std::lock_guard<std::mutex> lock(mutex_);
-		handles_.emplace(hnd, std::make_pair(buffer.get(), 1));
+
+		struct cros_gralloc_imported_handle_info hnd_info = {
+			.buffer = buffer.get(),
+			.refcount = 1,
+		};
+		handles_.emplace(hnd, hnd_info);
 		buffers_.emplace(hnd->id, std::move(buffer));
 	}
 
@@ -347,11 +352,10 @@ int32_t cros_gralloc_driver::retain(buffer_handle_t handle)
 		// has already been imported into this process and the given handle has
 		// already been registered in this process. Increase both the buffer and
 		// handle reference count.
-		auto &hnd_buffer = hnd_it->second.first;
-		hnd_buffer->increase_refcount();
+		auto &hnd_info = hnd_it->second;
 
-		auto &hnd_refcount = hnd_it->second.second;
-		hnd_refcount++;
+		hnd_info.buffer->increase_refcount();
+		hnd_info.refcount++;
 
 		return 0;
 	}
@@ -396,7 +400,11 @@ int32_t cros_gralloc_driver::retain(buffer_handle_t handle)
 		buffers_.emplace(id, std::move(scoped_buffer));
 	}
 
-	handles_.emplace(hnd, std::make_pair(buffer, 1));
+	struct cros_gralloc_imported_handle_info hnd_info = {
+		.buffer = buffer,
+		.refcount = 1,
+	};
+	handles_.emplace(hnd, hnd_info);
 	return 0;
 }
 
@@ -416,7 +424,7 @@ int32_t cros_gralloc_driver::release(buffer_handle_t handle)
 		return -EINVAL;
 	}
 
-	if (!--handles_[hnd].second)
+	if (!--handles_[hnd].refcount)
 		handles_.erase(hnd);
 
 	if (buffer->decrease_refcount() == 0) {
@@ -600,7 +608,7 @@ cros_gralloc_buffer *cros_gralloc_driver::get_buffer(cros_gralloc_handle_t hnd)
 {
 	/* Assumes driver mutex is held. */
 	if (handles_.count(hnd))
-		return handles_[hnd].first;
+		return handles_[hnd].buffer;
 
 	return nullptr;
 }
