@@ -355,7 +355,7 @@ static int i915_align_dimensions(struct bo *bo, uint32_t tiling, uint64_t modifi
 	switch (tiling) {
 	default:
 	case I915_TILING_NONE:
-		horizontal_alignment = 64;
+		horizontal_alignment = 32;
 		if (modifier == I915_FORMAT_MOD_Yf_TILED ||
 		    modifier == I915_FORMAT_MOD_Yf_TILED_CCS) {
 			horizontal_alignment = 128;
