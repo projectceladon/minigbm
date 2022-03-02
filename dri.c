@@ -459,7 +459,7 @@ size_t dri_num_planes_from_modifier(struct driver *drv, uint32_t format, uint64_
 	}
 
 	uint64_t planes;
-	GLboolean ret = dri->image_extension->queryDmaBufFormatModifierAttribs(
+	unsigned char ret = dri->image_extension->queryDmaBufFormatModifierAttribs(
 	    dri->device, format, modifier, __DRI_IMAGE_FORMAT_MODIFIER_ATTRIB_PLANE_COUNT, &planes);
 	if (!ret)
 		return 0;
