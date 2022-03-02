@@ -41,6 +41,9 @@ static const uint64_t gen12_modifier_order[] = { I915_FORMAT_MOD_Y_TILED_GEN12_R
 						 I915_FORMAT_MOD_Y_TILED, I915_FORMAT_MOD_X_TILED,
 						 DRM_FORMAT_MOD_LINEAR };
 
+static const uint64_t gen11_modifier_order[] = { I915_FORMAT_MOD_Y_TILED, I915_FORMAT_MOD_X_TILED,
+						 DRM_FORMAT_MOD_LINEAR };
+
 struct modifier_support_t {
 	const uint64_t *order;
 	uint32_t count;
@@ -163,6 +166,10 @@ static void i915_get_modifier_order(struct i915_device *i915)
 	if (i915->gen == 12) {
 		i915->modifier.order = gen12_modifier_order;
 		i915->modifier.count = ARRAY_SIZE(gen12_modifier_order);
+	}
+	else if (i915->gen == 11) {
+		i915->modifier.order = gen11_modifier_order;
+		i915->modifier.count = ARRAY_SIZE(gen11_modifier_order);
 	} else {
 		i915->modifier.order = gen_modifier_order;
 		i915->modifier.count = ARRAY_SIZE(gen_modifier_order);
