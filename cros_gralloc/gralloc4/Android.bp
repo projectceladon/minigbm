@@ -28,6 +28,7 @@ filegroup {
     srcs: [
         "CrosGralloc4Allocator.cc",
         "CrosGralloc4AllocatorService.cc",
+        "CrosGralloc4Utils.cc",
     ],
 }
 
@@ -35,6 +36,7 @@ filegroup {
     name: "minigbm_gralloc4_mapper_files",
     srcs: [
         "CrosGralloc4Mapper.cc",
+        "CrosGralloc4Utils.cc",
     ],
 }
 
@@ -59,11 +61,9 @@ cc_defaults {
 
     shared_libs: [
         "android.hardware.graphics.mapper@4.0",
-        "libbase",
         "libgralloctypes",
         "libhidlbase",
-        "libminigbm_gralloc",
-        "libminigbm_gralloc4_utils",
+        "libbase",
         "libutils",
     ],
 
