@@ -163,7 +163,7 @@ static int mediatek_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint
 	stride = ALIGN(stride, 64);
 #endif
 
-	if (bo->meta.use_flags & BO_USE_HW_VIDEO_ENCODER) {
+	if (bo->meta.use_flags & (BO_USE_HW_VIDEO_ENCODER | BO_USE_SCANOUT)) {
 		uint32_t aligned_height = ALIGN(height, 32);
 		uint32_t padding[DRV_MAX_PLANES] = { 0 };
 
