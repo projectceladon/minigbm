@@ -59,7 +59,6 @@ static const uint32_t texture_source_formats[] = {
 	DRM_FORMAT_YVU420_ANDROID
 };
 
-#ifdef DONT_USE_64_ALIGNMENT_FOR_VIDEO_BUFFERS
 static const uint32_t video_yuv_formats[] = {
 	DRM_FORMAT_NV21,
 	DRM_FORMAT_NV12,
@@ -77,7 +76,6 @@ static bool is_video_yuv_format(uint32_t format)
 	}
 	return false;
 }
-#endif
 
 static int mediatek_init(struct driver *drv)
 {
@@ -361,12 +359,12 @@ static void mediatek_resolve_format_and_use_flags(struct driver *drv, uint32_t f
 		*out_format = DRM_FORMAT_YVU420;
 		*out_use_flags &= ~BO_USE_SCANOUT;
 		break;
-	case DRM_FORMAT_YVU420_ANDROID:
-		*out_use_flags &= ~BO_USE_SCANOUT;
-		break;
 	default:
 		break;
 	}
+	/* Mediatek doesn't support YUV overlays */
+	if (is_video_yuv_format(format))
+		*out_use_flags &= ~BO_USE_SCANOUT;
 }
 
 const struct backend backend_mediatek = {
