@@ -95,18 +95,17 @@ Error CrosGralloc4Allocator::allocate(const BufferDescriptorInfo& descriptor, ui
         return Error::NO_RESOURCES;
     }
 
-    outHandle->setTo(handle, /*shouldOwn=*/true);
-
     cros_gralloc_handle_t crosHandle = cros_gralloc_convert_handle(handle);
-    if (!crosHandle) {
-        return Error::NO_RESOURCES;
-    }
 
     Error error = initializeMetadata(crosHandle, crosDescriptor);
     if (error != Error::NONE) {
+        mDriver->release(handle);
+        native_handle_close(handle);
+        native_handle_delete(handle);
         return error;
     }
 
+    outHandle->setTo(handle, /*shouldOwn=*/true);
     *outStride = crosHandle->pixel_stride;
 
     return Error::NONE;
