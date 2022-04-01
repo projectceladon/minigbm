@@ -15,7 +15,7 @@
 #include <string>
 #include <unordered_map>
 
-#if ANDROID_API_LEVEL >= 31
+#if ANDROID_API_LEVEL >= 31 && defined(HAS_DMABUF_SYSTEM_HEAP)
 #include <BufferAllocator/BufferAllocator.h>
 #endif
 
@@ -62,7 +62,7 @@ class cros_gralloc_driver
 
 	int create_reserved_region(const std::string &buffer_name, uint64_t reserved_region_size);
 
-#if ANDROID_API_LEVEL >= 31
+#if ANDROID_API_LEVEL >= 31 && defined(HAS_DMABUF_SYSTEM_HEAP)
 	/* For allocating cros_gralloc_buffer reserved regions for metadata. */
 	BufferAllocator allocator_;
 #endif
