@@ -12,6 +12,7 @@
 
 #include <hardware/gralloc1.h>
 
+#define I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS fourcc_mod_code(INTEL, 6)
 enum { HAL_PIXEL_FORMAT_NV12_Y_TILED_INTEL = 0x100,
        HAL_PIXEL_FORMAT_NV12_LINEAR_INTEL = 0x101,
        HAL_PIXEL_FORMAT_YCrCb_422_H_INTEL = 0x102,

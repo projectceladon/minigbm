@@ -22,6 +22,7 @@
 
 #ifdef USE_GRALLOC1
 #include "i915_private.h"
+#include "cros_gralloc/i915_private_android_types.h"
 #endif
 
 #define I915_CACHELINE_SIZE 64
@@ -306,6 +307,8 @@ static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t heig
 	static const uint64_t modifier_order[] = {
 		I915_FORMAT_MOD_Y_TILED,
 		I915_FORMAT_MOD_X_TILED,
+		I915_FORMAT_MOD_Y_TILED_CCS,
+		I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS,
 		DRM_FORMAT_MOD_LINEAR,
 	};
 	uint64_t modifier;
@@ -332,6 +335,7 @@ static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t heig
 #ifdef USE_GRALLOC1
 	case I915_FORMAT_MOD_Yf_TILED:
 	case I915_FORMAT_MOD_Yf_TILED_CCS:
+	case I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS:
 #endif
 		bo->meta.tiling = I915_TILING_Y;
 		break;
@@ -391,6 +395,33 @@ static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t heig
 
 		bo->meta.num_planes = 2;
 		bo->meta.total_size = offset;
+	} else if (modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS) {
+		/*
+		 * considering only 128 byte compression and one cache line of
+		 * aux buffer(64B) contains compression status of 4-Y tiles.
+		 * Which is 4 * (128B * 32L).
+		 * line stride(bytes) is 4 * 128B
+		 * and tile stride(lines) is 32L
+		 */
+		uint32_t stride = ALIGN(drv_stride_from_format(format, width, 0), 512);
+		height = ALIGN(drv_height_from_format(format, height, 0), 32);
+
+		bo->meta.strides[0] = stride;
+		/* size calculation and alignment are 64KB aligned
+		 * size as per spec
+		 */
+		bo->meta.sizes[0] = ALIGN(stride * height, 65536);
+		bo->meta.offsets[0] = 0;
+		/* Aux buffer is linear and page aligned. It is placed after
+		 * other planes and aligned to main buffer stride.
+		 */
+		bo->meta.strides[1] = bo->meta.strides[0] / 8;
+		/* Aligned to page size */
+		bo->meta.sizes[1] = ALIGN(bo->meta.sizes[0] / 256, getpagesize());
+		bo->meta.offsets[1] = bo->meta.sizes[0];
+		/* Total number of planes & sizes */
+		bo->meta.num_planes = 2;
+		bo->meta.total_size = bo->meta.sizes[0] + bo->meta.sizes[1];
 	} else {
 		i915_bo_from_format(bo, width, height, format);
 	}

@@ -512,6 +512,13 @@ Return<void> CrosGralloc4Mapper::get(cros_gralloc_handle_t crosHandle,
             planeLayout.widthInSamples = crosHandle->width / planeLayout.horizontalSubsampling;
             planeLayout.heightInSamples = crosHandle->height / planeLayout.verticalSubsampling;
         }
+        if (crosHandle->format_modifier == I915_FORMAT_MOD_Y_TILED_CCS ||
+            crosHandle->format_modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS) {
+            planeLayouts.resize(planeLayouts.size() + 1);
+            PlaneLayout& planeLayout = planeLayouts[planeLayouts.size() - 1];
+            planeLayout.offsetInBytes = crosHandle->offsets[planeLayouts.size() - 1];
+            planeLayout.strideInBytes = crosHandle->strides[planeLayouts.size() - 1];
+        }
 
         status = android::gralloc4::encodePlaneLayouts(planeLayouts, &encodedMetadata);
     } else if (metadataType == android::gralloc4::MetadataType_Crop) {
