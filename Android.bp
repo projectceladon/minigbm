@@ -238,6 +238,7 @@ cc_library_shared {
     cflags: [
         "-DDRV_MSM",
         "-DQCOM_DISABLE_COMPRESSED_NV12",
+        "-DHAS_DMABUF_SYSTEM_HEAP",
     ],
 }
 
