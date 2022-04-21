@@ -17,6 +17,7 @@
 
 #ifdef USE_GRALLOC1
 #include "i915_private_android.h"
+#include "cros_gralloc/i915_private_android_types.h"
 #endif
 
 cros_gralloc_driver::cros_gralloc_driver() : drv_(nullptr)
@@ -158,6 +159,16 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 	}
 
 #ifdef USE_GRALLOC1
+	if (resolved_format == DRM_FORMAT_XRGB8888 ||
+		resolved_format == DRM_FORMAT_XBGR8888 ||
+		resolved_format == DRM_FORMAT_ARGB8888 ||
+		resolved_format == DRM_FORMAT_ABGR8888) {
+		struct cros_gralloc_buffer_descriptor* descriptor_ccs =
+			const_cast<struct cros_gralloc_buffer_descriptor*>(descriptor);
+		if (descriptor_ccs->use_flags & BO_USE_SCANOUT)	{
+			descriptor_ccs->modifier = I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS;
+		}
+	}
 	if (descriptor->modifier == 0) {
 		bo = drv_bo_create(drv_, descriptor->width, descriptor->height, resolved_format,
 				   use_flags);
