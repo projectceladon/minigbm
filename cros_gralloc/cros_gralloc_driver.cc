@@ -176,15 +176,34 @@ fail:
 	return -ENODEV;
 }
 
-bool cros_gralloc_driver::is_supported(const struct cros_gralloc_buffer_descriptor *descriptor)
+bool cros_gralloc_driver::is_supported(struct cros_gralloc_buffer_descriptor *descriptor)
 {
 	struct combination *combo;
 	uint32_t resolved_format;
+	bool supported;
 	struct driver *drv = (descriptor->use_flags & BO_USE_SCANOUT) ? drv_kms_ : drv_render_;
 
 	resolved_format = drv_resolve_format(drv, descriptor->drm_format, descriptor->use_flags);
 	combo = drv_get_combination(drv, resolved_format, descriptor->use_flags);
-	return (combo != nullptr);
+
+	supported = (combo != nullptr);
+
+	/* if kmsro is enabled, it is scanout buffer and not used for video, don't need remove
+	 * scanout flag */
+	if ((is_kmsro_enabled()) && (descriptor->use_flags & BO_USE_SCANOUT) &&
+	    !IsSupportedYUVFormat(descriptor->droid_format)) {
+		combo = drv_get_combination(drv, resolved_format,
+					    (descriptor->use_flags) & (~BO_USE_SCANOUT));
+		supported = (combo != nullptr);
+	}
+	/* if couldn't get combo but is overlay(video) buffer, remove the scanout flag */
+	if (!supported && IsSupportedYUVFormat(descriptor->droid_format)) {
+		drv = drv_render_;
+		descriptor->use_flags &= ~BO_USE_SCANOUT;
+		combo = drv_get_combination(drv, resolved_format, descriptor->use_flags);
+		supported = (combo != nullptr);
+	}
+	return supported;
 }
 
 int32_t create_reserved_region(const std::string &buffer_name, uint64_t reserved_region_size)
@@ -665,4 +684,17 @@ void cros_gralloc_driver::for_each_handle(
 	for (const auto &pair : handles_) {
 		function(pair.first);
 	}
+}
+
+bool cros_gralloc_driver::IsSupportedYUVFormat(uint32_t droid_format)
+{
+	switch (droid_format) {
+	case HAL_PIXEL_FORMAT_YCbCr_420_888:
+	case HAL_PIXEL_FORMAT_YV12:
+	case HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED:
+		return true;
+	default:
+		return i915_private_supported_yuv_format(droid_format);
+	}
+	return false;
 }
