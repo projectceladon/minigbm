@@ -112,7 +112,6 @@ static int gralloc0_alloc(alloc_device_t *dev, int w, int h, int format, int usa
 			  buffer_handle_t *handle, int *stride)
 {
 	int32_t ret;
-	bool supported;
 	struct cros_gralloc_buffer_descriptor descriptor;
 	auto mod = (struct gralloc0_module const *)dev->common.module;
 
@@ -124,21 +123,7 @@ static int gralloc0_alloc(alloc_device_t *dev, int w, int h, int format, int usa
 	descriptor.use_flags = gralloc0_convert_usage(usage);
 	descriptor.reserved_region_size = 0;
 
-	supported = mod->driver->is_supported(&descriptor);
-	if (!supported && (usage & GRALLOC_USAGE_HW_COMPOSER)) {
-		descriptor.use_flags &= ~BO_USE_SCANOUT;
-		supported = mod->driver->is_supported(&descriptor);
-	}
-	if (!supported && (usage & GRALLOC_USAGE_HW_VIDEO_ENCODER) &&
-	    !gralloc0_droid_yuv_format(format)) {
-		// Unmask BO_USE_HW_VIDEO_ENCODER in the case of non-yuv formats
-		// because they are not input to a hw encoder but used as an
-		// intermediate format (e.g. camera).
-		descriptor.use_flags &= ~BO_USE_HW_VIDEO_ENCODER;
-		supported = mod->driver->is_supported(&descriptor);
-	}
-
-	if (!supported) {
+	if (!(mod->driver->is_supported(&descriptor))) {
 		drv_log("Unsupported combination -- HAL format: %u, HAL usage: %u, "
 			"drv_format: %4.4s, use_flags: %llu\n",
 			format, usage, reinterpret_cast<char *>(&descriptor.drm_format),

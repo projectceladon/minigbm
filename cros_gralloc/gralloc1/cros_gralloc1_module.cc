@@ -385,21 +385,8 @@ int32_t CrosGralloc1::allocate(struct cros_gralloc_buffer_descriptor *descriptor
 	uint64_t usage =
 	    cros_gralloc1_convert_usage(descriptor->producer_usage, descriptor->consumer_usage);
 	descriptor->use_flags = usage;
-	bool supported = driver->is_supported(descriptor);
-	if (!supported && (descriptor->consumer_usage & GRALLOC1_CONSUMER_USAGE_HWCOMPOSER)) {
-		/* when alloc BO_USE_SCANOUT buffer for kmsro, use BO_USE_SCANOUT for dev
-		 * dintinguish */
-		if (driver->is_kmsro_enabled() && (descriptor->use_flags & BO_USE_SCANOUT)) {
-			struct cros_gralloc_buffer_descriptor tmpdescriptor = *descriptor;
-			tmpdescriptor.use_flags &= ~BO_USE_SCANOUT;
-			supported = driver->is_supported(&tmpdescriptor);
-		} else {
-			descriptor->use_flags &= ~BO_USE_SCANOUT;
-			supported = driver->is_supported(descriptor);
-		}
-	}
 
-	if (!supported) {
+	if (!(driver->is_supported(descriptor))) {
 		drv_log("Unsupported combination -- HAL format: %u, HAL flags: %u, "
 			"drv_format: %u, drv_flags: %llu",
 			descriptor->droid_format, usage, descriptor->drm_format,

@@ -20,7 +20,7 @@ class cros_gralloc_driver
 	~cros_gralloc_driver();
 
 	int32_t init();
-	bool is_supported(const struct cros_gralloc_buffer_descriptor *descriptor);
+	bool is_supported(struct cros_gralloc_buffer_descriptor *descriptor);
 	int32_t allocate(const struct cros_gralloc_buffer_descriptor *descriptor,
 			 buffer_handle_t *out_handle);
 
@@ -54,6 +54,7 @@ class cros_gralloc_driver
 	{
 		return drv_kms_ != drv_render_;
 	};
+	bool IsSupportedYUVFormat(uint32_t droid_format);
 
       private:
 	cros_gralloc_driver(cros_gralloc_driver const &);
