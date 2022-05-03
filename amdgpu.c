@@ -625,6 +625,9 @@ static int amdgpu_import_bo(struct bo *bo, struct drv_import_fd_data *data)
 		dri_tiling = combo->metadata.tiling != TILE_TYPE_LINEAR;
 	}
 
+	bo->meta.num_planes = dri_num_planes_from_modifier(bo->drv, data->format,
+		data->format_modifier);
+
 	if (dri_tiling)
 		return dri_bo_import(bo, data);
 	else
