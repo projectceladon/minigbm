@@ -356,9 +356,9 @@ static int i915_add_combinations(struct driver *drv)
 		return ret;
 
 	if (i915_has_tile4(drv)) {
-		metadata.tiling = I915_TILING_F;
+		metadata.tiling = I915_TILING_4;
 		metadata.priority = 3;
-		metadata.modifier = I915_FORMAT_MOD_F_TILED;
+		metadata.modifier = I915_FORMAT_MOD_4_TILED;
 	} else {
 		metadata.tiling = I915_TILING_Y;
 		metadata.priority = 3;
@@ -424,7 +424,7 @@ static int i915_align_dimensions(struct bo *bo, uint32_t tiling, uint64_t modifi
 			vertical_alignment = 32;
 		}
 		break;
-	case I915_TILING_F:
+	case I915_TILING_4:
 		horizontal_alignment = 128;
 		vertical_alignment = 32;
 		break;
@@ -652,8 +652,8 @@ static int i915_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t h
 	case I915_FORMAT_MOD_Yf_TILED_CCS:
 		bo->tiling = I915_TILING_Y;
 		break;
-	case I915_FORMAT_MOD_F_TILED:
-		bo->tiling = I915_TILING_F;
+	case I915_FORMAT_MOD_4_TILED:
+		bo->tiling = I915_TILING_4;
 		break;
 	}
 
@@ -863,7 +863,7 @@ static int i915_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint32_t
 	uint64_t modifier;
 
 	if (i915_has_tile4(bo->drv)) {
-		modifier_order[0] = I915_FORMAT_MOD_F_TILED;
+		modifier_order[0] = I915_FORMAT_MOD_4_TILED;
 	}
 	modifier = drv_pick_modifier(modifiers, count, modifier_order, ARRAY_SIZE(modifier_order));
 

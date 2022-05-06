@@ -105,9 +105,9 @@ int i915_private_add_combinations(struct driver *drv)
 			     texture_flags | BO_USE_CAMERA_MASK);
 
 	if (i915_has_tile4(drv)) {
-		metadata.tiling = I915_TILING_F;
+		metadata.tiling = I915_TILING_4;
 		metadata.priority = 3;
-		metadata.modifier = I915_FORMAT_MOD_F_TILED;
+		metadata.modifier = I915_FORMAT_MOD_4_TILED;
 	} else {
 		metadata.tiling = I915_TILING_Y;
 		metadata.priority = 3;
