@@ -239,14 +239,6 @@ static int cross_domain_init(struct driver *drv)
 	if (!params[param_host_visible].value && !params[param_create_guest_handle].value)
 		return -ENOTSUP;
 
-	/*
-	 * crosvm never reports the fake capset.  This is just an extra check to make sure we
-	 * don't use the cross-domain context by accident.  Developers may remove this for
-	 * testing purposes.
-	 */
-	if ((params[param_supported_capset_ids].value & (1 << CAPSET_CROSS_FAKE)) == 0)
-		return -ENOTSUP;
-
 	priv = calloc(1, sizeof(*priv));
 	if (!priv)
 		return -ENOMEM;
