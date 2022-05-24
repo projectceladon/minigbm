@@ -524,11 +524,37 @@ static void *i915_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t 
 
 		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_MMAP_GTT, &gem_map);
 		if (ret) {
-			drv_log("DRM_IOCTL_I915_GEM_MMAP_GTT failed\n");
-			return MAP_FAILED;
-		}
+			drv_log("DRM_IOCTL_I915_GEM_MMAP_GTT failed retrying DRM_IOCTL_I915_GEM_MMAP\n");
 
-		addr = mmap(0, bo->meta.total_size, drv_get_prot(map_flags), MAP_SHARED,
+			struct drm_i915_gem_mmap gem_map;
+			memset(&gem_map, 0, sizeof(gem_map));
+
+			/* TODO(b/118799155): We don't seem to have a good way to
+			* detect the use cases for which WC mapping is really needed.
+			* The current heuristic seems overly coarse and may be slowing
+			* down some other use cases unnecessarily.
+			*
+			* For now, care must be taken not to use WC mappings for
+			* Renderscript and camera use cases, as they're
+			* performance-sensitive. */
+			if ((bo->meta.use_flags & BO_USE_SCANOUT) &&
+			    !(bo->meta.use_flags &
+			      (BO_USE_RENDERSCRIPT | BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE)))
+				gem_map.flags = I915_MMAP_WC;
+
+			gem_map.handle = bo->handles[0].u32;
+			gem_map.offset = 0;
+			gem_map.size = bo->meta.total_size;
+
+			ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_MMAP, &gem_map);
+			if (ret) {
+				drv_log("DRM_IOCTL_I915_GEM_MMAP failed\n");
+				return MAP_FAILED;
+			}
+
+			addr = (void *)(uintptr_t)gem_map.addr_ptr;
+		} else
+			addr = mmap(0, bo->meta.total_size, drv_get_prot(map_flags), MAP_SHARED,
 			    bo->drv->fd, gem_map.offset);
 	}
 
