@@ -48,8 +48,9 @@ static const uint32_t dumb_texture_source_formats[] = {
 };
 
 static const uint32_t texture_source_formats[] = {
-	DRM_FORMAT_NV21,	   DRM_FORMAT_R8,	   DRM_FORMAT_R16,	    DRM_FORMAT_RG88,
-	DRM_FORMAT_YVU420_ANDROID, DRM_FORMAT_ABGR2101010, DRM_FORMAT_ABGR16161616F
+	DRM_FORMAT_NV12,	DRM_FORMAT_NV21,	 DRM_FORMAT_R8,
+	DRM_FORMAT_R16,	        DRM_FORMAT_RG88,	 DRM_FORMAT_YVU420_ANDROID,
+	DRM_FORMAT_ABGR2101010, DRM_FORMAT_ABGR16161616F
 };
 
 extern struct virtgpu_param params[];
