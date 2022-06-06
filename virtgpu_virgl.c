@@ -806,7 +806,7 @@ static int virgl_bo_invalidate(struct bo *bo, struct mapping *mapping)
 	// Invalidate is only necessary if the host writes to the buffer. The encoder and
 	// decoder flags don't differentiate between input and output buffers, but we can
 	// use the format to determine whether this buffer could be encoder/decoder output.
-	host_write_flags = BO_USE_RENDERING | BO_USE_CAMERA_WRITE;
+	host_write_flags = BO_USE_RENDERING | BO_USE_CAMERA_WRITE | BO_USE_GPU_DATA_BUFFER;
 	if (bo->meta.format == DRM_FORMAT_R8)
 		host_write_flags |= BO_USE_HW_VIDEO_ENCODER;
 	else
