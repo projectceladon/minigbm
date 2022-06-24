@@ -207,6 +207,21 @@ static bool should_avoid_ubwc(void)
 		drv_log("WARNING: waffle detected, disabling UBWC\n");
 		return true;
 	}
+
+	/* Sommelier relies on implicit modifier, which does not pass host modifier to
+	 * zwp_linux_buffer_params_v1_add. Graphics will be broken if UBWC is enabled.
+	 * Sommelier shall be fixed to mirror what arc wayland_service does, and then
+	 * we can re-enable UBWC here.
+	 *
+	 * Inherit the trick from crrev/c/2523246 previously used for gtest. The side
+	 * effect is all VM guests on msm will revert back to use linear modifier.
+	 *
+	 * See b/229147702
+	 */
+	if (!dlsym(RTLD_DEFAULT, "cupsFilePrintf")) {
+		drv_log("WARNING: virtualization detected, disabling UBWC\n");
+		return true;
+	}
 #endif
 	return false;
 }
