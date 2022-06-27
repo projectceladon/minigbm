@@ -517,10 +517,10 @@ static int amdgpu_create_bo_linear(struct bo *bo, uint32_t width, uint32_t heigh
 	 * aligned. This uses more memory than necessary since the first plane only needs to be
 	 * 256 aligned, but it's acceptable for a short-term fix. It's probably safe for other gpu
 	 * families, but let's restrict it to Raven and Stoney for now (b/171013552, b/190484589).
+	 * This only applies to the Android YUV (multiplane) format.
 	 * */
-	if (num_planes > 1 &&
-	    (priv->dev_info.family == AMDGPU_FAMILY_RV ||
-	     (priv->dev_info.family == AMDGPU_FAMILY_CZ && !(use_flags & BO_USE_HW_VIDEO_ENCODER))))
+	if (format == DRM_FORMAT_YVU420_ANDROID &&
+	    (priv->dev_info.family == AMDGPU_FAMILY_RV || priv->dev_info.family == AMDGPU_FAMILY_CZ))
 		stride = ALIGN(stride, 512);
 	else
 		stride = ALIGN(stride, 256);
