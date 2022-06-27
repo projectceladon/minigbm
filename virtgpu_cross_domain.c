@@ -358,7 +358,7 @@ static int cross_domain_bo_create(struct bo *bo, uint32_t width, uint32_t height
 	if (use_flags & BO_USE_SW_MASK)
 		blob_flags |= VIRTGPU_BLOB_FLAG_USE_MAPPABLE;
 
-	if (params[param_cross_device].value && (use_flags & BO_USE_NON_GPU_HW))
+	if (params[param_cross_device].value)
 		blob_flags |= VIRTGPU_BLOB_FLAG_USE_CROSS_DEVICE;
 
 	/// It may be possible to have host3d blobs and handles from guest memory at the same time.
