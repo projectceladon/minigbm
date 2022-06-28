@@ -55,7 +55,7 @@ struct i915_device {
 	int32_t has_hw_protection;
 	struct modifier_support_t modifier;
 	int device_id;
-	bool is_adlp;
+	bool is_xelpd;
 };
 
 static void i915_info_from_device_id(struct i915_device *i915)
@@ -109,7 +109,7 @@ static void i915_info_from_device_id(struct i915_device *i915)
 				      0x46D0, 0x46D1, 0x46D2 };
 	unsigned i;
 	i915->gen = 4;
-	i915->is_adlp = false;
+	i915->is_xelpd = false;
 
 	for (i = 0; i < ARRAY_SIZE(gen3_ids); i++)
 		if (gen3_ids[i] == i915->device_id)
@@ -157,7 +157,7 @@ static void i915_info_from_device_id(struct i915_device *i915)
 
 	for (i = 0; i < ARRAY_SIZE(adlp_ids); i++)
 		if (adlp_ids[i] == i915->device_id) {
-			i915->is_adlp = true;
+			i915->is_xelpd = true;
 			i915->gen = 12;
 		}
 }
@@ -593,7 +593,7 @@ static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t heig
 
 		height = ALIGN(drv_height_from_format(format, height, 0), 32);
 
-		if (i915->is_adlp && (stride > 1)) {
+		if (i915->is_xelpd && (stride > 1)) {
 			stride = 1 << (32 - __builtin_clz(stride - 1));
 			height = ALIGN(drv_height_from_format(format, height, 0), 128);
 		}
