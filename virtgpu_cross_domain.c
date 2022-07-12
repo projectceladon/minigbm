@@ -89,15 +89,18 @@ static void add_combinations(struct driver *drv)
 
 	drv_modify_combination(drv, DRM_FORMAT_YVU420, &metadata, BO_USE_HW_VIDEO_ENCODER);
 	drv_modify_combination(drv, DRM_FORMAT_NV12, &metadata,
+			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE |
 			       BO_USE_HW_VIDEO_DECODER | BO_USE_SCANOUT | BO_USE_HW_VIDEO_ENCODER);
 
 	/*
 	 * R8 format is used for Android's HAL_PIXEL_FORMAT_BLOB and is used for JPEG snapshots
-	 * from camera and input/output from hardware decoder/encoder.
+	 * from camera, input/output from hardware decoder/encoder, and
+	 * AHBs used as SSBOs/UBOs.
 	 */
 	drv_modify_combination(drv, DRM_FORMAT_R8, &metadata,
-			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER |
-				   BO_USE_HW_VIDEO_ENCODER);
+			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE |
+			       BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER |
+			       BO_USE_GPU_DATA_BUFFER);
 
 	drv_modify_linear_combinations(drv);
 }
