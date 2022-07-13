@@ -258,7 +258,7 @@ static void drv_bo_mapping_destroy(struct bo *bo)
 				if (ret) {
 					pthread_mutex_unlock(&drv->mappings_lock);
 					assert(ret);
-					drv_log("munmap failed\n");
+					drv_loge("munmap failed\n");
 					return;
 				}
 
@@ -438,7 +438,7 @@ struct bo *drv_bo_import(struct driver *drv, struct drv_import_fd_data *data)
 
 		seek_end = lseek(data->fds[plane], 0, SEEK_END);
 		if (seek_end == (off_t)(-1)) {
-			drv_log("lseek() failed with %s\n", strerror(errno));
+			drv_loge("lseek() failed with %s\n", strerror(errno));
 			goto destroy_bo;
 		}
 
@@ -449,7 +449,7 @@ struct bo *drv_bo_import(struct driver *drv, struct drv_import_fd_data *data)
 			bo->meta.sizes[plane] = data->offsets[plane + 1] - data->offsets[plane];
 
 		if ((int64_t)bo->meta.offsets[plane] + bo->meta.sizes[plane] > seek_end) {
-			drv_log("buffer size is too large.\n");
+			drv_loge("buffer size is too large.\n");
 			goto destroy_bo;
 		}
 
@@ -660,7 +660,7 @@ int drv_bo_get_plane_fd(struct bo *bo, size_t plane)
 		ret = drmPrimeHandleToFD(bo->drv->fd, bo->handles[plane].u32, DRM_CLOEXEC, &fd);
 
 	if (ret)
-		drv_log("Failed to get plane fd: %s\n", strerror(errno));
+		drv_loge("Failed to get plane fd: %s\n", strerror(errno));
 
 	return (ret) ? ret : fd;
 }

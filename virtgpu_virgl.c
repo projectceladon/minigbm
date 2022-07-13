@@ -97,7 +97,7 @@ static uint32_t translate_format(uint32_t drm_fourcc)
 	case DRM_FORMAT_YVU420_ANDROID:
 		return VIRGL_FORMAT_YV12;
 	default:
-		drv_log("Unhandled format:%d\n", drm_fourcc);
+		drv_loge("Unhandled format:%d\n", drm_fourcc);
 		return 0;
 	}
 }
@@ -439,7 +439,7 @@ static uint32_t compute_virgl_bind_flags(uint64_t use_flags, uint32_t format)
 		    VIRGL_BIND_MINIGBM_HW_VIDEO_ENCODER);
 
 	if (use_flags)
-		drv_log("Unhandled bo use flag: %llx\n", (unsigned long long)use_flags);
+		drv_loge("Unhandled bo use flag: %llx\n", (unsigned long long)use_flags);
 
 	return bind;
 }
@@ -495,7 +495,7 @@ static int virgl_3d_bo_create(struct bo *bo, uint32_t width, uint32_t height, ui
 	res_create.size = ALIGN(bo->meta.total_size, PAGE_SIZE); // PAGE_SIZE = 0x1000
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_VIRTGPU_RESOURCE_CREATE, &res_create);
 	if (ret) {
-		drv_log("DRM_IOCTL_VIRTGPU_RESOURCE_CREATE failed with %s\n", strerror(errno));
+		drv_loge("DRM_IOCTL_VIRTGPU_RESOURCE_CREATE failed with %s\n", strerror(errno));
 		return ret;
 	}
 
@@ -513,7 +513,7 @@ static void *virgl_3d_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint3
 	gem_map.handle = bo->handles[0].u32;
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_VIRTGPU_MAP, &gem_map);
 	if (ret) {
-		drv_log("DRM_IOCTL_VIRTGPU_MAP failed with %s\n", strerror(errno));
+		drv_loge("DRM_IOCTL_VIRTGPU_MAP failed with %s\n", strerror(errno));
 		return MAP_FAILED;
 	}
 
@@ -550,7 +550,7 @@ static int virgl_get_caps(struct driver *drv, union virgl_caps *caps, int *caps_
 
 	ret = drmIoctl(drv->fd, DRM_IOCTL_VIRTGPU_GET_CAPS, &cap_args);
 	if (ret) {
-		drv_log("DRM_IOCTL_VIRTGPU_GET_CAPS failed with %s\n", strerror(errno));
+		drv_loge("DRM_IOCTL_VIRTGPU_GET_CAPS failed with %s\n", strerror(errno));
 		*caps_is_v2 = 0;
 
 		// Fallback to v1
@@ -559,7 +559,7 @@ static int virgl_get_caps(struct driver *drv, union virgl_caps *caps, int *caps_
 
 		ret = drmIoctl(drv->fd, DRM_IOCTL_VIRTGPU_GET_CAPS, &cap_args);
 		if (ret)
-			drv_log("DRM_IOCTL_VIRTGPU_GET_CAPS failed with %s\n", strerror(errno));
+			drv_loge("DRM_IOCTL_VIRTGPU_GET_CAPS failed with %s\n", strerror(errno));
 	}
 
 	return ret;
@@ -717,7 +717,7 @@ static int virgl_bo_create_blob(struct driver *drv, struct bo *bo)
 
 	ret = drmIoctl(drv->fd, DRM_IOCTL_VIRTGPU_RESOURCE_CREATE_BLOB, &drm_rc_blob);
 	if (ret < 0) {
-		drv_log("DRM_VIRTGPU_RESOURCE_CREATE_BLOB failed with %s\n", strerror(errno));
+		drv_loge("DRM_VIRTGPU_RESOURCE_CREATE_BLOB failed with %s\n", strerror(errno));
 		return -errno;
 	}
 
@@ -862,8 +862,8 @@ static int virgl_bo_invalidate(struct bo *bo, struct mapping *mapping)
 
 		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_VIRTGPU_TRANSFER_FROM_HOST, &xfer);
 		if (ret) {
-			drv_log("DRM_IOCTL_VIRTGPU_TRANSFER_FROM_HOST failed with %s\n",
-				strerror(errno));
+			drv_loge("DRM_IOCTL_VIRTGPU_TRANSFER_FROM_HOST failed with %s\n",
+				 strerror(errno));
 			return -errno;
 		}
 	}
@@ -874,7 +874,7 @@ static int virgl_bo_invalidate(struct bo *bo, struct mapping *mapping)
 	waitcmd.handle = mapping->vma->handle;
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_VIRTGPU_WAIT, &waitcmd);
 	if (ret) {
-		drv_log("DRM_IOCTL_VIRTGPU_WAIT failed with %s\n", strerror(errno));
+		drv_loge("DRM_IOCTL_VIRTGPU_WAIT failed with %s\n", strerror(errno));
 		return -errno;
 	}
 
@@ -938,8 +938,8 @@ static int virgl_bo_flush(struct bo *bo, struct mapping *mapping)
 
 		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_VIRTGPU_TRANSFER_TO_HOST, &xfer);
 		if (ret) {
-			drv_log("DRM_IOCTL_VIRTGPU_TRANSFER_TO_HOST failed with %s\n",
-				strerror(errno));
+			drv_loge("DRM_IOCTL_VIRTGPU_TRANSFER_TO_HOST failed with %s\n",
+				 strerror(errno));
 			return -errno;
 		}
 	}
@@ -953,7 +953,7 @@ static int virgl_bo_flush(struct bo *bo, struct mapping *mapping)
 
 		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_VIRTGPU_WAIT, &waitcmd);
 		if (ret) {
-			drv_log("DRM_IOCTL_VIRTGPU_WAIT failed with %s\n", strerror(errno));
+			drv_loge("DRM_IOCTL_VIRTGPU_WAIT failed with %s\n", strerror(errno));
 			return -errno;
 		}
 	}
@@ -1065,7 +1065,7 @@ static int virgl_resource_info(struct bo *bo, uint32_t strides[DRV_MAX_PLANES],
 	res_info.type = VIRTGPU_RESOURCE_INFO_TYPE_EXTENDED;
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_VIRTGPU_RESOURCE_INFO_CROS, &res_info);
 	if (ret) {
-		drv_log("DRM_IOCTL_VIRTGPU_RESOURCE_INFO failed with %s\n", strerror(errno));
+		drv_loge("DRM_IOCTL_VIRTGPU_RESOURCE_INFO failed with %s\n", strerror(errno));
 		return ret;
 	}
 

@@ -204,7 +204,7 @@ static bool should_avoid_ubwc(void)
 	 * See b/163137550
 	 */
 	if (dlsym(RTLD_DEFAULT, "waffle_display_connect")) {
-		drv_log("WARNING: waffle detected, disabling UBWC\n");
+		drv_logi("WARNING: waffle detected, disabling UBWC\n");
 		return true;
 	}
 
@@ -219,7 +219,7 @@ static bool should_avoid_ubwc(void)
 	 * See b/229147702
 	 */
 	if (!dlsym(RTLD_DEFAULT, "cupsFilePrintf")) {
-		drv_log("WARNING: virtualization detected, disabling UBWC\n");
+		drv_logi("WARNING: virtualization detected, disabling UBWC\n");
 		return true;
 	}
 #endif
@@ -314,7 +314,7 @@ static int msm_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t he
 
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_MSM_GEM_NEW, &req);
 	if (ret) {
-		drv_log("DRM_IOCTL_MSM_GEM_NEW failed with %s\n", strerror(errno));
+		drv_loge("DRM_IOCTL_MSM_GEM_NEW failed with %s\n", strerror(errno));
 		return -errno;
 	}
 
@@ -353,7 +353,7 @@ static int msm_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint32_
 	struct combination *combo = drv_get_combination(bo->drv, format, flags);
 
 	if (!combo) {
-		drv_log("invalid format = %d, flags = %" PRIx64 " combination\n", format, flags);
+		drv_loge("invalid format = %d, flags = %" PRIx64 " combination\n", format, flags);
 		return -EINVAL;
 	}
 
@@ -368,7 +368,7 @@ static void *msm_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t m
 	req.handle = bo->handles[0].u32;
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_MSM_GEM_INFO, &req);
 	if (ret) {
-		drv_log("DRM_IOCLT_MSM_GEM_INFO failed with %s\n", strerror(errno));
+		drv_loge("DRM_IOCLT_MSM_GEM_INFO failed with %s\n", strerror(errno));
 		return MAP_FAILED;
 	}
 	vma->length = bo->meta.total_size;

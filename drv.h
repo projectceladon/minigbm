@@ -223,9 +223,6 @@ enum drv_log_level {
 #define drv_logd(format, ...) _drv_log(DRV_LOGD, format, ##__VA_ARGS__)
 #define drv_logi(format, ...) _drv_log(DRV_LOGI, format, ##__VA_ARGS__)
 
-/* for backward compability purpose */
-#define drv_log(format, ...) _drv_log(DRV_LOGE, format, ##__VA_ARGS__)
-
 __attribute__((format(printf, 5, 6))) void drv_log_prefix(enum drv_log_level level,
 							  const char *prefix, const char *file,
 							  int line, const char *format, ...);

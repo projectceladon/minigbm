@@ -53,8 +53,8 @@ static void cross_domain_release_private(struct driver *drv)
 
 		ret = drmIoctl(drv->fd, DRM_IOCTL_GEM_CLOSE, &gem_close);
 		if (ret) {
-			drv_log("DRM_IOCTL_GEM_CLOSE failed (handle=%x) error %d\n",
-				priv->ring_handle, ret);
+			drv_loge("DRM_IOCTL_GEM_CLOSE failed (handle=%x) error %d\n",
+				 priv->ring_handle, ret);
 		}
 	}
 
@@ -121,7 +121,7 @@ static int cross_domain_submit_cmd(struct driver *drv, uint32_t *cmd, uint32_t c
 
 	ret = drmIoctl(drv->fd, DRM_IOCTL_VIRTGPU_EXECBUFFER, &exec);
 	if (ret < 0) {
-		drv_log("DRM_IOCTL_VIRTGPU_EXECBUFFER failed with %s\n", strerror(errno));
+		drv_loge("DRM_IOCTL_VIRTGPU_EXECBUFFER failed with %s\n", strerror(errno));
 		return -EINVAL;
 	}
 
@@ -132,7 +132,7 @@ static int cross_domain_submit_cmd(struct driver *drv, uint32_t *cmd, uint32_t c
 	}
 
 	if (ret < 0) {
-		drv_log("DRM_IOCTL_VIRTGPU_WAIT failed with %s\n", strerror(errno));
+		drv_loge("DRM_IOCTL_VIRTGPU_WAIT failed with %s\n", strerror(errno));
 		return ret;
 	}
 
@@ -266,7 +266,7 @@ static int cross_domain_init(struct driver *drv)
 
 	ret = drmIoctl(drv->fd, DRM_IOCTL_VIRTGPU_GET_CAPS, &args);
 	if (ret) {
-		drv_log("DRM_IOCTL_VIRTGPU_GET_CAPS failed with %s\n", strerror(errno));
+		drv_loge("DRM_IOCTL_VIRTGPU_GET_CAPS failed with %s\n", strerror(errno));
 		goto free_private;
 	}
 
@@ -289,7 +289,7 @@ static int cross_domain_init(struct driver *drv)
 	init.num_params = 2;
 	ret = drmIoctl(drv->fd, DRM_IOCTL_VIRTGPU_CONTEXT_INIT, &init);
 	if (ret) {
-		drv_log("DRM_IOCTL_VIRTGPU_CONTEXT_INIT failed with %s\n", strerror(errno));
+		drv_loge("DRM_IOCTL_VIRTGPU_CONTEXT_INIT failed with %s\n", strerror(errno));
 		goto free_private;
 	}
 
@@ -300,7 +300,7 @@ static int cross_domain_init(struct driver *drv)
 
 	ret = drmIoctl(drv->fd, DRM_IOCTL_VIRTGPU_RESOURCE_CREATE_BLOB, &drm_rc_blob);
 	if (ret < 0) {
-		drv_log("DRM_VIRTGPU_RESOURCE_CREATE_BLOB failed with %s\n", strerror(errno));
+		drv_loge("DRM_VIRTGPU_RESOURCE_CREATE_BLOB failed with %s\n", strerror(errno));
 		goto free_private;
 	}
 
@@ -310,7 +310,7 @@ static int cross_domain_init(struct driver *drv)
 	map.handle = priv->ring_handle;
 	ret = drmIoctl(drv->fd, DRM_IOCTL_VIRTGPU_MAP, &map);
 	if (ret < 0) {
-		drv_log("DRM_IOCTL_VIRTGPU_MAP failed with %s\n", strerror(errno));
+		drv_loge("DRM_IOCTL_VIRTGPU_MAP failed with %s\n", strerror(errno));
 		goto free_private;
 	}
 
@@ -318,7 +318,7 @@ static int cross_domain_init(struct driver *drv)
 	    mmap(0, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, drv->fd, map.offset);
 
 	if (priv->ring_addr == MAP_FAILED) {
-		drv_log("mmap failed with %s\n", strerror(errno));
+		drv_loge("mmap failed with %s\n", strerror(errno));
 		goto free_private;
 	}
 
@@ -353,7 +353,7 @@ static int cross_domain_bo_create(struct bo *bo, uint32_t width, uint32_t height
 
 	ret = cross_domain_metadata_query(bo->drv, &bo->meta);
 	if (ret < 0) {
-		drv_log("Metadata query failed");
+		drv_loge("Metadata query failed");
 		return ret;
 	}
 
@@ -380,7 +380,7 @@ static int cross_domain_bo_create(struct bo *bo, uint32_t width, uint32_t height
 
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_VIRTGPU_RESOURCE_CREATE_BLOB, &drm_rc_blob);
 	if (ret < 0) {
-		drv_log("DRM_VIRTGPU_RESOURCE_CREATE_BLOB failed with %s\n", strerror(errno));
+		drv_loge("DRM_VIRTGPU_RESOURCE_CREATE_BLOB failed with %s\n", strerror(errno));
 		return -errno;
 	}
 
@@ -398,7 +398,7 @@ static void *cross_domain_bo_map(struct bo *bo, struct vma *vma, size_t plane, u
 	gem_map.handle = bo->handles[0].u32;
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_VIRTGPU_MAP, &gem_map);
 	if (ret) {
-		drv_log("DRM_IOCTL_VIRTGPU_MAP failed with %s\n", strerror(errno));
+		drv_loge("DRM_IOCTL_VIRTGPU_MAP failed with %s\n", strerror(errno));
 		return MAP_FAILED;
 	}
 
