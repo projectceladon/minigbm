@@ -519,8 +519,8 @@ static int amdgpu_create_bo_linear(struct bo *bo, uint32_t width, uint32_t heigh
 	 * families, but let's restrict it to Raven and Stoney for now (b/171013552, b/190484589).
 	 * This only applies to the Android YUV (multiplane) format.
 	 * */
-	if (format == DRM_FORMAT_YVU420_ANDROID &&
-	    (priv->dev_info.family == AMDGPU_FAMILY_RV || priv->dev_info.family == AMDGPU_FAMILY_CZ))
+	if (format == DRM_FORMAT_YVU420_ANDROID && (priv->dev_info.family == AMDGPU_FAMILY_RV ||
+						    priv->dev_info.family == AMDGPU_FAMILY_CZ))
 		stride = ALIGN(stride, 512);
 	else
 		stride = ALIGN(stride, 256);
@@ -625,8 +625,8 @@ static int amdgpu_import_bo(struct bo *bo, struct drv_import_fd_data *data)
 		dri_tiling = combo->metadata.tiling != TILE_TYPE_LINEAR;
 	}
 
-	bo->meta.num_planes = dri_num_planes_from_modifier(bo->drv, data->format,
-		data->format_modifier);
+	bo->meta.num_planes =
+	    dri_num_planes_from_modifier(bo->drv, data->format, data->format_modifier);
 
 	if (dri_tiling)
 		return dri_bo_import(bo, data);

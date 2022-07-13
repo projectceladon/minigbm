@@ -103,10 +103,9 @@ static void i915_info_from_device_id(struct i915_device *i915)
 		0x46b3, 0x46c0, 0x46c1, 0x46c2, 0x46c3, 0x9A40, 0x9A49, 0x9A59, 0x9A60, 0x9A68,
 		0x9A70, 0x9A78, 0x9AC0, 0x9AC9, 0x9AD9, 0x9AF8, 0x4905, 0x4906, 0x4907, 0x4908
 	};
-	const uint16_t adlp_ids[] = { 0x46A0, 0x46A1, 0x46A2, 0x46A3, 0x46A6, 0x46A8,
-				      0x46AA, 0x462A, 0x4626, 0x4628, 0x46B0, 0x46B1,
-				      0x46B2, 0x46B3, 0x46C0, 0x46C1, 0x46C2, 0x46C3,
-				      0x46D0, 0x46D1, 0x46D2 };
+	const uint16_t adlp_ids[] = { 0x46A0, 0x46A1, 0x46A2, 0x46A3, 0x46A6, 0x46A8, 0x46AA,
+				      0x462A, 0x4626, 0x4628, 0x46B0, 0x46B1, 0x46B2, 0x46B3,
+				      0x46C0, 0x46C1, 0x46C2, 0x46C3, 0x46D0, 0x46D1, 0x46D2 };
 
 	const uint16_t rplp_ids[] = { 0xA720, 0xA721, 0xA7A0, 0xA7A1, 0xA7A8, 0xA7A9 };
 	unsigned i;
@@ -175,8 +174,7 @@ static void i915_get_modifier_order(struct i915_device *i915)
 	if (i915->gen == 12) {
 		i915->modifier.order = gen12_modifier_order;
 		i915->modifier.count = ARRAY_SIZE(gen12_modifier_order);
-	}
-	else if (i915->gen == 11) {
+	} else if (i915->gen == 11) {
 		i915->modifier.order = gen11_modifier_order;
 		i915->modifier.count = ARRAY_SIZE(gen11_modifier_order);
 	} else {
@@ -449,8 +447,7 @@ static int i915_bo_from_format(struct bo *bo, uint32_t width, uint32_t height, u
 	return 0;
 }
 
-static size_t i915_num_planes_from_modifier(struct driver *drv, uint32_t format,
-					    uint64_t modifier)
+static size_t i915_num_planes_from_modifier(struct driver *drv, uint32_t format, uint64_t modifier)
 {
 	size_t num_planes = drv_num_planes_from_format(format);
 	if (modifier == I915_FORMAT_MOD_Y_TILED_CCS ||
@@ -699,8 +696,8 @@ static int i915_bo_import(struct bo *bo, struct drv_import_fd_data *data)
 	int ret;
 	struct drm_i915_gem_get_tiling gem_get_tiling = { 0 };
 
-	bo->meta.num_planes = i915_num_planes_from_modifier(bo->drv, data->format,
-		data->format_modifier);
+	bo->meta.num_planes =
+	    i915_num_planes_from_modifier(bo->drv, data->format, data->format_modifier);
 
 	ret = drv_prime_bo_import(bo, data);
 	if (ret)
