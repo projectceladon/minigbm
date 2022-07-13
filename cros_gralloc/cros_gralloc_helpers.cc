@@ -123,7 +123,7 @@ uint64_t cros_gralloc_convert_usage(uint64_t usage)
 	handle_usage(&usage, BUFFER_USAGE_FRONT_RENDERING, &use_flags, BO_USE_FRONT_RENDERING);
 
 	if (usage) {
-		drv_log("Unhandled gralloc usage: %llx\n", (unsigned long long)usage);
+		ALOGE("Unhandled gralloc usage: %llx", (unsigned long long)usage);
 		return BO_USE_NONE;
 	}
 
@@ -162,10 +162,10 @@ int32_t cros_gralloc_sync_wait(int32_t fence, bool close_fence)
 	 */
 	int err = sync_wait(fence, 1000);
 	if (err < 0) {
-		drv_log("Timed out on sync wait, err = %s\n", strerror(errno));
+		ALOGE("Timed out on sync wait, err = %s", strerror(errno));
 		err = sync_wait(fence, -1);
 		if (err < 0) {
-			drv_log("sync wait error = %s\n", strerror(errno));
+			ALOGE("sync wait error = %s", strerror(errno));
 			return -errno;
 		}
 	}
@@ -173,7 +173,7 @@ int32_t cros_gralloc_sync_wait(int32_t fence, bool close_fence)
 	if (close_fence) {
 		err = close(fence);
 		if (err) {
-			drv_log("Unable to close fence fd, err = %s\n", strerror(errno));
+			ALOGE("Unable to close fence fd, err = %s", strerror(errno));
 			return -errno;
 		}
 	}
