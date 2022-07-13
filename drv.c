@@ -744,7 +744,8 @@ uint32_t drv_num_buffers_per_bo(struct bo *bo)
 	return count;
 }
 
-void drv_log_prefix(const char *prefix, const char *file, int line, const char *format, ...)
+void drv_log_prefix(enum drv_log_level level, const char *prefix, const char *file, int line,
+		    const char *format, ...)
 {
 	char buf[50];
 	snprintf(buf, sizeof(buf), "[%s:%s(%d)]", prefix, basename(file), line);
@@ -752,10 +753,30 @@ void drv_log_prefix(const char *prefix, const char *file, int line, const char *
 	va_list args;
 	va_start(args, format);
 #ifdef __ANDROID__
-	__android_log_vprint(ANDROID_LOG_ERROR, buf, format, args);
+	int prio = ANDROID_LOG_ERROR;
+	switch (level) {
+	case DRV_LOGV:
+		prio = ANDROID_LOG_VERBOSE;
+		break;
+	case DRV_LOGD:
+		prio = ANDROID_LOG_DEBUG;
+		break;
+	case DRV_LOGI:
+		prio = ANDROID_LOG_INFO;
+		break;
+	case DRV_LOGE:
+	default:
+		break;
+	};
+	__android_log_vprint(prio, buf, format, args);
 #else
-	fprintf(stderr, "%s ", buf);
-	vfprintf(stderr, format, args);
+	if (level == DRV_LOGE) {
+		fprintf(stderr, "%s ", buf);
+		vfprintf(stderr, format, args);
+	} else {
+		fprintf(stdout, "%s ", buf);
+		vfprintf(stdout, format, args);
+	}
 #endif
 	va_end(args);
 }

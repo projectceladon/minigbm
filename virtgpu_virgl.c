@@ -351,13 +351,13 @@ static void virgl_add_combination(struct driver *drv, uint32_t drm_format,
 	if (params[param_3d].value) {
 		if ((use_flags & BO_USE_SCANOUT) &&
 		    !virgl_supports_combination_natively(drv, drm_format, BO_USE_SCANOUT)) {
-			drv_log("Strip scanout on format: %d\n", drm_format);
+			drv_logi("Strip scanout on format: %d\n", drm_format);
 			use_flags &= ~BO_USE_SCANOUT;
 		}
 
 		if (!virgl_supports_combination_natively(drv, drm_format, use_flags) &&
 		    !virgl_supports_combination_through_emulation(drv, drm_format, use_flags)) {
-			drv_log("Skipping unsupported combination format:%d\n", drm_format);
+			drv_logi("Skipping unsupported combination format:%d\n", drm_format);
 			return;
 		}
 	}
