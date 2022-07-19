@@ -41,6 +41,7 @@ extern "C" {
 #define BO_USE_FRONT_RENDERING		(1ull << 16)
 #define BO_USE_RENDERSCRIPT		(1ull << 17)
 #define BO_USE_GPU_DATA_BUFFER		(1ull << 18)
+#define BO_USE_SENSOR_DIRECT_DATA	(1ull << 19)
 
 /* Quirks for allocating a buffer. */
 #define BO_QUIRK_NONE			0
