@@ -407,6 +407,7 @@ static uint32_t compute_virgl_bind_flags(uint64_t use_flags, uint32_t format)
 	handle_flag(&use_flags, BO_USE_SCANOUT, &bind, VIRGL_BIND_SCANOUT);
 	handle_flag(&use_flags, BO_USE_CURSOR, &bind, VIRGL_BIND_CURSOR);
 	handle_flag(&use_flags, BO_USE_LINEAR, &bind, VIRGL_BIND_LINEAR);
+	handle_flag(&use_flags, BO_USE_SENSOR_DIRECT_DATA, &bind, VIRGL_BIND_LINEAR);
 	handle_flag(&use_flags, BO_USE_GPU_DATA_BUFFER, &bind, VIRGL_BIND_LINEAR);
 	handle_flag(&use_flags, BO_USE_FRONT_RENDERING, &bind, VIRGL_BIND_LINEAR);
 
@@ -641,9 +642,11 @@ static int virgl_init(struct driver *drv)
 	virgl_add_combination(drv, DRM_FORMAT_P010, &LINEAR_METADATA,
 			      BO_USE_SCANOUT | BO_USE_TEXTURE | BO_USE_SW_MASK |
 				  BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE);
+	/* Android VTS sensors hal tests require BO_USE_SENSOR_DIRECT_DATA. */
 	drv_modify_combination(drv, DRM_FORMAT_R8, &LINEAR_METADATA,
 			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER |
-				   BO_USE_HW_VIDEO_ENCODER | BO_USE_GPU_DATA_BUFFER);
+				   BO_USE_HW_VIDEO_ENCODER | BO_USE_SENSOR_DIRECT_DATA |
+				   BO_USE_GPU_DATA_BUFFER);
 
 	if (!priv->host_gbm_enabled) {
 		drv_modify_combination(drv, DRM_FORMAT_ABGR8888, &LINEAR_METADATA,
