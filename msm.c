@@ -138,7 +138,9 @@ static void msm_calculate_layout(struct bo *bo)
 			DRM_FORMAT_R8 of height one is used for JPEG camera output, so don't
 			height align that. */
 		if (bo->meta.format == DRM_FORMAT_YVU420_ANDROID ||
+			bo->meta.format == DRM_FORMAT_YVU420 ||
 		    (bo->meta.format == DRM_FORMAT_R8 && height == 1)) {
+			assert(bo->meta.tiling != MSM_UBWC_TILING);
 			alignh = height;
 		} else {
 			alignh = ALIGN(height, DEFAULT_ALIGNMENT);
@@ -265,6 +267,8 @@ static int msm_init(struct driver *drv)
 	 * (including the external provider implmenetation).
 	 */
 	drv_modify_combination(drv, DRM_FORMAT_YVU420_ANDROID, &LINEAR_METADATA,
+			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE);
+	drv_modify_combination(drv, DRM_FORMAT_YVU420, &LINEAR_METADATA,
 			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE);
 
 	/* Android CTS tests require this. */
