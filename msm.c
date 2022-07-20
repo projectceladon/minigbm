@@ -138,7 +138,7 @@ static void msm_calculate_layout(struct bo *bo)
 			DRM_FORMAT_R8 of height one is used for JPEG camera output, so don't
 			height align that. */
 		if (bo->meta.format == DRM_FORMAT_YVU420_ANDROID ||
-			bo->meta.format == DRM_FORMAT_YVU420 ||
+		    bo->meta.format == DRM_FORMAT_YVU420 ||
 		    (bo->meta.format == DRM_FORMAT_R8 && height == 1)) {
 			assert(bo->meta.tiling != MSM_UBWC_TILING);
 			alignh = height;
@@ -260,7 +260,7 @@ static int msm_init(struct driver *drv)
 	 */
 	drv_modify_combination(drv, DRM_FORMAT_R8, &LINEAR_METADATA,
 			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER |
-				   BO_USE_HW_VIDEO_ENCODER);
+				   BO_USE_HW_VIDEO_ENCODER | BO_USE_GPU_DATA_BUFFER);
 
 	/*
 	 * Android also frequently requests YV12 formats for some camera implementations

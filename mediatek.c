@@ -109,7 +109,8 @@ static int mediatek_init(struct driver *drv)
 	 */
 	drv_modify_combination(drv, DRM_FORMAT_R8, &metadata,
 			       BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER |
-				   BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE);
+				   BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE |
+				   BO_USE_GPU_DATA_BUFFER);
 
 	/* NV12 format for encoding and display. */
 	drv_modify_combination(drv, DRM_FORMAT_NV12, &metadata,

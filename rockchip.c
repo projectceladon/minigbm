@@ -107,7 +107,8 @@ static int rockchip_init(struct driver *drv)
 	 */
 	drv_add_combination(drv, DRM_FORMAT_R8, &metadata,
 			    BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SW_MASK |
-				BO_USE_LINEAR | BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER);
+				BO_USE_LINEAR | BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER |
+				BO_USE_GPU_DATA_BUFFER);
 
 	return 0;
 }

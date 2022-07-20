@@ -290,6 +290,16 @@ enum gbm_bo_flags {
     * with pixel data.
     */
    GBM_BO_USE_FRONT_RENDERING = (1 << 16),
+
+   /**
+    * (1 << 17) is reserved for RenderScript (deprecated in Android 12).
+    */
+
+   /**
+    * The buffer will be used as a shader storage or uniform buffer
+    * object.
+    */
+   GBM_BO_USE_GPU_DATA_BUFFER = (1 << 18),
 };
 
 int
