@@ -219,6 +219,23 @@ out_unlock:
 	return ret;
 }
 
+/* Fill out metadata for guest buffers, used only for CPU access: */
+void cross_domain_get_emulated_metadata(struct bo_metadata *metadata)
+{
+	uint32_t offset = 0;
+
+	for (size_t i = 0; i < metadata->num_planes; i++) {
+		metadata->strides[i] =
+		    drv_stride_from_format(metadata->format, metadata->width, i);
+		metadata->sizes[i] =
+		    drv_size_from_format(metadata->format, metadata->strides[i], metadata->height, i);
+		metadata->offsets[i] = offset;
+		offset += metadata->sizes[i];
+	}
+
+	metadata->total_size = offset;
+}
+
 static int cross_domain_init(struct driver *drv)
 {
 	int ret;
@@ -356,32 +373,38 @@ static int cross_domain_bo_create(struct bo *bo, uint32_t width, uint32_t height
 	uint32_t blob_flags = VIRTGPU_BLOB_FLAG_USE_SHAREABLE;
 	struct drm_virtgpu_resource_create_blob drm_rc_blob = { 0 };
 
-	ret = cross_domain_metadata_query(bo->drv, &bo->meta);
-	if (ret < 0) {
-		drv_loge("Metadata query failed");
-		return ret;
-	}
-
 	if (use_flags & BO_USE_SW_MASK)
 		blob_flags |= VIRTGPU_BLOB_FLAG_USE_MAPPABLE;
 
-	if (params[param_cross_device].value)
-		blob_flags |= VIRTGPU_BLOB_FLAG_USE_CROSS_DEVICE;
-
-	/// It may be possible to have host3d blobs and handles from guest memory at the same time.
-	/// But for the immediate use cases, we will either have one or the other.  For now, just
-	/// prefer guest memory since adding that feature is more involved (requires --udmabuf
-	/// flag to crosvm), so developers would likely test that.
-	if (params[param_create_guest_handle].value) {
+	if (!(use_flags & BO_USE_HW_MASK)) {
+		cross_domain_get_emulated_metadata(&bo->meta);
 		drm_rc_blob.blob_mem = VIRTGPU_BLOB_MEM_GUEST;
-		blob_flags |= VIRTGPU_BLOB_FLAG_CREATE_GUEST_HANDLE;
-	} else if (params[param_host_visible].value) {
-		drm_rc_blob.blob_mem = VIRTGPU_BLOB_MEM_HOST3D;
+	} else {
+		ret = cross_domain_metadata_query(bo->drv, &bo->meta);
+		if (ret < 0) {
+			drv_loge("Metadata query failed");
+			return ret;
+		}
+
+		if (params[param_cross_device].value)
+			blob_flags |= VIRTGPU_BLOB_FLAG_USE_CROSS_DEVICE;
+
+		/// It may be possible to have host3d blobs and handles from guest memory at the
+		/// same time. But for the immediate use cases, we will either have one or the
+		/// other.  For now, just prefer guest memory since adding that feature is more
+		/// involved (requires --udmabuf flag to crosvm), so developers would likely test
+		/// that.
+		if (params[param_create_guest_handle].value) {
+			drm_rc_blob.blob_mem = VIRTGPU_BLOB_MEM_GUEST;
+			blob_flags |= VIRTGPU_BLOB_FLAG_CREATE_GUEST_HANDLE;
+		} else if (params[param_host_visible].value) {
+			drm_rc_blob.blob_mem = VIRTGPU_BLOB_MEM_HOST3D;
+		}
+		drm_rc_blob.blob_id = (uint64_t)bo->meta.blob_id;
 	}
 
 	drm_rc_blob.size = bo->meta.total_size;
 	drm_rc_blob.blob_flags = blob_flags;
-	drm_rc_blob.blob_id = (uint64_t)bo->meta.blob_id;
 
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_VIRTGPU_RESOURCE_CREATE_BLOB, &drm_rc_blob);
 	if (ret < 0) {
