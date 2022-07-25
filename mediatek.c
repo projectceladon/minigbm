@@ -109,7 +109,8 @@ static int mediatek_init(struct driver *drv)
 	 */
 	drv_modify_combination(drv, DRM_FORMAT_R8, &metadata,
 			       BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER |
-				   BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE);
+				   BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE |
+				   BO_USE_GPU_DATA_BUFFER);
 
 	/* NV12 format for encoding and display. */
 	drv_modify_combination(drv, DRM_FORMAT_NV12, &metadata,
@@ -149,7 +150,7 @@ static int mediatek_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint
 
 	if (!drv_has_modifier(modifiers, count, DRM_FORMAT_MOD_LINEAR)) {
 		errno = EINVAL;
-		drv_log("no usable modifier found\n");
+		drv_loge("no usable modifier found\n");
 		return -EINVAL;
 	}
 
@@ -195,7 +196,7 @@ static int mediatek_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint
 
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_MTK_GEM_CREATE, &gem_create);
 	if (ret) {
-		drv_log("DRM_IOCTL_MTK_GEM_CREATE failed (size=%" PRIu64 ")\n", gem_create.size);
+		drv_loge("DRM_IOCTL_MTK_GEM_CREATE failed (size=%" PRIu64 ")\n", gem_create.size);
 		return -errno;
 	}
 
@@ -224,13 +225,13 @@ static void *mediatek_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint3
 
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_MTK_GEM_MAP_OFFSET, &gem_map);
 	if (ret) {
-		drv_log("DRM_IOCTL_MTK_GEM_MAP_OFFSET failed\n");
+		drv_loge("DRM_IOCTL_MTK_GEM_MAP_OFFSET failed\n");
 		return MAP_FAILED;
 	}
 
 	prime_fd = drv_bo_get_plane_fd(bo, 0);
 	if (prime_fd < 0) {
-		drv_log("Failed to get a prime fd\n");
+		drv_loge("Failed to get a prime fd\n");
 		return MAP_FAILED;
 	}
 
@@ -303,7 +304,7 @@ static int mediatek_bo_invalidate(struct bo *bo, struct mapping *mapping)
 
 		poll(&fds, 1, -1);
 		if (fds.revents != fds.events)
-			drv_log("poll prime_fd failed\n");
+			drv_loge("poll prime_fd failed\n");
 
 		if (priv->cached_addr)
 			memcpy(priv->cached_addr, priv->gem_addr, bo->meta.total_size);
