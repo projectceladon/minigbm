@@ -10,6 +10,7 @@
 #include "../drv.h"
 #include "cros_gralloc_handle.h"
 
+#include <log/log.h>
 #include <system/graphics.h>
 #include <system/window.h>
 
