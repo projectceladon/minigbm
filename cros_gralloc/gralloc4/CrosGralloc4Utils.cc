@@ -64,18 +64,17 @@ int convertToCrosDescriptor(const BufferDescriptorInfo& descriptor,
     outCrosDescriptor->droid_usage = descriptor.usage;
     outCrosDescriptor->reserved_region_size = descriptor.reservedSize;
     if (descriptor.layerCount > 1) {
-        drv_log("Failed to convert descriptor. Unsupported layerCount: %d\n",
-                descriptor.layerCount);
+        ALOGE("Failed to convert descriptor. Unsupported layerCount: %d", descriptor.layerCount);
         return -EINVAL;
     }
     if (convertToDrmFormat(descriptor.format, &outCrosDescriptor->drm_format)) {
         std::string pixelFormatString = getPixelFormatString(descriptor.format);
-        drv_log("Failed to convert descriptor. Unsupported format %s\n", pixelFormatString.c_str());
+        ALOGE("Failed to convert descriptor. Unsupported format %s", pixelFormatString.c_str());
         return -EINVAL;
     }
     if (convertToBufferUsage(descriptor.usage, &outCrosDescriptor->use_flags)) {
         std::string usageString = getUsageString(descriptor.usage);
-        drv_log("Failed to convert descriptor. Unsupported usage flags %s\n", usageString.c_str());
+        ALOGE("Failed to convert descriptor. Unsupported usage flags %s", usageString.c_str());
         return -EINVAL;
     }
     return 0;
@@ -398,7 +397,7 @@ int getPlaneLayouts(uint32_t drmFormat, std::vector<PlaneLayout>* outPlaneLayout
     const auto& planeLayoutsMap = GetPlaneLayoutsMap();
     const auto it = planeLayoutsMap.find(drmFormat);
     if (it == planeLayoutsMap.end()) {
-        drv_log("Unknown plane layout for format %d\n", drmFormat);
+        ALOGE("Unknown plane layout for format %d", drmFormat);
         return -EINVAL;
     }
 
