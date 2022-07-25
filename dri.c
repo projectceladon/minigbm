@@ -78,7 +78,7 @@ static void close_gem_handle(uint32_t handle, int fd)
 	gem_close.handle = handle;
 	ret = drmIoctl(fd, DRM_IOCTL_GEM_CLOSE, &gem_close);
 	if (ret)
-		drv_log("DRM_IOCTL_GEM_CLOSE failed (handle=%x) error %d\n", handle, ret);
+		drv_loge("DRM_IOCTL_GEM_CLOSE failed (handle=%x) error %d\n", handle, ret);
 }
 
 /*
@@ -135,7 +135,7 @@ static int import_into_minigbm(struct dri_driver *dri, struct bo *bo)
 		close(prime_fd);
 
 		if (ret) {
-			drv_log("drmPrimeFDToHandle failed with %s\n", strerror(errno));
+			drv_loge("drmPrimeFDToHandle failed with %s\n", strerror(errno));
 			goto cleanup;
 		}
 
