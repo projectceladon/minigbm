@@ -226,10 +226,9 @@ void cross_domain_get_emulated_metadata(struct bo_metadata *metadata)
 	uint32_t offset = 0;
 
 	for (size_t i = 0; i < metadata->num_planes; i++) {
-		metadata->strides[i] =
-		    drv_stride_from_format(metadata->format, metadata->width, i);
-		metadata->sizes[i] =
-		    drv_size_from_format(metadata->format, metadata->strides[i], metadata->height, i);
+		metadata->strides[i] = drv_stride_from_format(metadata->format, metadata->width, i);
+		metadata->sizes[i] = drv_size_from_format(metadata->format, metadata->strides[i],
+							  metadata->height, i);
 		metadata->offsets[i] = offset;
 		offset += metadata->sizes[i];
 	}
