@@ -207,6 +207,15 @@ static int mediatek_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint
 			uint32_t padded_last_plane_size = drv_size_from_format(
 			    format, bo->meta.strides[last_plane], ALIGN(height, 4), last_plane);
 			bo->meta.total_size += padded_last_plane_size - bo->meta.sizes[last_plane];
+
+			/* b/239243515 workaround starts here */
+			height = ALIGN(height, 4);
+			bo->meta.total_size = 0;
+			for (plane = 0; plane < bo->meta.num_planes; plane++) {
+				bo->meta.total_size += drv_size_from_format(
+				    format, bo->meta.strides[plane], height, plane);
+			}
+			/* b/239243515 workaround ends here */
 		}
 #endif
 	}
