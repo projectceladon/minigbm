@@ -36,6 +36,14 @@
 #define DONT_USE_64_ALIGNMENT_FOR_VIDEO_BUFFERS
 #endif
 
+// For Mali Sigurd based GPUs, the texture unit reads outside the specified texture dimensions.
+// Therefore, certain formats require extra memory padding to its allocated surface to prevent the
+// hardware from reading outside an allocation. For YVU420, we need additional padding for the last
+// chroma plane.
+#if defined(MTK_MT8186)
+#define USE_EXTRA_PADDING_FOR_YVU420
+#endif
+
 struct mediatek_private_map_data {
 	void *cached_addr;
 	void *gem_addr;
@@ -190,6 +198,17 @@ static int mediatek_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint
 			height = ALIGN(height, 16);
 #endif
 		drv_bo_from_format(bo, stride, height, format);
+
+#ifdef USE_EXTRA_PADDING_FOR_YVU420
+		/* Do the fix after drv_bo_from_format to avoid extra calculations. */
+		if ((format == DRM_FORMAT_YVU420 || format == DRM_FORMAT_YVU420_ANDROID) &&
+		    (bo->meta.use_flags & BO_USE_TEXTURE)) {
+			const size_t last_plane = bo->meta.num_planes - 1;
+			uint32_t padded_last_plane_size = drv_size_from_format(
+			    format, bo->meta.strides[last_plane], ALIGN(height, 4), last_plane);
+			bo->meta.total_size += padded_last_plane_size - bo->meta.sizes[last_plane];
+		}
+#endif
 	}
 
 	gem_create.size = bo->meta.total_size;
