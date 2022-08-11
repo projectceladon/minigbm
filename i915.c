@@ -58,6 +58,7 @@ struct i915_device {
 	bool is_xelpd;
 	/*TODO : cleanup is_mtl to avoid adding variables for every new platforms */
 	bool is_mtl;
+	int32_t num_fences_avail;
 };
 
 static void i915_info_from_device_id(struct i915_device *i915)
@@ -395,6 +396,15 @@ static int i915_init(struct driver *drv)
 		return -EINVAL;
 	}
 
+	memset(&get_param, 0, sizeof(get_param));
+	get_param.param = I915_PARAM_NUM_FENCES_AVAIL;
+	get_param.value = &i915->num_fences_avail;
+	ret = drmIoctl(drv->fd, DRM_IOCTL_I915_GETPARAM, &get_param);
+	if (ret) {
+		drv_loge("Failed to get I915_PARAM_NUM_FENCES_AVAIL\n");
+		return -EINVAL;
+	}
+
 	if (i915->graphics_version >= 12)
 		i915->has_hw_protection = 1;
 
@@ -681,20 +691,24 @@ static int i915_bo_create_from_metadata(struct bo *bo)
 	for (plane = 0; plane < bo->meta.num_planes; plane++)
 		bo->handles[plane].u32 = gem_handle;
 
-	gem_set_tiling.handle = bo->handles[0].u32;
-	gem_set_tiling.tiling_mode = bo->meta.tiling;
-	gem_set_tiling.stride = bo->meta.strides[0];
+	/* Set/Get tiling ioctl not supported  based on fence availability
+	   Refer : "https://patchwork.freedesktop.org/patch/325343/"
+         */
+	if (i915->num_fences_avail) {
+		gem_set_tiling.handle = bo->handles[0].u32;
+		gem_set_tiling.tiling_mode = bo->meta.tiling;
+		gem_set_tiling.stride = bo->meta.strides[0];
 
-	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_SET_TILING, &gem_set_tiling);
-	if (ret) {
-		struct drm_gem_close gem_close = { 0 };
-		gem_close.handle = bo->handles[0].u32;
-		drmIoctl(bo->drv->fd, DRM_IOCTL_GEM_CLOSE, &gem_close);
+		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_SET_TILING, &gem_set_tiling);
+		if (ret) {
+			struct drm_gem_close gem_close = { 0 };
+			gem_close.handle = bo->handles[0].u32;
+			drmIoctl(bo->drv->fd, DRM_IOCTL_GEM_CLOSE, &gem_close);
 
-		drv_loge("DRM_IOCTL_I915_GEM_SET_TILING failed with %d\n", errno);
-		return -errno;
+			drv_loge("DRM_IOCTL_I915_GEM_SET_TILING failed with %d\n", errno);
+			return -errno;
+		}
 	}
-
 	return 0;
 }
 
@@ -708,6 +722,7 @@ static int i915_bo_import(struct bo *bo, struct drv_import_fd_data *data)
 {
 	int ret;
 	struct drm_i915_gem_get_tiling gem_get_tiling = { 0 };
+	struct i915_device *i915 = bo->drv->priv;
 
 	bo->meta.num_planes =
 	    i915_num_planes_from_modifier(bo->drv, data->format, data->format_modifier);
@@ -716,17 +731,21 @@ static int i915_bo_import(struct bo *bo, struct drv_import_fd_data *data)
 	if (ret)
 		return ret;
 
-	/* TODO(gsingh): export modifiers and get rid of backdoor tiling. */
-	gem_get_tiling.handle = bo->handles[0].u32;
+	/* Set/Get tiling ioctl not supported  based on fence availability
+	   Refer : "https://patchwork.freedesktop.org/patch/325343/"
+         */
+	if (i915->num_fences_avail) {
+		/* TODO(gsingh): export modifiers and get rid of backdoor tiling. */
+		gem_get_tiling.handle = bo->handles[0].u32;
 
-	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_GET_TILING, &gem_get_tiling);
-	if (ret) {
-		drv_gem_bo_destroy(bo);
-		drv_loge("DRM_IOCTL_I915_GEM_GET_TILING failed.\n");
-		return ret;
+		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_GET_TILING, &gem_get_tiling);
+		if (ret) {
+			drv_gem_bo_destroy(bo);
+			drv_loge("DRM_IOCTL_I915_GEM_GET_TILING failed.\n");
+			return ret;
+		}
+		bo->meta.tiling = gem_get_tiling.tiling_mode;
 	}
-
-	bo->meta.tiling = gem_get_tiling.tiling_mode;
 	return 0;
 }
 
