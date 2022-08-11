@@ -50,12 +50,14 @@ struct modifier_support_t {
 };
 
 struct i915_device {
-	uint32_t gen;
+	uint32_t graphics_version;
 	int32_t has_llc;
 	int32_t has_hw_protection;
 	struct modifier_support_t modifier;
 	int device_id;
 	bool is_xelpd;
+	/*TODO : cleanup is_mtl to avoid adding variables for every new platforms */
+	bool is_mtl;
 };
 
 static void i915_info_from_device_id(struct i915_device *i915)
@@ -108,73 +110,83 @@ static void i915_info_from_device_id(struct i915_device *i915)
 				      0x46C0, 0x46C1, 0x46C2, 0x46C3, 0x46D0, 0x46D1, 0x46D2 };
 
 	const uint16_t rplp_ids[] = { 0xA720, 0xA721, 0xA7A0, 0xA7A1, 0xA7A8, 0xA7A9 };
+
+	const uint16_t mtl_ids[] = { 0x7D40, 0x7D60, 0x7D45, 0x7D55, 0x7DD5 };
+
 	unsigned i;
-	i915->gen = 4;
+	i915->graphics_version = 4;
 	i915->is_xelpd = false;
+	i915->is_mtl = false;
 
 	for (i = 0; i < ARRAY_SIZE(gen3_ids); i++)
 		if (gen3_ids[i] == i915->device_id)
-			i915->gen = 3;
+			i915->graphics_version = 3;
 
 	/* Gen 4 */
 	for (i = 0; i < ARRAY_SIZE(gen4_ids); i++)
 		if (gen4_ids[i] == i915->device_id)
-			i915->gen = 4;
+			i915->graphics_version = 4;
 
 	/* Gen 5 */
 	for (i = 0; i < ARRAY_SIZE(gen5_ids); i++)
 		if (gen5_ids[i] == i915->device_id)
-			i915->gen = 5;
+			i915->graphics_version = 5;
 
 	/* Gen 6 */
 	for (i = 0; i < ARRAY_SIZE(gen6_ids); i++)
 		if (gen6_ids[i] == i915->device_id)
-			i915->gen = 6;
+			i915->graphics_version = 6;
 
 	/* Gen 7 */
 	for (i = 0; i < ARRAY_SIZE(gen7_ids); i++)
 		if (gen7_ids[i] == i915->device_id)
-			i915->gen = 7;
+			i915->graphics_version = 7;
 
 	/* Gen 8 */
 	for (i = 0; i < ARRAY_SIZE(gen8_ids); i++)
 		if (gen8_ids[i] == i915->device_id)
-			i915->gen = 8;
+			i915->graphics_version = 8;
 
 	/* Gen 9 */
 	for (i = 0; i < ARRAY_SIZE(gen9_ids); i++)
 		if (gen9_ids[i] == i915->device_id)
-			i915->gen = 9;
+			i915->graphics_version = 9;
 
 	/* Gen 11 */
 	for (i = 0; i < ARRAY_SIZE(gen11_ids); i++)
 		if (gen11_ids[i] == i915->device_id)
-			i915->gen = 11;
+			i915->graphics_version = 11;
 
 	/* Gen 12 */
 	for (i = 0; i < ARRAY_SIZE(gen12_ids); i++)
 		if (gen12_ids[i] == i915->device_id)
-			i915->gen = 12;
+			i915->graphics_version = 12;
 
 	for (i = 0; i < ARRAY_SIZE(adlp_ids); i++)
 		if (adlp_ids[i] == i915->device_id) {
 			i915->is_xelpd = true;
-			i915->gen = 12;
+			i915->graphics_version = 12;
 		}
 
 	for (i = 0; i < ARRAY_SIZE(rplp_ids); i++)
 		if (rplp_ids[i] == i915->device_id) {
 			i915->is_xelpd = true;
-			i915->gen = 12;
+			i915->graphics_version = 12;
+		}
+
+	for (i = 0; i < ARRAY_SIZE(mtl_ids); i++)
+		if (mtl_ids[i] == i915->device_id) {
+			i915->graphics_version = 12;
+			i915->is_mtl = true;
 		}
 }
 
 static void i915_get_modifier_order(struct i915_device *i915)
 {
-	if (i915->gen == 12) {
+	if (i915->graphics_version == 12) {
 		i915->modifier.order = gen12_modifier_order;
 		i915->modifier.count = ARRAY_SIZE(gen12_modifier_order);
-	} else if (i915->gen == 11) {
+	} else if (i915->graphics_version == 11) {
 		i915->modifier.order = gen11_modifier_order;
 		i915->modifier.count = ARRAY_SIZE(gen11_modifier_order);
 	} else {
@@ -259,7 +271,7 @@ static int i915_add_combinations(struct driver *drv)
 	const uint64_t nv12_usage =
 	    BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER | BO_USE_SCANOUT | hw_protected;
 	const uint64_t p010_usage = BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER | hw_protected |
-				    (i915->gen >= 11 ? BO_USE_SCANOUT : 0);
+				    (i915->graphics_version >= 11 ? BO_USE_SCANOUT : 0);
 #else
 	const uint64_t nv12_usage = BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER;
 	const uint64_t p010_usage = nv12_usage;
@@ -312,7 +324,7 @@ static int i915_align_dimensions(struct bo *bo, uint32_t tiling, uint32_t *strid
 		break;
 
 	case I915_TILING_Y:
-		if (i915->gen == 3) {
+		if (i915->graphics_version == 3) {
 			horizontal_alignment = 512;
 			vertical_alignment = 8;
 		} else {
@@ -323,7 +335,7 @@ static int i915_align_dimensions(struct bo *bo, uint32_t tiling, uint32_t *strid
 	}
 
 	*aligned_height = ALIGN(*aligned_height, vertical_alignment);
-	if (i915->gen > 3) {
+	if (i915->graphics_version > 3) {
 		*stride = ALIGN(*stride, horizontal_alignment);
 	} else {
 		while (*stride > horizontal_alignment)
@@ -332,7 +344,7 @@ static int i915_align_dimensions(struct bo *bo, uint32_t tiling, uint32_t *strid
 		*stride = horizontal_alignment;
 	}
 
-	if (i915->gen <= 3 && *stride > 8192)
+	if (i915->graphics_version <= 3 && *stride > 8192)
 		return -EINVAL;
 
 	return 0;
@@ -368,7 +380,7 @@ static int i915_init(struct driver *drv)
 		free(i915);
 		return -EINVAL;
 	}
-	/* must call before i915->gen is used anywhere else */
+	/* must call before i915->graphics_version is used anywhere else */
 	i915_info_from_device_id(i915);
 
 	i915_get_modifier_order(i915);
@@ -383,7 +395,7 @@ static int i915_init(struct driver *drv)
 		return -EINVAL;
 	}
 
-	if (i915->gen >= 12)
+	if (i915->graphics_version >= 12)
 		i915->has_hw_protection = 1;
 
 	drv->priv = i915;
@@ -402,7 +414,7 @@ static bool i915_format_needs_LCU_alignment(uint32_t format, size_t plane,
 	case DRM_FORMAT_NV12:
 	case DRM_FORMAT_P010:
 	case DRM_FORMAT_P016:
-		return (i915->gen == 11 || i915->gen == 12) && plane == 1;
+		return (i915->graphics_version == 11 || i915->graphics_version == 12) && plane == 1;
 	}
 	return false;
 }
@@ -465,7 +477,7 @@ static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t heig
 {
 	uint64_t modifier;
 	struct i915_device *i915 = bo->drv->priv;
-	bool huge_bo = (i915->gen < 11) && (width > 4096);
+	bool huge_bo = (i915->graphics_version < 11) && (width > 4096);
 
 	if (modifiers) {
 		modifier =
@@ -511,7 +523,7 @@ static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t heig
 	}
 
 	/* Prevent gen 8 and earlier from trying to use a tiling modifier */
-	if (i915->gen <= 8 && format == DRM_FORMAT_ARGB8888) {
+	if (i915->graphics_version <= 8 && format == DRM_FORMAT_ARGB8888) {
 		modifier = DRM_FORMAT_MOD_LINEAR;
 	}
 
