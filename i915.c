@@ -44,6 +44,9 @@ static const uint64_t gen12_modifier_order[] = { I915_FORMAT_MOD_Y_TILED_GEN12_R
 static const uint64_t gen11_modifier_order[] = { I915_FORMAT_MOD_Y_TILED, I915_FORMAT_MOD_X_TILED,
 						 DRM_FORMAT_MOD_LINEAR };
 
+static const uint64_t xe_lpdp_modifier_order[] = { I915_FORMAT_MOD_4_TILED, I915_FORMAT_MOD_X_TILED,
+						 DRM_FORMAT_MOD_LINEAR};
+
 struct modifier_support_t {
 	const uint64_t *order;
 	uint32_t count;
@@ -184,7 +187,10 @@ static void i915_info_from_device_id(struct i915_device *i915)
 
 static void i915_get_modifier_order(struct i915_device *i915)
 {
-	if (i915->graphics_version == 12) {
+	if (i915->is_mtl) {
+		i915->modifier.order = xe_lpdp_modifier_order;
+		i915->modifier.count = ARRAY_SIZE(xe_lpdp_modifier_order);
+	} else if (i915->graphics_version == 12) {
 		i915->modifier.order = gen12_modifier_order;
 		i915->modifier.count = ARRAY_SIZE(gen12_modifier_order);
 	} else if (i915->graphics_version == 11) {
@@ -263,30 +269,50 @@ static int i915_add_combinations(struct driver *drv)
 	drv_add_combinations(drv, scanout_render_formats, ARRAY_SIZE(scanout_render_formats),
 			     &metadata_x_tiled, scanout_and_render_not_linear);
 
-	struct format_metadata metadata_y_tiled = { .tiling = I915_TILING_Y,
+	if (i915->is_mtl) {
+		struct format_metadata metadata_4_tiled = { .tiling = I915_TILING_4,
+						    .priority = 3,
+						    .modifier = I915_FORMAT_MOD_4_TILED };
+/* Support tile4 NV12 and P010 for libva */
+#ifdef I915_SCANOUT_4_TILED
+		const uint64_t nv12_usage =
+			BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER | BO_USE_SCANOUT | hw_protected;
+		const uint64_t p010_usage = BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER | hw_protected |
+                        BO_USE_SCANOUT;
+#else
+		const uint64_t nv12_usage = BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER;
+		const uint64_t p010_usage = nv12_usage;
+#endif
+		drv_add_combination(drv, DRM_FORMAT_NV12, &metadata_4_tiled, nv12_usage);
+		drv_add_combination(drv, DRM_FORMAT_P010, &metadata_4_tiled, p010_usage);
+		drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats), &metadata_4_tiled,
+			     render_not_linear);
+		drv_add_combinations(drv, scanout_render_formats, ARRAY_SIZE(scanout_render_formats),
+			     &metadata_4_tiled, render_not_linear);
+	} else {
+		struct format_metadata metadata_y_tiled = { .tiling = I915_TILING_Y,
 						    .priority = 3,
 						    .modifier = I915_FORMAT_MOD_Y_TILED };
-
 /* Support y-tiled NV12 and P010 for libva */
 #ifdef I915_SCANOUT_Y_TILED
-	const uint64_t nv12_usage =
-	    BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER | BO_USE_SCANOUT | hw_protected;
-	const uint64_t p010_usage = BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER | hw_protected |
-				    (i915->graphics_version >= 11 ? BO_USE_SCANOUT : 0);
+		const uint64_t nv12_usage =
+			BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER | BO_USE_SCANOUT | hw_protected;
+		const uint64_t p010_usage = BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER | hw_protected |
+			(i915->graphics_version >= 11 ? BO_USE_SCANOUT : 0);
 #else
-	const uint64_t nv12_usage = BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER;
-	const uint64_t p010_usage = nv12_usage;
+		const uint64_t nv12_usage = BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER;
+		const uint64_t p010_usage = nv12_usage;
 #endif
-	drv_add_combination(drv, DRM_FORMAT_NV12, &metadata_y_tiled, nv12_usage);
-	drv_add_combination(drv, DRM_FORMAT_P010, &metadata_y_tiled, p010_usage);
-
-	drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats), &metadata_y_tiled,
+		drv_add_combination(drv, DRM_FORMAT_NV12, &metadata_y_tiled, nv12_usage);
+		drv_add_combination(drv, DRM_FORMAT_P010, &metadata_y_tiled, p010_usage);
+		drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats), &metadata_y_tiled,
 			     render_not_linear);
-
-	// Y-tiled scanout isn't available on old platforms so we add
-	// |scanout_render_formats| without that USE flag.
-	drv_add_combinations(drv, scanout_render_formats, ARRAY_SIZE(scanout_render_formats),
+		/* Y-tiled scanout isn't available on old platforms so we add
+		 * |scanout_render_formats| without that USE flag.
+		 */
+		drv_add_combinations(drv, scanout_render_formats, ARRAY_SIZE(scanout_render_formats),
 			     &metadata_y_tiled, render_not_linear);
+	}
 	return 0;
 }
 
@@ -325,6 +351,7 @@ static int i915_align_dimensions(struct bo *bo, uint32_t tiling, uint32_t *strid
 		break;
 
 	case I915_TILING_Y:
+	case I915_TILING_4:
 		if (i915->graphics_version == 3) {
 			horizontal_alignment = 512;
 			vertical_alignment = 8;
@@ -552,6 +579,9 @@ static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t heig
 	case I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS:
 		bo->meta.tiling = I915_TILING_Y;
 		break;
+	case I915_FORMAT_MOD_4_TILED:
+		bo->meta.tiling = I915_TILING_4;
+		break;
 	}
 
 	bo->meta.format_modifier = modifier;
@@ -754,10 +784,9 @@ static void *i915_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t 
 	int ret;
 	void *addr = MAP_FAILED;
 
-	if (bo->meta.format_modifier == I915_FORMAT_MOD_Y_TILED_CCS)
-		return MAP_FAILED;
-
-	if (bo->meta.format_modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS)
+	if ((bo->meta.format_modifier == I915_FORMAT_MOD_Y_TILED_CCS) ||
+	    (bo->meta.format_modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS) ||
+	    (bo->meta.format_modifier == I915_FORMAT_MOD_4_TILED))
 		return MAP_FAILED;
 
 	if (bo->meta.tiling == I915_TILING_NONE) {
