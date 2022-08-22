@@ -70,6 +70,7 @@ static const uint32_t texture_source_formats[] = {
 static const uint32_t video_yuv_formats[] = {
 	DRM_FORMAT_NV21,
 	DRM_FORMAT_NV12,
+	DRM_FORMAT_YUYV,
 	DRM_FORMAT_YVU420,
 	DRM_FORMAT_YVU420_ANDROID
 };
@@ -96,6 +97,10 @@ static int mediatek_init(struct driver *drv)
 			     &LINEAR_METADATA, BO_USE_TEXTURE_MASK);
 
 	drv_add_combination(drv, DRM_FORMAT_R8, &LINEAR_METADATA, BO_USE_SW_MASK | BO_USE_LINEAR);
+
+	/* YUYV format for video overlay and camera subsystem. */
+	drv_add_combination(drv, DRM_FORMAT_YUYV, &LINEAR_METADATA,
+			    BO_USE_HW_VIDEO_DECODER | BO_USE_SCANOUT | BO_USE_LINEAR);
 
 	/* Android CTS tests require this. */
 	drv_add_combination(drv, DRM_FORMAT_BGR888, &LINEAR_METADATA, BO_USE_SW_MASK);
