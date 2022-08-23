@@ -125,7 +125,7 @@ uint64_t cros_gralloc_convert_usage(uint64_t usage)
 	handle_usage(&usage, BUFFER_USAGE_SENSOR_DIRECT_DATA, &use_flags,
 		     BO_USE_SENSOR_DIRECT_DATA);
 	handle_usage(&usage, BUFFER_USAGE_GPU_DATA_BUFFER, &use_flags, BO_USE_GPU_DATA_BUFFER);
-	handle_usage(&usage, BUFFER_USAGE_FRONT_RENDERING, &use_flags, BO_USE_FRONT_RENDERING);
+	handle_usage(&usage, BUFFER_USAGE_FRONT_RENDERING_MASK, &use_flags, BO_USE_FRONT_RENDERING);
 
 	if (usage) {
 		ALOGE("Unhandled gralloc usage: %llx", (unsigned long long)usage);
