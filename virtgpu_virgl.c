@@ -776,6 +776,20 @@ static int virgl_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint3
 		return virgl_2d_dumb_bo_create(bo, width, height, format, use_flags);
 }
 
+static int virgl_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint32_t height,
+					 uint32_t format, const uint64_t *modifiers, uint32_t count)
+{
+	uint64_t use_flags = 0;
+
+	for (uint32_t i = 0; i < count; i++) {
+		if (modifiers[i] == DRM_FORMAT_MOD_LINEAR) {
+			return virgl_bo_create(bo, width, height, format, use_flags);
+		}
+	}
+
+	return -EINVAL;
+}
+
 static int virgl_bo_destroy(struct bo *bo)
 {
 	if (params[param_3d].value)
@@ -1100,6 +1114,7 @@ const struct backend virtgpu_virgl = { .name = "virtgpu_virgl",
 				       .init = virgl_init,
 				       .close = virgl_close,
 				       .bo_create = virgl_bo_create,
+				       .bo_create_with_modifiers = virgl_bo_create_with_modifiers,
 				       .bo_destroy = virgl_bo_destroy,
 				       .bo_import = drv_prime_bo_import,
 				       .bo_map = virgl_bo_map,
