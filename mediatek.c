@@ -100,7 +100,8 @@ static int mediatek_init(struct driver *drv)
 
 	/* YUYV format for video overlay and camera subsystem. */
 	drv_add_combination(drv, DRM_FORMAT_YUYV, &LINEAR_METADATA,
-			    BO_USE_HW_VIDEO_DECODER | BO_USE_SCANOUT | BO_USE_LINEAR);
+			    BO_USE_HW_VIDEO_DECODER | BO_USE_SCANOUT | BO_USE_LINEAR |
+				BO_USE_TEXTURE);
 
 	/* Android CTS tests require this. */
 	drv_add_combination(drv, DRM_FORMAT_BGR888, &LINEAR_METADATA, BO_USE_SW_MASK);
