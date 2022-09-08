@@ -26,7 +26,7 @@
 #define TILE_TYPE_LINEAR 0
 
 #if defined(MTK_MT8183) || defined(MTK_MT8186)
-#define SUPPORTS_YUV422_AND_HIGH_BIT_DEPTH_TEXTURING
+#define SUPPORTS_YUV422
 #endif
 
 // All platforms except MT8173 should USE_NV12_FOR_HW_VIDEO_DECODING.
@@ -56,12 +56,12 @@ static const uint32_t render_target_formats[] = { DRM_FORMAT_ABGR8888, DRM_FORMA
 
 // clang-format off
 static const uint32_t texture_source_formats[] = {
-#ifdef SUPPORTS_YUV422_AND_HIGH_BIT_DEPTH_TEXTURING
+#ifdef SUPPORTS_YUV422
 	DRM_FORMAT_NV21,
 	DRM_FORMAT_YUYV,
+#endif
 	DRM_FORMAT_ABGR2101010,
 	DRM_FORMAT_ABGR16161616F,
-#endif
 	DRM_FORMAT_NV12,
 	DRM_FORMAT_YVU420,
 	DRM_FORMAT_YVU420_ANDROID
@@ -194,7 +194,7 @@ static int mediatek_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint
 
 		drv_bo_from_format_and_padding(bo, stride, aligned_height, format, padding);
 	} else {
-#ifdef SUPPORTS_YUV422_AND_HIGH_BIT_DEPTH_TEXTURING
+#ifdef SUPPORTS_YUV422
 		/*
 		 * JPEG Encoder Accelerator requires 16x16 alignment. We want the buffer
 		 * from camera can be put in JEA directly so align the height to 16
