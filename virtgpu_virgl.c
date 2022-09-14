@@ -688,7 +688,7 @@ static int virgl_bo_create_blob(struct driver *drv, struct bo *bo)
 	struct virgl_priv *priv = (struct virgl_priv *)drv->priv;
 
 	uint32_t blob_flags = VIRTGPU_BLOB_FLAG_USE_SHAREABLE;
-	if (bo->meta.use_flags & BO_USE_SW_MASK)
+	if (bo->meta.use_flags & (BO_USE_SW_MASK | BO_USE_GPU_DATA_BUFFER))
 		blob_flags |= VIRTGPU_BLOB_FLAG_USE_MAPPABLE;
 
 	// For now, all blob use cases are cross device. When we add wider

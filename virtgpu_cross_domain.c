@@ -373,7 +373,7 @@ static int cross_domain_bo_create(struct bo *bo, uint32_t width, uint32_t height
 	uint32_t blob_flags = VIRTGPU_BLOB_FLAG_USE_SHAREABLE;
 	struct drm_virtgpu_resource_create_blob drm_rc_blob = { 0 };
 
-	if (use_flags & BO_USE_SW_MASK)
+	if (use_flags & (BO_USE_SW_MASK | BO_USE_GPU_DATA_BUFFER))
 		blob_flags |= VIRTGPU_BLOB_FLAG_USE_MAPPABLE;
 
 	if (!(use_flags & BO_USE_HW_MASK)) {
