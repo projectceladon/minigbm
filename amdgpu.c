@@ -425,7 +425,8 @@ static int amdgpu_init(struct driver *drv)
 	 */
 	drv_modify_combination(drv, DRM_FORMAT_R8, &metadata,
 			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER |
-				   BO_USE_HW_VIDEO_ENCODER | BO_USE_GPU_DATA_BUFFER);
+				   BO_USE_HW_VIDEO_ENCODER | BO_USE_GPU_DATA_BUFFER |
+				   BO_USE_SENSOR_DIRECT_DATA);
 
 	/*
 	 * The following formats will be allocated by the DRI backend and may be potentially tiled.

@@ -172,7 +172,7 @@ bool cros_gralloc_driver::get_resolved_format_and_use_flags(
 		resolved_use_flags &= ~BO_USE_HW_VIDEO_ENCODER;
 		combo = drv_get_combination(drv_.get(), resolved_format, resolved_use_flags);
 	}
-	if (!combo && (descriptor->droid_usage & BUFFER_USAGE_FRONT_RENDERING)) {
+	if (!combo && (descriptor->droid_usage & BUFFER_USAGE_FRONT_RENDERING_MASK)) {
 		resolved_use_flags &= ~BO_USE_FRONT_RENDERING;
 		resolved_use_flags |= BO_USE_LINEAR;
 		combo = drv_get_combination(drv_.get(), resolved_format, resolved_use_flags);

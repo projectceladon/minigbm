@@ -300,6 +300,11 @@ enum gbm_bo_flags {
     * object.
     */
    GBM_BO_USE_GPU_DATA_BUFFER = (1 << 18),
+
+   /**
+    * The buffer will be used as a sensor direct report output.
+    */
+   GBM_BO_USE_SENSOR_DIRECT_DATA = (1 << 19),
 };
 
 int
