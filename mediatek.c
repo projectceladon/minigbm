@@ -26,7 +26,7 @@
 #define TILE_TYPE_LINEAR 0
 
 #if defined(MTK_MT8183) || defined(MTK_MT8186)
-#define SUPPORTS_YUV422_AND_HIGH_BIT_DEPTH_TEXTURING
+#define SUPPORTS_YUV422
 #endif
 
 // All platforms except MT8173 should USE_NV12_FOR_HW_VIDEO_DECODING.
@@ -34,6 +34,14 @@
 #define USE_NV12_FOR_HW_VIDEO_DECODING
 #else
 #define DONT_USE_64_ALIGNMENT_FOR_VIDEO_BUFFERS
+#endif
+
+// For Mali Sigurd based GPUs, the texture unit reads outside the specified texture dimensions.
+// Therefore, certain formats require extra memory padding to its allocated surface to prevent the
+// hardware from reading outside an allocation. For YVU420, we need additional padding for the last
+// chroma plane.
+#if defined(MTK_MT8186)
+#define USE_EXTRA_PADDING_FOR_YVU420
 #endif
 
 struct mediatek_private_map_data {
@@ -48,12 +56,12 @@ static const uint32_t render_target_formats[] = { DRM_FORMAT_ABGR8888, DRM_FORMA
 
 // clang-format off
 static const uint32_t texture_source_formats[] = {
-#ifdef SUPPORTS_YUV422_AND_HIGH_BIT_DEPTH_TEXTURING
+#ifdef SUPPORTS_YUV422
 	DRM_FORMAT_NV21,
 	DRM_FORMAT_YUYV,
+#endif
 	DRM_FORMAT_ABGR2101010,
 	DRM_FORMAT_ABGR16161616F,
-#endif
 	DRM_FORMAT_NV12,
 	DRM_FORMAT_YVU420,
 	DRM_FORMAT_YVU420_ANDROID
@@ -62,6 +70,7 @@ static const uint32_t texture_source_formats[] = {
 static const uint32_t video_yuv_formats[] = {
 	DRM_FORMAT_NV21,
 	DRM_FORMAT_NV12,
+	DRM_FORMAT_YUYV,
 	DRM_FORMAT_YVU420,
 	DRM_FORMAT_YVU420_ANDROID
 };
@@ -89,6 +98,11 @@ static int mediatek_init(struct driver *drv)
 
 	drv_add_combination(drv, DRM_FORMAT_R8, &LINEAR_METADATA, BO_USE_SW_MASK | BO_USE_LINEAR);
 
+	/* YUYV format for video overlay and camera subsystem. */
+	drv_add_combination(drv, DRM_FORMAT_YUYV, &LINEAR_METADATA,
+			    BO_USE_HW_VIDEO_DECODER | BO_USE_SCANOUT | BO_USE_LINEAR |
+				BO_USE_TEXTURE);
+
 	/* Android CTS tests require this. */
 	drv_add_combination(drv, DRM_FORMAT_BGR888, &LINEAR_METADATA, BO_USE_SW_MASK);
 
@@ -110,7 +124,7 @@ static int mediatek_init(struct driver *drv)
 	drv_modify_combination(drv, DRM_FORMAT_R8, &metadata,
 			       BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER |
 				   BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE |
-				   BO_USE_GPU_DATA_BUFFER);
+				   BO_USE_GPU_DATA_BUFFER | BO_USE_SENSOR_DIRECT_DATA);
 
 	/* NV12 format for encoding and display. */
 	drv_modify_combination(drv, DRM_FORMAT_NV12, &metadata,
@@ -180,7 +194,7 @@ static int mediatek_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint
 
 		drv_bo_from_format_and_padding(bo, stride, aligned_height, format, padding);
 	} else {
-#ifdef SUPPORTS_YUV422_AND_HIGH_BIT_DEPTH_TEXTURING
+#ifdef SUPPORTS_YUV422
 		/*
 		 * JPEG Encoder Accelerator requires 16x16 alignment. We want the buffer
 		 * from camera can be put in JEA directly so align the height to 16
@@ -190,6 +204,26 @@ static int mediatek_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint
 			height = ALIGN(height, 16);
 #endif
 		drv_bo_from_format(bo, stride, height, format);
+
+#ifdef USE_EXTRA_PADDING_FOR_YVU420
+		/* Do the fix after drv_bo_from_format to avoid extra calculations. */
+		if ((format == DRM_FORMAT_YVU420 || format == DRM_FORMAT_YVU420_ANDROID) &&
+		    (bo->meta.use_flags & BO_USE_TEXTURE)) {
+			const size_t last_plane = bo->meta.num_planes - 1;
+			uint32_t padded_last_plane_size = drv_size_from_format(
+			    format, bo->meta.strides[last_plane], ALIGN(height, 4), last_plane);
+			bo->meta.total_size += padded_last_plane_size - bo->meta.sizes[last_plane];
+
+			/* b/239243515 workaround starts here */
+			height = ALIGN(height, 4);
+			bo->meta.total_size = 0;
+			for (plane = 0; plane < bo->meta.num_planes; plane++) {
+				bo->meta.total_size += drv_size_from_format(
+				    format, bo->meta.strides[plane], height, plane);
+			}
+			/* b/239243515 workaround ends here */
+		}
+#endif
 	}
 
 	gem_create.size = bo->meta.total_size;
