@@ -341,7 +341,7 @@ const std::unordered_map<uint32_t, std::vector<PlaneLayout>>& GetPlaneLayoutsMap
                              },
                              {
                                      .components = {{.type = android::gralloc4::
-                                                             PlaneLayoutComponentType_CB,
+                                                             PlaneLayoutComponentType_CR,
                                                      .offsetInBits = 0,
                                                      .sizeInBits = 8}},
                                      .sampleIncrementInBits = 8,
@@ -350,7 +350,7 @@ const std::unordered_map<uint32_t, std::vector<PlaneLayout>>& GetPlaneLayoutsMap
                              },
                              {
                                      .components = {{.type = android::gralloc4::
-                                                             PlaneLayoutComponentType_CR,
+                                                             PlaneLayoutComponentType_CB,
                                                      .offsetInBits = 0,
                                                      .sizeInBits = 8}},
                                      .sampleIncrementInBits = 8,

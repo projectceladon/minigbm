@@ -94,12 +94,13 @@ static void add_combinations(struct driver *drv)
 
 	/*
 	 * R8 format is used for Android's HAL_PIXEL_FORMAT_BLOB and is used for JPEG snapshots
-	 * from camera, input/output from hardware decoder/encoder, and
+	 * from camera, input/output from hardware decoder/encoder and sensors, and
 	 * AHBs used as SSBOs/UBOs.
 	 */
 	drv_modify_combination(drv, DRM_FORMAT_R8, &metadata,
 			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER |
-				   BO_USE_HW_VIDEO_ENCODER | BO_USE_GPU_DATA_BUFFER);
+				   BO_USE_HW_VIDEO_ENCODER | BO_USE_SENSOR_DIRECT_DATA |
+				   BO_USE_GPU_DATA_BUFFER);
 
 	drv_modify_linear_combinations(drv);
 }
@@ -225,10 +226,9 @@ void cross_domain_get_emulated_metadata(struct bo_metadata *metadata)
 	uint32_t offset = 0;
 
 	for (size_t i = 0; i < metadata->num_planes; i++) {
-		metadata->strides[i] =
-		    drv_stride_from_format(metadata->format, metadata->width, i);
-		metadata->sizes[i] =
-		    drv_size_from_format(metadata->format, metadata->strides[i], metadata->height, i);
+		metadata->strides[i] = drv_stride_from_format(metadata->format, metadata->width, i);
+		metadata->sizes[i] = drv_size_from_format(metadata->format, metadata->strides[i],
+							  metadata->height, i);
 		metadata->offsets[i] = offset;
 		offset += metadata->sizes[i];
 	}
@@ -373,7 +373,7 @@ static int cross_domain_bo_create(struct bo *bo, uint32_t width, uint32_t height
 	uint32_t blob_flags = VIRTGPU_BLOB_FLAG_USE_SHAREABLE;
 	struct drm_virtgpu_resource_create_blob drm_rc_blob = { 0 };
 
-	if (use_flags & BO_USE_SW_MASK)
+	if (use_flags & (BO_USE_SW_MASK | BO_USE_GPU_DATA_BUFFER))
 		blob_flags |= VIRTGPU_BLOB_FLAG_USE_MAPPABLE;
 
 	if (!(use_flags & BO_USE_HW_MASK)) {

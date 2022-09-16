@@ -48,6 +48,8 @@ uint64_t gbm_convert_usage(uint32_t usage)
 		use_flags |= BO_USE_FRONT_RENDERING;
 	if (usage & GBM_BO_USE_GPU_DATA_BUFFER)
 		use_flags |= BO_USE_GPU_DATA_BUFFER;
+	if (usage & GBM_BO_USE_SENSOR_DIRECT_DATA)
+		use_flags |= BO_USE_SENSOR_DIRECT_DATA;
 
 	return use_flags;
 }
