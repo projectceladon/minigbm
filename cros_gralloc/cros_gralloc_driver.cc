@@ -131,19 +131,23 @@ int32_t cros_gralloc_driver::init()
 
 			continue;
 		}
-
-		drmFreeVersion(version);
-		drv_render_ = drv_create(fd);
 		if (!drv_render_) {
-			drv_log("Failed to create driver for render only device\n");
-			close(fd);
-			goto fail;
-		}
+			drmFreeVersion(version);
+			drv_render_ = drv_create(fd);
+			if (!drv_render_) {
+				drv_log("Failed to create driver for render only device\n");
+				close(fd);
+				goto fail;
+			}
 
-		// return success if both nodes exist
-		if (drv_kms_)
-			return 0;
-		continue;
+			// return success if both nodes exist
+			if (drv_kms_)
+				return 0;
+			continue;
+		} else { // already open one render node, close this one
+			close(fd);
+			break;
+		}
 	}
 
 	// if only have one node, set drv_render_ == drv_kms_
