@@ -7,6 +7,7 @@
 #ifdef DRV_MEDIATEK
 
 // clang-format off
+#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
@@ -84,6 +85,33 @@ static bool is_video_yuv_format(uint32_t format)
 			return true;
 	}
 	return false;
+}
+
+static uint32_t get_format_horizontal_alignment(uint32_t format)
+{
+#ifdef DONT_USE_64_ALIGNMENT_FOR_VIDEO_BUFFERS
+	switch (format) {
+	case DRM_FORMAT_NV21:
+	case DRM_FORMAT_NV12:
+	case DRM_FORMAT_YUYV:
+		return 16;
+	case DRM_FORMAT_YVU420:
+	case DRM_FORMAT_YVU420_ANDROID:
+		/* see drv_bo_from_format_and_padding */
+		return 32;
+	default:
+		assert(!is_video_yuv_format(format));
+		break;
+	}
+#endif
+
+	/*
+	 * Since the ARM L1 cache line size is 64 bytes, align to that as a
+	 * performance optimization, except for video buffers on certain platforms,
+	 * these should only be accessed from the GPU and VCODEC subsystems (maybe
+	 * also MDP), so it's better to align to macroblocks.
+	 */
+	return 64;
 }
 
 static int mediatek_init(struct driver *drv)
@@ -168,19 +196,8 @@ static int mediatek_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint
 		return -EINVAL;
 	}
 
-	/*
-	 * Since the ARM L1 cache line size is 64 bytes, align to that as a
-	 * performance optimization, except for video buffers on certain platforms,
-	 * these should only be accessed from the GPU and VCODEC subsystems (maybe
-	 * also MDP), so it's better to align to macroblocks.
-	 */
 	stride = drv_stride_from_format(format, width, 0);
-#ifdef DONT_USE_64_ALIGNMENT_FOR_VIDEO_BUFFERS
-	const uint32_t alignment = is_video_yuv_format(format) ? 16 : 64;
-	stride = ALIGN(stride, alignment);
-#else
-	stride = ALIGN(stride, 64);
-#endif
+	stride = ALIGN(stride, get_format_horizontal_alignment(format));
 
 	if ((bo->meta.use_flags & BO_USE_HW_VIDEO_ENCODER) || is_camera_preview) {
 		uint32_t aligned_height = ALIGN(height, 32);
