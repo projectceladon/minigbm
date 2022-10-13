@@ -36,7 +36,7 @@ class cros_gralloc_driver
 	int32_t unlock(buffer_handle_t handle, int32_t *release_fence);
 
 	int32_t invalidate(buffer_handle_t handle);
-	int32_t flush(buffer_handle_t handle, int32_t *release_fence);
+	int32_t flush(buffer_handle_t handle);
 
 	int32_t get_backing_store(buffer_handle_t handle, uint64_t *out_store);
 	int32_t resource_info(buffer_handle_t handle, uint32_t strides[DRV_MAX_PLANES],
