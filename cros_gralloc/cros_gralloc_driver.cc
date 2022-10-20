@@ -67,6 +67,12 @@ int32_t cros_gralloc_driver::init()
 	uint32_t j;
 	char *node;
 
+	const int render_num = 10;
+	const int name_length = 50;
+	int node_fd[render_num];
+	char node_name[render_num][name_length] = { "" };
+	int availabe_node = 0;
+
 	// destroy drivers if exist before re-initializing them
 	if (drv_kms_) {
 		int fd = drv_get_fd(drv_kms_);
@@ -113,46 +119,61 @@ int32_t cros_gralloc_driver::init()
 		if (j < ARRAY_SIZE(undesired))
 			continue;
 
-		/* While in the KMOSR mode, need open two backend driver, need specify
-		 * the drv_kms_ to open the virtio_gpu node.
-		 */
-		if (!strcmp(version->name, "virtio_gpu")) {
-			drmFreeVersion(version);
-			drv_kms_ = drv_create(fd);
-			if (!drv_kms_) {
-				drv_log("Failed to create driver for virtio device\n");
-				close(fd);
-				goto fail;
-			}
-
-			// return success if both nodes exist
-			if (drv_render_)
-				return 0;
-
-			continue;
-		}
+		node_fd[availabe_node] = fd;
+		strcpy(node_name[availabe_node], version->name);
+		availabe_node++;
 
 		drmFreeVersion(version);
-		drv_render_ = drv_create(fd);
-		if (!drv_render_) {
-			drv_log("Failed to create driver for render only device\n");
-			close(fd);
-			goto fail;
-		}
-
-		// return success if both nodes exist
-		if (drv_kms_)
-			return 0;
-		continue;
 	}
 
-	// if only have one node, set drv_render_ == drv_kms_
-	if (drv_kms_ && !drv_render_)
-		drv_render_ = drv_kms_;
-	if (drv_render_ && !drv_kms_)
-		drv_kms_ = drv_render_;
+	// open the first render node
+	if (availabe_node > 0) {
+		drv_render_ = drv_create(node_fd[0]);
+		if (!drv_render_) {
+			drv_log("Failed to create driver for the 1st device\n");
+			close(node_fd[0]);
+			goto fail;
+		}
+	}
 
-	// if no node is found, return error
+	switch (availabe_node) {
+	// only have one render node, is GVT-d/BM/VirtIO
+	case 1:
+		if (drv_render_) {
+			drv_kms_ = drv_render_;
+		} else
+			goto fail;
+		break;
+	// is SR-IOV or iGPU + dGPU
+	case 2:
+		if (!strcmp(node_name[1], "virtio_gpu")) {
+			drv_kms_ = drv_create(node_fd[1]);
+			if (!drv_kms_) {
+				drv_log("Failed to create driver for virtio device\n");
+				close(node_fd[1]);
+				goto fail;
+			}
+		} else {
+			close(node_fd[1]);
+			drv_kms_ = drv_render_;
+		}
+		break;
+	// is SR-IOV + dGPU
+	case 3:
+		if (!strcmp(node_name[1], "i915")) {
+			close(node_fd[1]);
+		}
+		if (!strcmp(node_name[2], "virtio_gpu")) {
+			drv_kms_ = drv_create(node_fd[2]);
+			if (!drv_kms_) {
+				drv_log("Failed to create driver for virtio device\n");
+				close(node_fd[2]);
+				goto fail;
+			}
+		}
+		// TO-DO: the 3rd node is i915 or others.
+	}
+
 	if (!drv_render_ && !drv_kms_)
 		return -ENODEV;
 
