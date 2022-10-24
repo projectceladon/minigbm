@@ -6,6 +6,7 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <pthread.h>
 #include <stdatomic.h>
 #include <stdint.h>
 #include <string.h>
@@ -54,11 +55,23 @@ static const uint32_t texture_source_formats[] = {
 
 extern struct virtgpu_param params[];
 
+struct virgl_blob_metadata_cache {
+	struct lru_entry entry;
+	struct bo_metadata meta;
+};
+
+#define lru_entry_to_metadata(entry) ((struct virgl_blob_metadata_cache *)(void*)(entry))
+
+#define MAX_CACHED_FORMATS 128
+
 struct virgl_priv {
 	int caps_is_v2;
 	union virgl_caps caps;
 	int host_gbm_enabled;
 	atomic_int next_blob_id;
+
+	pthread_mutex_t host_blob_format_lock;
+	struct lru virgl_blob_metadata_cache;
 };
 
 static uint32_t translate_format(uint32_t drm_fourcc)
@@ -593,7 +606,12 @@ static int virgl_init(struct driver *drv)
 	if (!priv)
 		return -ENOMEM;
 
+	int ret = pthread_mutex_init(&priv->host_blob_format_lock, NULL);
+	if (ret)
+		return ret;
+
 	drv->priv = priv;
+	lru_init(&priv->virgl_blob_metadata_cache, MAX_CACHED_FORMATS);
 
 	virgl_init_params_and_caps(drv);
 
@@ -678,41 +696,56 @@ static void virgl_close(struct driver *drv)
 	drv->priv = NULL;
 }
 
-static int virgl_bo_create_blob(struct driver *drv, struct bo *bo)
+static uint32_t blob_flags_from_use_flags(uint32_t use_flags)
 {
-	int ret;
-	uint32_t stride;
-	uint32_t cur_blob_id;
-	uint32_t cmd[VIRGL_PIPE_RES_CREATE_SIZE + 1] = { 0 };
-	struct drm_virtgpu_resource_create_blob drm_rc_blob = { 0 };
-	struct virgl_priv *priv = (struct virgl_priv *)drv->priv;
-
 	uint32_t blob_flags = VIRTGPU_BLOB_FLAG_USE_SHAREABLE;
-	if (bo->meta.use_flags & (BO_USE_SW_MASK | BO_USE_GPU_DATA_BUFFER))
+	if (use_flags & (BO_USE_SW_MASK | BO_USE_GPU_DATA_BUFFER))
 		blob_flags |= VIRTGPU_BLOB_FLAG_USE_MAPPABLE;
 
 	// For now, all blob use cases are cross device. When we add wider
 	// support for blobs, we can revisit making this unconditional.
 	blob_flags |= VIRTGPU_BLOB_FLAG_USE_CROSS_DEVICE;
 
+	return blob_flags;
+}
+
+static bool virgl_blob_metadata_eq(struct lru_entry *entry, void *data)
+{
+	struct virgl_blob_metadata_cache *e = lru_entry_to_metadata(entry);
+	struct bo_metadata *meta = data;
+	uint32_t virgl_format1 = translate_format(e->meta.format);
+	uint32_t virgl_format2 = translate_format(meta->format);
+
+	return e->meta.height == meta->height && e->meta.width == meta->width &&
+		e->meta.use_flags == meta->use_flags && virgl_format1 == virgl_format2;
+}
+
+static int virgl_blob_do_create(struct driver *drv, uint32_t width, uint32_t height,
+				uint32_t use_flags, uint32_t virgl_format,
+				uint32_t total_size, uint32_t *bo_handle)
+{
+	int ret;
+	uint32_t cur_blob_id;
+	uint32_t cmd[VIRGL_PIPE_RES_CREATE_SIZE + 1] = { 0 };
+	struct drm_virtgpu_resource_create_blob drm_rc_blob = { 0 };
+	struct virgl_priv *priv = (struct virgl_priv *)drv->priv;
+	uint32_t virgl_bind_flags = compute_virgl_bind_flags(use_flags);
+	uint32_t blob_flags = blob_flags_from_use_flags(use_flags);
+
 	cur_blob_id = atomic_fetch_add(&priv->next_blob_id, 1);
-	stride = drv_stride_from_format(bo->meta.format, bo->meta.width, 0);
-	drv_bo_from_format(bo, stride, bo->meta.height, bo->meta.format);
-	bo->meta.total_size = ALIGN(bo->meta.total_size, PAGE_SIZE);
-	bo->meta.tiling = blob_flags;
 
 	cmd[0] = VIRGL_CMD0(VIRGL_CCMD_PIPE_RESOURCE_CREATE, 0, VIRGL_PIPE_RES_CREATE_SIZE);
 	cmd[VIRGL_PIPE_RES_CREATE_TARGET] = PIPE_TEXTURE_2D;
-	cmd[VIRGL_PIPE_RES_CREATE_WIDTH] = bo->meta.width;
-	cmd[VIRGL_PIPE_RES_CREATE_HEIGHT] = bo->meta.height;
-	cmd[VIRGL_PIPE_RES_CREATE_FORMAT] = translate_format(bo->meta.format);
-	cmd[VIRGL_PIPE_RES_CREATE_BIND] = compute_virgl_bind_flags(bo->meta.use_flags);
+	cmd[VIRGL_PIPE_RES_CREATE_WIDTH] = width;
+	cmd[VIRGL_PIPE_RES_CREATE_HEIGHT] = height;
+	cmd[VIRGL_PIPE_RES_CREATE_FORMAT] = virgl_format;
+	cmd[VIRGL_PIPE_RES_CREATE_BIND] = virgl_bind_flags;
 	cmd[VIRGL_PIPE_RES_CREATE_DEPTH] = 1;
 	cmd[VIRGL_PIPE_RES_CREATE_BLOB_ID] = cur_blob_id;
 
 	drm_rc_blob.cmd = (uint64_t)&cmd;
 	drm_rc_blob.cmd_size = 4 * (VIRGL_PIPE_RES_CREATE_SIZE + 1);
-	drm_rc_blob.size = bo->meta.total_size;
+	drm_rc_blob.size = total_size;
 	drm_rc_blob.blob_mem = VIRTGPU_BLOB_MEM_HOST3D;
 	drm_rc_blob.blob_flags = blob_flags;
 	drm_rc_blob.blob_id = cur_blob_id;
@@ -723,8 +756,117 @@ static int virgl_bo_create_blob(struct driver *drv, struct bo *bo)
 		return -errno;
 	}
 
+	*bo_handle = drm_rc_blob.bo_handle;
+	return 0;
+}
+
+// Queries the host layout for the requested buffer metadata.
+//
+// Of particular interest is total_size. This value is passed to the kernel when creating
+// a buffer via drm_virtgpu_resource_create_blob.size, to specify how much "vram" to
+// allocate for use when exposing the host buffer to the guest. As such, we need to know
+// this value before allocating a buffer to ensure that the full host buffer is actually
+// visible to the guest.
+//
+// Note that we can't reuse these test buffers as actual allocations because our guess for
+// total_size is insufficient if width!=stride or padding!=0.
+static int virgl_blob_get_host_format(struct driver *drv, struct bo_metadata *meta)
+{
+	struct virgl_priv *priv = (struct virgl_priv *)drv->priv;
+	int num_planes = drv_num_planes_from_format(meta->format);
+
+	pthread_mutex_lock(&priv->host_blob_format_lock);
+	if (meta->format == DRM_FORMAT_R8) {
+		meta->offsets[0] = 0;
+		meta->sizes[0] = meta->width;
+		meta->strides[0] = meta->width;
+		meta->total_size = meta->width;
+	} else {
+		uint32_t virgl_format = translate_format(meta->format);
+		struct virgl_blob_metadata_cache *entry;
+
+		entry = lru_entry_to_metadata(lru_find(
+				&priv->virgl_blob_metadata_cache, virgl_blob_metadata_eq, meta));
+
+		if (!entry) {
+			uint32_t total_size = 0;
+			for (int i = 0; i < num_planes; i++) {
+				uint32_t stride =
+					drv_stride_from_format(meta->format, meta->width, i);
+				total_size +=
+					drv_size_from_format(meta->format, stride, meta->height, i);
+			}
+
+			uint32_t handle;
+			int ret = virgl_blob_do_create(drv, meta->width, meta->height,
+						       meta->use_flags, virgl_format,
+						       total_size, &handle);
+			if (ret) {
+				pthread_mutex_unlock(&priv->host_blob_format_lock);
+				return ret;
+			}
+
+			struct drm_virtgpu_resource_info_cros info = { 0 };
+			info.bo_handle = handle;
+			info.type = VIRTGPU_RESOURCE_INFO_TYPE_EXTENDED;
+			int info_ret =
+				drmIoctl(drv->fd, DRM_IOCTL_VIRTGPU_RESOURCE_INFO_CROS, &info);
+
+			struct drm_gem_close gem_close = { 0 };
+			gem_close.handle = handle;
+			int close_ret = drmIoctl(drv->fd, DRM_IOCTL_GEM_CLOSE, &gem_close);
+			if (close_ret)
+				drv_loge("DRM_IOCTL_GEM_CLOSE failed (handle=%x) error %d\n",
+					 handle, close_ret);
+
+			if (info_ret) {
+				pthread_mutex_unlock(&priv->host_blob_format_lock);
+				drv_loge("Getting resource info failed with %s\n", strerror(errno));
+				return info_ret;
+			}
+
+			entry = calloc(1, sizeof(*entry));
+			entry->meta = *meta;
+
+			for (int i = 0; i < num_planes; i++) {
+				entry->meta.strides[i] = info.strides[i];
+				entry->meta.sizes[i] = info.strides[i] *
+					drv_height_from_format(meta->format, meta->height, i);
+				entry->meta.offsets[i] = info.offsets[i];
+			}
+			entry->meta.total_size = entry->meta.offsets[num_planes - 1] +
+				entry->meta.sizes[num_planes - 1];
+
+			lru_insert(&priv->virgl_blob_metadata_cache, &entry->entry);
+		}
+
+		memcpy(meta->offsets, entry->meta.offsets, sizeof(meta->offsets));
+		memcpy(meta->sizes, entry->meta.sizes, sizeof(meta->sizes));
+		memcpy(meta->strides, entry->meta.strides, sizeof(meta->strides));
+		meta->total_size = entry->meta.total_size;
+	}
+	pthread_mutex_unlock(&priv->host_blob_format_lock);
+
+	meta->total_size = ALIGN(meta->total_size, PAGE_SIZE);
+	meta->tiling = blob_flags_from_use_flags(meta->use_flags);
+
+	return 0;
+}
+
+static int virgl_bo_create_blob(struct driver *drv, struct bo *bo)
+{
+	int ret;
+	uint32_t virgl_format = translate_format(bo->meta.format);
+	uint32_t bo_handle;
+
+	virgl_blob_get_host_format(drv, &bo->meta);
+	ret = virgl_blob_do_create(drv, bo->meta.width, bo->meta.height, bo->meta.use_flags,
+				   virgl_format, bo->meta.total_size, &bo_handle);
+	if (ret)
+		return ret;
+
 	for (uint32_t plane = 0; plane < bo->meta.num_planes; plane++)
-		bo->handles[plane].u32 = drm_rc_blob.bo_handle;
+		bo->handles[plane].u32 = bo_handle;
 
 	return 0;
 }
@@ -754,9 +896,13 @@ static bool should_use_blob(struct driver *drv, uint32_t format, uint64_t use_fl
 		return true;
 	case DRM_FORMAT_YVU420_ANDROID:
 	case DRM_FORMAT_NV12:
-		// Knowing buffer metadata at buffer creation isn't yet supported, so buffers
-		// can't be properly mapped into the guest.
-		return (use_flags & BO_USE_SW_MASK) == 0;
+		// Zero copy buffers are exposed for guest software access via a persistent
+		// mapping, with no flush/invalidate messages. However, the virtio-video
+		// device relies transfers to/from the host waiting on implicit fences in
+		// the host kernel to synchronize with hardware output. As such, we can only
+		// use zero copy if the guest doesn't need software access or if we're encoder
+		// input.
+		return (use_flags & BO_USE_SW_MASK) == 0 || (use_flags & BO_USE_HW_VIDEO_ENCODER);
 	default:
 		return false;
 	}
