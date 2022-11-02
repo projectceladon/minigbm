@@ -25,12 +25,20 @@
 
 #define TILE_TYPE_LINEAR 0
 
-#if defined(MTK_MT8183) || defined(MTK_MT8186)
+// clang-format off
+#if defined(MTK_MT8183) || \
+    defined(MTK_MT8186)
+// clang-format on
 #define SUPPORTS_YUV422
 #endif
 
 // All platforms except MT8173 should USE_NV12_FOR_HW_VIDEO_DECODING.
-#if defined(MTK_MT8183) || defined(MTK_MT8186) || defined(MTK_MT8192) || defined(MTK_MT8195)
+// clang-format off
+#if defined(MTK_MT8183) || \
+    defined(MTK_MT8186) || \
+    defined(MTK_MT8192) || \
+    defined(MTK_MT8195)
+// clang-format on
 #define USE_NV12_FOR_HW_VIDEO_DECODING
 #else
 #define DONT_USE_64_ALIGNMENT_FOR_VIDEO_BUFFERS
