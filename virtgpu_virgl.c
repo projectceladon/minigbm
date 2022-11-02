@@ -776,7 +776,8 @@ static int virgl_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint3
 }
 
 static int virgl_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint32_t height,
-					 uint32_t format, const uint64_t *modifiers, uint32_t count)
+					  uint32_t format, const uint64_t *modifiers,
+					  uint32_t count)
 {
 	uint64_t use_flags = 0;
 
