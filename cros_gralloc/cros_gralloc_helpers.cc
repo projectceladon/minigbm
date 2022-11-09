@@ -18,6 +18,9 @@
 /* Define to match AIDL BufferUsage::GPU_DATA_BUFFER. */
 #define BUFFER_USAGE_GPU_DATA_BUFFER (1 << 24)
 
+/* Define to match AIDL PixelFormat::R_8. */
+#define HAL_PIXEL_FORMAT_R8 0x38
+
 uint32_t cros_gralloc_convert_format(int format)
 {
 	/*
@@ -53,6 +56,7 @@ uint32_t cros_gralloc_convert_format(int format)
 	 * equal to their size in bytes.
 	 */
 	case HAL_PIXEL_FORMAT_BLOB:
+	case HAL_PIXEL_FORMAT_R8:
 		return DRM_FORMAT_R8;
 	case HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED:
 		return DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED;
