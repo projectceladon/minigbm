@@ -25,12 +25,21 @@
 
 #define TILE_TYPE_LINEAR 0
 
-#if defined(MTK_MT8183) || defined(MTK_MT8186)
+// clang-format off
+#if defined(MTK_MT8183) || \
+    defined(MTK_MT8186)
+// clang-format on
 #define SUPPORTS_YUV422
 #endif
 
 // All platforms except MT8173 should USE_NV12_FOR_HW_VIDEO_DECODING.
-#if defined(MTK_MT8183) || defined(MTK_MT8186) || defined(MTK_MT8192) || defined(MTK_MT8195)
+// clang-format off
+#if defined(MTK_MT8183) || \
+    defined(MTK_MT8186) || \
+    defined(MTK_MT8188G) || \
+    defined(MTK_MT8192) || \
+    defined(MTK_MT8195)
+// clang-format on
 #define USE_NV12_FOR_HW_VIDEO_DECODING
 #else
 #define DONT_USE_64_ALIGNMENT_FOR_VIDEO_BUFFERS
@@ -206,22 +215,31 @@ static int mediatek_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint
 		drv_bo_from_format(bo, stride, height, format);
 
 #ifdef USE_EXTRA_PADDING_FOR_YVU420
-		/* Do the fix after drv_bo_from_format to avoid extra calculations. */
+		/*
+		 * Apply extra padding for YV12 if the height does not meet round up requirement and
+		 * the image is to be sampled by gpu.
+		 */
+		static const uint32_t required_round_up = 4;
+		const uint32_t height_mod = height % required_round_up;
 		if ((format == DRM_FORMAT_YVU420 || format == DRM_FORMAT_YVU420_ANDROID) &&
-		    (bo->meta.use_flags & BO_USE_TEXTURE)) {
-			const size_t last_plane = bo->meta.num_planes - 1;
-			uint32_t padded_last_plane_size = drv_size_from_format(
-			    format, bo->meta.strides[last_plane], ALIGN(height, 4), last_plane);
-			bo->meta.total_size += padded_last_plane_size - bo->meta.sizes[last_plane];
+		    (bo->meta.use_flags & BO_USE_TEXTURE) && height_mod) {
+			const uint32_t height_padding = required_round_up - height_mod;
+			const uint32_t u_padding =
+			    drv_size_from_format(format, bo->meta.strides[2], height_padding, 2);
 
-			/* b/239243515 workaround starts here */
-			height = ALIGN(height, 4);
-			bo->meta.total_size = 0;
-			for (plane = 0; plane < bo->meta.num_planes; plane++) {
-				bo->meta.total_size += drv_size_from_format(
-				    format, bo->meta.strides[plane], height, plane);
+			bo->meta.total_size += u_padding;
+
+			/*
+			 * Since we are not aligning Y, we must make sure that its padding fits
+			 * inside the rest of the space allocated for the V/U planes.
+			 */
+			const uint32_t y_padding =
+			    drv_size_from_format(format, bo->meta.strides[0], height_padding, 0);
+			const uint32_t vu_size = drv_bo_get_plane_size(bo, 2) * 2;
+			if (y_padding > vu_size) {
+				/* Align with mali workaround to pad all 3 planes. */
+				bo->meta.total_size += y_padding + u_padding;
 			}
-			/* b/239243515 workaround ends here */
 		}
 #endif
 	}

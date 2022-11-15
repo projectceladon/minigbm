@@ -44,18 +44,24 @@ static const uint64_t gen12_modifier_order[] = { I915_FORMAT_MOD_Y_TILED_GEN12_R
 static const uint64_t gen11_modifier_order[] = { I915_FORMAT_MOD_Y_TILED, I915_FORMAT_MOD_X_TILED,
 						 DRM_FORMAT_MOD_LINEAR };
 
+static const uint64_t xe_lpdp_modifier_order[] = { I915_FORMAT_MOD_4_TILED, I915_FORMAT_MOD_X_TILED,
+						 DRM_FORMAT_MOD_LINEAR};
+
 struct modifier_support_t {
 	const uint64_t *order;
 	uint32_t count;
 };
 
 struct i915_device {
-	uint32_t gen;
+	uint32_t graphics_version;
 	int32_t has_llc;
 	int32_t has_hw_protection;
 	struct modifier_support_t modifier;
 	int device_id;
 	bool is_xelpd;
+	/*TODO : cleanup is_mtl to avoid adding variables for every new platforms */
+	bool is_mtl;
+	int32_t num_fences_avail;
 };
 
 static void i915_info_from_device_id(struct i915_device *i915)
@@ -108,73 +114,86 @@ static void i915_info_from_device_id(struct i915_device *i915)
 				      0x46C0, 0x46C1, 0x46C2, 0x46C3, 0x46D0, 0x46D1, 0x46D2 };
 
 	const uint16_t rplp_ids[] = { 0xA720, 0xA721, 0xA7A0, 0xA7A1, 0xA7A8, 0xA7A9 };
+
+	const uint16_t mtl_ids[] = { 0x7D40, 0x7D60, 0x7D45, 0x7D55, 0x7DD5 };
+
 	unsigned i;
-	i915->gen = 4;
+	i915->graphics_version = 4;
 	i915->is_xelpd = false;
+	i915->is_mtl = false;
 
 	for (i = 0; i < ARRAY_SIZE(gen3_ids); i++)
 		if (gen3_ids[i] == i915->device_id)
-			i915->gen = 3;
+			i915->graphics_version = 3;
 
 	/* Gen 4 */
 	for (i = 0; i < ARRAY_SIZE(gen4_ids); i++)
 		if (gen4_ids[i] == i915->device_id)
-			i915->gen = 4;
+			i915->graphics_version = 4;
 
 	/* Gen 5 */
 	for (i = 0; i < ARRAY_SIZE(gen5_ids); i++)
 		if (gen5_ids[i] == i915->device_id)
-			i915->gen = 5;
+			i915->graphics_version = 5;
 
 	/* Gen 6 */
 	for (i = 0; i < ARRAY_SIZE(gen6_ids); i++)
 		if (gen6_ids[i] == i915->device_id)
-			i915->gen = 6;
+			i915->graphics_version = 6;
 
 	/* Gen 7 */
 	for (i = 0; i < ARRAY_SIZE(gen7_ids); i++)
 		if (gen7_ids[i] == i915->device_id)
-			i915->gen = 7;
+			i915->graphics_version = 7;
 
 	/* Gen 8 */
 	for (i = 0; i < ARRAY_SIZE(gen8_ids); i++)
 		if (gen8_ids[i] == i915->device_id)
-			i915->gen = 8;
+			i915->graphics_version = 8;
 
 	/* Gen 9 */
 	for (i = 0; i < ARRAY_SIZE(gen9_ids); i++)
 		if (gen9_ids[i] == i915->device_id)
-			i915->gen = 9;
+			i915->graphics_version = 9;
 
 	/* Gen 11 */
 	for (i = 0; i < ARRAY_SIZE(gen11_ids); i++)
 		if (gen11_ids[i] == i915->device_id)
-			i915->gen = 11;
+			i915->graphics_version = 11;
 
 	/* Gen 12 */
 	for (i = 0; i < ARRAY_SIZE(gen12_ids); i++)
 		if (gen12_ids[i] == i915->device_id)
-			i915->gen = 12;
+			i915->graphics_version = 12;
 
 	for (i = 0; i < ARRAY_SIZE(adlp_ids); i++)
 		if (adlp_ids[i] == i915->device_id) {
 			i915->is_xelpd = true;
-			i915->gen = 12;
+			i915->graphics_version = 12;
 		}
 
 	for (i = 0; i < ARRAY_SIZE(rplp_ids); i++)
 		if (rplp_ids[i] == i915->device_id) {
 			i915->is_xelpd = true;
-			i915->gen = 12;
+			i915->graphics_version = 12;
+		}
+
+	for (i = 0; i < ARRAY_SIZE(mtl_ids); i++)
+		if (mtl_ids[i] == i915->device_id) {
+			i915->graphics_version = 12;
+			i915->is_mtl = true;
 		}
 }
 
 static void i915_get_modifier_order(struct i915_device *i915)
 {
-	if (i915->gen == 12) {
+	if (i915->is_mtl) {
+		i915->modifier.order = xe_lpdp_modifier_order;
+		i915->modifier.count = ARRAY_SIZE(xe_lpdp_modifier_order);
+	} else if (i915->graphics_version == 12) {
 		i915->modifier.order = gen12_modifier_order;
 		i915->modifier.count = ARRAY_SIZE(gen12_modifier_order);
-	} else if (i915->gen == 11) {
+	} else if (i915->graphics_version == 11) {
 		i915->modifier.order = gen11_modifier_order;
 		i915->modifier.count = ARRAY_SIZE(gen11_modifier_order);
 	} else {
@@ -250,30 +269,50 @@ static int i915_add_combinations(struct driver *drv)
 	drv_add_combinations(drv, scanout_render_formats, ARRAY_SIZE(scanout_render_formats),
 			     &metadata_x_tiled, scanout_and_render_not_linear);
 
-	struct format_metadata metadata_y_tiled = { .tiling = I915_TILING_Y,
+	if (i915->is_mtl) {
+		struct format_metadata metadata_4_tiled = { .tiling = I915_TILING_4,
+						    .priority = 3,
+						    .modifier = I915_FORMAT_MOD_4_TILED };
+/* Support tile4 NV12 and P010 for libva */
+#ifdef I915_SCANOUT_4_TILED
+		const uint64_t nv12_usage =
+			BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER | BO_USE_SCANOUT | hw_protected;
+		const uint64_t p010_usage = BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER | hw_protected |
+                        BO_USE_SCANOUT;
+#else
+		const uint64_t nv12_usage = BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER;
+		const uint64_t p010_usage = nv12_usage;
+#endif
+		drv_add_combination(drv, DRM_FORMAT_NV12, &metadata_4_tiled, nv12_usage);
+		drv_add_combination(drv, DRM_FORMAT_P010, &metadata_4_tiled, p010_usage);
+		drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats), &metadata_4_tiled,
+			     render_not_linear);
+		drv_add_combinations(drv, scanout_render_formats, ARRAY_SIZE(scanout_render_formats),
+			     &metadata_4_tiled, render_not_linear);
+	} else {
+		struct format_metadata metadata_y_tiled = { .tiling = I915_TILING_Y,
 						    .priority = 3,
 						    .modifier = I915_FORMAT_MOD_Y_TILED };
-
 /* Support y-tiled NV12 and P010 for libva */
 #ifdef I915_SCANOUT_Y_TILED
-	const uint64_t nv12_usage =
-	    BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER | BO_USE_SCANOUT | hw_protected;
-	const uint64_t p010_usage = BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER | hw_protected |
-				    (i915->gen >= 11 ? BO_USE_SCANOUT : 0);
+		const uint64_t nv12_usage =
+			BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER | BO_USE_SCANOUT | hw_protected;
+		const uint64_t p010_usage = BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER | hw_protected |
+			(i915->graphics_version >= 11 ? BO_USE_SCANOUT : 0);
 #else
-	const uint64_t nv12_usage = BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER;
-	const uint64_t p010_usage = nv12_usage;
+		const uint64_t nv12_usage = BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER;
+		const uint64_t p010_usage = nv12_usage;
 #endif
-	drv_add_combination(drv, DRM_FORMAT_NV12, &metadata_y_tiled, nv12_usage);
-	drv_add_combination(drv, DRM_FORMAT_P010, &metadata_y_tiled, p010_usage);
-
-	drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats), &metadata_y_tiled,
+		drv_add_combination(drv, DRM_FORMAT_NV12, &metadata_y_tiled, nv12_usage);
+		drv_add_combination(drv, DRM_FORMAT_P010, &metadata_y_tiled, p010_usage);
+		drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats), &metadata_y_tiled,
 			     render_not_linear);
-
-	// Y-tiled scanout isn't available on old platforms so we add
-	// |scanout_render_formats| without that USE flag.
-	drv_add_combinations(drv, scanout_render_formats, ARRAY_SIZE(scanout_render_formats),
+		/* Y-tiled scanout isn't available on old platforms so we add
+		 * |scanout_render_formats| without that USE flag.
+		 */
+		drv_add_combinations(drv, scanout_render_formats, ARRAY_SIZE(scanout_render_formats),
 			     &metadata_y_tiled, render_not_linear);
+	}
 	return 0;
 }
 
@@ -312,7 +351,8 @@ static int i915_align_dimensions(struct bo *bo, uint32_t tiling, uint32_t *strid
 		break;
 
 	case I915_TILING_Y:
-		if (i915->gen == 3) {
+	case I915_TILING_4:
+		if (i915->graphics_version == 3) {
 			horizontal_alignment = 512;
 			vertical_alignment = 8;
 		} else {
@@ -323,7 +363,7 @@ static int i915_align_dimensions(struct bo *bo, uint32_t tiling, uint32_t *strid
 	}
 
 	*aligned_height = ALIGN(*aligned_height, vertical_alignment);
-	if (i915->gen > 3) {
+	if (i915->graphics_version > 3) {
 		*stride = ALIGN(*stride, horizontal_alignment);
 	} else {
 		while (*stride > horizontal_alignment)
@@ -332,7 +372,7 @@ static int i915_align_dimensions(struct bo *bo, uint32_t tiling, uint32_t *strid
 		*stride = horizontal_alignment;
 	}
 
-	if (i915->gen <= 3 && *stride > 8192)
+	if (i915->graphics_version <= 3 && *stride > 8192)
 		return -EINVAL;
 
 	return 0;
@@ -368,7 +408,7 @@ static int i915_init(struct driver *drv)
 		free(i915);
 		return -EINVAL;
 	}
-	/* must call before i915->gen is used anywhere else */
+	/* must call before i915->graphics_version is used anywhere else */
 	i915_info_from_device_id(i915);
 
 	i915_get_modifier_order(i915);
@@ -383,7 +423,16 @@ static int i915_init(struct driver *drv)
 		return -EINVAL;
 	}
 
-	if (i915->gen >= 12)
+	memset(&get_param, 0, sizeof(get_param));
+	get_param.param = I915_PARAM_NUM_FENCES_AVAIL;
+	get_param.value = &i915->num_fences_avail;
+	ret = drmIoctl(drv->fd, DRM_IOCTL_I915_GETPARAM, &get_param);
+	if (ret) {
+		drv_loge("Failed to get I915_PARAM_NUM_FENCES_AVAIL\n");
+		return -EINVAL;
+	}
+
+	if (i915->graphics_version >= 12)
 		i915->has_hw_protection = 1;
 
 	drv->priv = i915;
@@ -402,7 +451,7 @@ static bool i915_format_needs_LCU_alignment(uint32_t format, size_t plane,
 	case DRM_FORMAT_NV12:
 	case DRM_FORMAT_P010:
 	case DRM_FORMAT_P016:
-		return (i915->gen == 11 || i915->gen == 12) && plane == 1;
+		return (i915->graphics_version == 11 || i915->graphics_version == 12) && plane == 1;
 	}
 	return false;
 }
@@ -465,7 +514,7 @@ static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t heig
 {
 	uint64_t modifier;
 	struct i915_device *i915 = bo->drv->priv;
-	bool huge_bo = (i915->gen < 11) && (width > 4096);
+	bool huge_bo = (i915->graphics_version < 11) && (width > 4096);
 
 	if (modifiers) {
 		modifier =
@@ -511,7 +560,7 @@ static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t heig
 	}
 
 	/* Prevent gen 8 and earlier from trying to use a tiling modifier */
-	if (i915->gen <= 8 && format == DRM_FORMAT_ARGB8888) {
+	if (i915->graphics_version <= 8 && format == DRM_FORMAT_ARGB8888) {
 		modifier = DRM_FORMAT_MOD_LINEAR;
 	}
 
@@ -529,6 +578,9 @@ static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t heig
 	 */
 	case I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS:
 		bo->meta.tiling = I915_TILING_Y;
+		break;
+	case I915_FORMAT_MOD_4_TILED:
+		bo->meta.tiling = I915_TILING_4;
 		break;
 	}
 
@@ -669,20 +721,24 @@ static int i915_bo_create_from_metadata(struct bo *bo)
 	for (plane = 0; plane < bo->meta.num_planes; plane++)
 		bo->handles[plane].u32 = gem_handle;
 
-	gem_set_tiling.handle = bo->handles[0].u32;
-	gem_set_tiling.tiling_mode = bo->meta.tiling;
-	gem_set_tiling.stride = bo->meta.strides[0];
+	/* Set/Get tiling ioctl not supported  based on fence availability
+	   Refer : "https://patchwork.freedesktop.org/patch/325343/"
+         */
+	if (i915->num_fences_avail) {
+		gem_set_tiling.handle = bo->handles[0].u32;
+		gem_set_tiling.tiling_mode = bo->meta.tiling;
+		gem_set_tiling.stride = bo->meta.strides[0];
 
-	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_SET_TILING, &gem_set_tiling);
-	if (ret) {
-		struct drm_gem_close gem_close = { 0 };
-		gem_close.handle = bo->handles[0].u32;
-		drmIoctl(bo->drv->fd, DRM_IOCTL_GEM_CLOSE, &gem_close);
+		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_SET_TILING, &gem_set_tiling);
+		if (ret) {
+			struct drm_gem_close gem_close = { 0 };
+			gem_close.handle = bo->handles[0].u32;
+			drmIoctl(bo->drv->fd, DRM_IOCTL_GEM_CLOSE, &gem_close);
 
-		drv_loge("DRM_IOCTL_I915_GEM_SET_TILING failed with %d\n", errno);
-		return -errno;
+			drv_loge("DRM_IOCTL_I915_GEM_SET_TILING failed with %d\n", errno);
+			return -errno;
+		}
 	}
-
 	return 0;
 }
 
@@ -696,6 +752,7 @@ static int i915_bo_import(struct bo *bo, struct drv_import_fd_data *data)
 {
 	int ret;
 	struct drm_i915_gem_get_tiling gem_get_tiling = { 0 };
+	struct i915_device *i915 = bo->drv->priv;
 
 	bo->meta.num_planes =
 	    i915_num_planes_from_modifier(bo->drv, data->format, data->format_modifier);
@@ -704,17 +761,21 @@ static int i915_bo_import(struct bo *bo, struct drv_import_fd_data *data)
 	if (ret)
 		return ret;
 
-	/* TODO(gsingh): export modifiers and get rid of backdoor tiling. */
-	gem_get_tiling.handle = bo->handles[0].u32;
+	/* Set/Get tiling ioctl not supported  based on fence availability
+	   Refer : "https://patchwork.freedesktop.org/patch/325343/"
+         */
+	if (i915->num_fences_avail) {
+		/* TODO(gsingh): export modifiers and get rid of backdoor tiling. */
+		gem_get_tiling.handle = bo->handles[0].u32;
 
-	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_GET_TILING, &gem_get_tiling);
-	if (ret) {
-		drv_gem_bo_destroy(bo);
-		drv_loge("DRM_IOCTL_I915_GEM_GET_TILING failed.\n");
-		return ret;
+		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_GET_TILING, &gem_get_tiling);
+		if (ret) {
+			drv_gem_bo_destroy(bo);
+			drv_loge("DRM_IOCTL_I915_GEM_GET_TILING failed.\n");
+			return ret;
+		}
+		bo->meta.tiling = gem_get_tiling.tiling_mode;
 	}
-
-	bo->meta.tiling = gem_get_tiling.tiling_mode;
 	return 0;
 }
 
@@ -723,10 +784,9 @@ static void *i915_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t 
 	int ret;
 	void *addr = MAP_FAILED;
 
-	if (bo->meta.format_modifier == I915_FORMAT_MOD_Y_TILED_CCS)
-		return MAP_FAILED;
-
-	if (bo->meta.format_modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS)
+	if ((bo->meta.format_modifier == I915_FORMAT_MOD_Y_TILED_CCS) ||
+	    (bo->meta.format_modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS) ||
+	    (bo->meta.format_modifier == I915_FORMAT_MOD_4_TILED))
 		return MAP_FAILED;
 
 	if (bo->meta.tiling == I915_TILING_NONE) {
