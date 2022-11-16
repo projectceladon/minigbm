@@ -77,6 +77,10 @@ extern "C" {
 #define I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS fourcc_mod_code(INTEL, 6)
 #endif
 
+//TODO: remove this defination once drm_fourcc.h contains it.
+#ifndef I915_FORMAT_MOD_4_TILED
+#define I915_FORMAT_MOD_4_TILED         fourcc_mod_code(INTEL, 9)
+#endif
 // clang-format on
 struct driver;
 struct bo;

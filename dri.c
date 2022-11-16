@@ -186,6 +186,10 @@ cleanup:
 	return ret;
 }
 
+const __DRIuseInvalidateExtension use_invalidate = {
+   .base = { __DRI_USE_INVALIDATE, 1 }
+};
+
 /*
  * The caller is responsible for setting drv->priv to a structure that derives from dri_driver.
  */
@@ -193,7 +197,8 @@ int dri_init(struct driver *drv, const char *dri_so_path, const char *driver_suf
 {
 	char fname[128];
 	const __DRIextension **(*get_extensions)();
-	const __DRIextension *loader_extensions[] = { NULL };
+	const __DRIextension *loader_extensions[] = { &use_invalidate.base, 
+		                                      NULL };
 
 	struct dri_driver *dri = drv->priv;
 	char *node_name = drmGetRenderDeviceNameFromFd(drv_get_fd(drv));
