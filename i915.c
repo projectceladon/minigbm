@@ -613,7 +613,7 @@ static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t heig
 		 * aligning to 32 bytes here.
 		 */
 		uint32_t stride = ALIGN(width, 32);
-		drv_bo_from_format(bo, stride, height, format);
+		return drv_bo_from_format(bo, stride, height, format);
 	} else if (modifier == I915_FORMAT_MOD_Y_TILED_CCS) {
 		/*
 		 * For compressed surfaces, we need a color control surface
@@ -691,7 +691,7 @@ static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t heig
 		bo->meta.num_planes = i915_num_planes_from_modifier(bo->drv, format, modifier);
 		bo->meta.total_size = bo->meta.sizes[0] + bo->meta.sizes[1];
 	} else {
-		i915_bo_from_format(bo, width, height, format);
+		return i915_bo_from_format(bo, width, height, format);
 	}
 	return 0;
 }
