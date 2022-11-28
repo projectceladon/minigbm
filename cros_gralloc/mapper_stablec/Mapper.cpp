@@ -290,7 +290,7 @@ int32_t CrosGrallocMapperV5::getMetadata(buffer_handle_t _Nonnull buffer,
     if (isStandardMetadata(metadataType)) {
         return getStandardMetadata(buffer, metadataType.value, outData, outDataSize);
     }
-    return -AIMAPPER_ERROR_BAD_VALUE;
+    return -AIMAPPER_ERROR_UNSUPPORTED;
 }
 
 int32_t CrosGrallocMapperV5::getStandardMetadata(buffer_handle_t _Nonnull bufferHandle,
