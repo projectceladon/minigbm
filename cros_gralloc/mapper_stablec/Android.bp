@@ -23,39 +23,21 @@ package {
     default_applicable_licenses: ["external_minigbm_license"],
 }
 
-cc_binary {
-    name: "android.hardware.graphics.allocator-service.minigbm",
-    defaults: ["minigbm_cros_gralloc_defaults"],
-    relative_install_path: "hw",
-    init_rc: [":allocator_rc"],
-    vintf_fragments: [":allocator_xml"],
-    vendor: true,
+cc_library_shared {
+    name: "mapper.minigbm",
+    defaults: ["minigbm_gralloc4_common_defaults"],
     shared_libs: [
         "android.hardware.graphics.allocator-V2-ndk",
-        "android.hardware.graphics.mapper@4.0",
-        "libbase",
-        "libbinder_ndk",
-        "libgralloctypes",
-        "libhidlbase",
-        "liblog",
         "libminigbm_gralloc",
-        "libminigbm_gralloc4_utils",
     ],
-    static_libs: [
-        "libaidlcommonsupport",
+    header_libs: [
+        "libbase_headers",
+        "libimapper_stablec",
+        "libimapper_providerutils",
     ],
     srcs: [
-        "Allocator.cpp",
-        "Main.cpp",
+        ":minigbm_gralloc4_mapper_files",
+        "Mapper.cpp",
     ],
-}
-
-filegroup {
-    name: "allocator_rc",
-    srcs: ["allocator.rc"],
-}
-
-filegroup {
-    name: "allocator_xml",
-    srcs: ["allocator.xml"],
+    cpp_std: "c++20",
 }

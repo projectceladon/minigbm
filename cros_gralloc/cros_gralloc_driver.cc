@@ -504,7 +504,7 @@ int32_t cros_gralloc_driver::invalidate(buffer_handle_t handle)
 	return buffer->invalidate();
 }
 
-int32_t cros_gralloc_driver::flush(buffer_handle_t handle, int32_t *release_fence)
+int32_t cros_gralloc_driver::flush(buffer_handle_t handle)
 {
 	std::lock_guard<std::mutex> lock(mutex_);
 
@@ -520,13 +520,6 @@ int32_t cros_gralloc_driver::flush(buffer_handle_t handle, int32_t *release_fenc
 		return -EINVAL;
 	}
 
-	/*
-	 * From the ANativeWindow::dequeueBuffer documentation:
-	 *
-	 * "A value of -1 indicates that the caller may access the buffer immediately without
-	 * waiting on a fence."
-	 */
-	*release_fence = -1;
 	return buffer->flush();
 }
 
