@@ -208,34 +208,35 @@ AIMapper_Error CrosGrallocMapperV5::lock(buffer_handle_t _Nonnull bufferHandle, 
         return AIMAPPER_ERROR_BAD_VALUE;
     }
 
-    if (region.left < 0 || region.top < 0 || region.right <= region.left ||
-        region.bottom <= region.top) {
-        ALOGE("Failed to lock. Invalid or empty accessRegion: [%d, %d, %d, %d]", region.left,
-              region.top, region.right, region.bottom);
-        return AIMAPPER_ERROR_BAD_VALUE;
-    }
-
-    if (region.right > crosHandle->width) {
-        ALOGE("Failed to lock. Invalid region: width greater than buffer width (%d vs %d).",
-              region.right, crosHandle->width);
-        return AIMAPPER_ERROR_BAD_VALUE;
-    }
-
-    if (region.bottom > crosHandle->height) {
-        ALOGE("Failed to lock. Invalid region: height greater than buffer height (%d vs "
-              "%d).",
-              region.bottom, crosHandle->height);
-        return AIMAPPER_ERROR_BAD_VALUE;
-    }
-
-    struct rectangle rect = {static_cast<uint32_t>(region.left), static_cast<uint32_t>(region.top),
-                             static_cast<uint32_t>(region.right - region.left),
-                             static_cast<uint32_t>(region.bottom - region.top)};
+    struct rectangle rect;
 
     // An access region of all zeros means the entire buffer.
-    if (rect.x == 0 && rect.y == 0 && rect.width == 0 && rect.height == 0) {
-        rect.width = crosHandle->width;
-        rect.height = crosHandle->height;
+    if (region.left == 0 && region.top == 0 && region.right == 0 && region.bottom == 0) {
+        rect = {0, 0, crosHandle->width, crosHandle->height};
+    } else {
+        if (region.left < 0 || region.top < 0 || region.right <= region.left ||
+            region.bottom <= region.top) {
+            ALOGE("Failed to lock. Invalid accessRegion: [%d, %d, %d, %d]", region.left,
+                  region.top, region.right, region.bottom);
+            return AIMAPPER_ERROR_BAD_VALUE;
+        }
+
+        if (region.right > crosHandle->width) {
+            ALOGE("Failed to lock. Invalid region: width greater than buffer width (%d vs %d).",
+                  region.right, crosHandle->width);
+            return AIMAPPER_ERROR_BAD_VALUE;
+        }
+
+        if (region.bottom > crosHandle->height) {
+            ALOGE("Failed to lock. Invalid region: height greater than buffer height (%d vs "
+                  "%d).",
+                  region.bottom, crosHandle->height);
+            return AIMAPPER_ERROR_BAD_VALUE;
+        }
+
+        rect = {static_cast<uint32_t>(region.left), static_cast<uint32_t>(region.top),
+                             static_cast<uint32_t>(region.right - region.left),
+                             static_cast<uint32_t>(region.bottom - region.top)};
     }
 
     uint8_t* addr[DRV_MAX_PLANES];
