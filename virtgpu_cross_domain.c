@@ -112,10 +112,10 @@ static int cross_domain_submit_cmd(struct driver *drv, uint32_t *cmd, uint32_t c
 	struct drm_virtgpu_execbuffer exec = { 0 };
 	struct cross_domain_private *priv = drv->priv;
 
+	exec.flags = VIRTGPU_EXECBUF_RING_IDX;
 	exec.command = (uint64_t)&cmd[0];
 	exec.size = cmd_size;
 	if (wait) {
-		exec.flags = VIRTGPU_EXECBUF_RING_IDX;
 		exec.bo_handles = (uint64_t)&priv->ring_handle;
 		exec.num_bo_handles = 1;
 	}
