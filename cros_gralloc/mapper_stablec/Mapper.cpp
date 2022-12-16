@@ -429,9 +429,6 @@ int32_t CrosGrallocMapperV5::getStandardMetadata(const cros_gralloc_buffer* cros
     if constexpr (metadataType == StandardMetadataType::CTA861_3) {
         return crosMetadata->cta861_3 ? provide(*crosMetadata->cta861_3) : 0;
     }
-    if constexpr (metadataType == StandardMetadataType::SMPTE2094_40) {
-        return 0;
-    }
     return -AIMAPPER_ERROR_UNSUPPORTED;
 }
 
@@ -548,12 +545,12 @@ AIMapper_Error CrosGrallocMapperV5::listSupportedMetadataTypes(
             describeStandard(StandardMetadataType::INTERLACED, true, false),
             describeStandard(StandardMetadataType::CHROMA_SITING, true, false),
             describeStandard(StandardMetadataType::PLANE_LAYOUTS, true, false),
+            describeStandard(StandardMetadataType::CROP, true, false),
             describeStandard(StandardMetadataType::DATASPACE, true, true),
             describeStandard(StandardMetadataType::COMPRESSION, true, false),
             describeStandard(StandardMetadataType::BLEND_MODE, true, true),
             describeStandard(StandardMetadataType::SMPTE2086, true, true),
             describeStandard(StandardMetadataType::CTA861_3, true, true),
-            describeStandard(StandardMetadataType::SMPTE2094_40, true, false),
     };
     *outDescriptionList = sSupportedMetadaTypes.data();
     *outNumberOfDescriptions = sSupportedMetadaTypes.size();
