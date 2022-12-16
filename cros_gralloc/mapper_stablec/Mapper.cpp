@@ -348,6 +348,9 @@ int32_t CrosGrallocMapperV5::getStandardMetadata(const cros_gralloc_buffer* cros
     if constexpr (metadataType == StandardMetadataType::WIDTH) {
         return provide(crosBuffer->get_width());
     }
+    if constexpr (metadataType == StandardMetadataType::STRIDE) {
+        return provide(crosBuffer->get_pixel_stride());
+    }
     if constexpr (metadataType == StandardMetadataType::HEIGHT) {
         return provide(crosBuffer->get_height());
     }
@@ -529,7 +532,7 @@ constexpr AIMapper_MetadataTypeDescription describeStandard(StandardMetadataType
 AIMapper_Error CrosGrallocMapperV5::listSupportedMetadataTypes(
         const AIMapper_MetadataTypeDescription* _Nullable* _Nonnull outDescriptionList,
         size_t* _Nonnull outNumberOfDescriptions) {
-    static constexpr std::array<AIMapper_MetadataTypeDescription, 21> sSupportedMetadaTypes{
+    static constexpr std::array<AIMapper_MetadataTypeDescription, 22> sSupportedMetadaTypes{
             describeStandard(StandardMetadataType::BUFFER_ID, true, false),
             describeStandard(StandardMetadataType::NAME, true, false),
             describeStandard(StandardMetadataType::WIDTH, true, false),
@@ -551,6 +554,7 @@ AIMapper_Error CrosGrallocMapperV5::listSupportedMetadataTypes(
             describeStandard(StandardMetadataType::BLEND_MODE, true, true),
             describeStandard(StandardMetadataType::SMPTE2086, true, true),
             describeStandard(StandardMetadataType::CTA861_3, true, true),
+            describeStandard(StandardMetadataType::STRIDE, true, false),
     };
     *outDescriptionList = sSupportedMetadaTypes.data();
     *outNumberOfDescriptions = sSupportedMetadaTypes.size();
