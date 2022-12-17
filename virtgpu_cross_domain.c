@@ -19,16 +19,16 @@
 #define CAPSET_CROSS_DOMAIN 5
 #define CAPSET_CROSS_FAKE 30
 
-static const uint32_t scanout_render_formats[] = { DRM_FORMAT_ABGR2101010, DRM_FORMAT_ABGR8888,
-						   DRM_FORMAT_ARGB2101010, DRM_FORMAT_ARGB8888,
-						   DRM_FORMAT_RGB565,	   DRM_FORMAT_XBGR2101010,
-						   DRM_FORMAT_XBGR8888,	   DRM_FORMAT_XRGB2101010,
+static const uint32_t scanout_render_formats[] = { DRM_FORMAT_ABGR8888, DRM_FORMAT_ARGB8888,
+						   DRM_FORMAT_RGB565, DRM_FORMAT_XBGR8888,
 						   DRM_FORMAT_XRGB8888 };
 
-static const uint32_t render_formats[] = { DRM_FORMAT_ABGR16161616F };
-
-static const uint32_t texture_only_formats[] = { DRM_FORMAT_R8, DRM_FORMAT_NV12, DRM_FORMAT_P010,
-						 DRM_FORMAT_YVU420, DRM_FORMAT_YVU420_ANDROID };
+static const uint32_t texture_only_formats[] = {
+	DRM_FORMAT_R8,		 DRM_FORMAT_NV12,	    DRM_FORMAT_P010,
+	DRM_FORMAT_YVU420,	 DRM_FORMAT_YVU420_ANDROID, DRM_FORMAT_ABGR2101010,
+	DRM_FORMAT_ARGB2101010,	 DRM_FORMAT_XBGR2101010,    DRM_FORMAT_XRGB2101010,
+	DRM_FORMAT_ABGR16161616F
+};
 
 extern struct virtgpu_param params[];
 
@@ -77,9 +77,6 @@ static void add_combinations(struct driver *drv)
 
 	drv_add_combinations(drv, scanout_render_formats, ARRAY_SIZE(scanout_render_formats),
 			     &metadata, BO_USE_RENDER_MASK | BO_USE_SCANOUT);
-
-	drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats), &metadata,
-			     BO_USE_RENDER_MASK);
 
 	drv_add_combinations(drv, texture_only_formats, ARRAY_SIZE(texture_only_formats), &metadata,
 			     BO_USE_TEXTURE_MASK);
