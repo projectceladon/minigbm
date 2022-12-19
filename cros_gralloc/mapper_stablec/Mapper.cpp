@@ -22,6 +22,7 @@
 
 using namespace ::aidl::android::hardware::graphics::common;
 using namespace ::android::hardware::graphics::mapper;
+using ::aidl::android::hardware::graphics::allocator::BufferDescriptorInfo;
 using ::android::base::unique_fd;
 
 #define REQUIRE_DRIVER()                                           \
@@ -40,10 +41,9 @@ using ::android::base::unique_fd;
     REQUIRE_DRIVER()                                    \
     VALIDATE_BUFFER_HANDLE(bufferHandle)
 
-static_assert(
-        CROS_GRALLOC4_METADATA_MAX_NAME_SIZE >=
-                ::aidl::android::hardware::graphics::allocator::BufferDescriptorInfo{}.name.size(),
-        "Metadata name storage too small to fit a BufferDescriptorInfo::name");
+static_assert(CROS_GRALLOC4_METADATA_MAX_NAME_SIZE >=
+                      decltype(std::declval<BufferDescriptorInfo>().name){}.size(),
+              "Metadata name storage too small to fit a BufferDescriptorInfo::name");
 
 constexpr const char* STANDARD_METADATA_NAME =
         "android.hardware.graphics.common.StandardMetadataType";
@@ -216,8 +216,8 @@ AIMapper_Error CrosGrallocMapperV5::lock(buffer_handle_t _Nonnull bufferHandle, 
     } else {
         if (region.left < 0 || region.top < 0 || region.right <= region.left ||
             region.bottom <= region.top) {
-            ALOGE("Failed to lock. Invalid accessRegion: [%d, %d, %d, %d]", region.left,
-                  region.top, region.right, region.bottom);
+            ALOGE("Failed to lock. Invalid accessRegion: [%d, %d, %d, %d]", region.left, region.top,
+                  region.right, region.bottom);
             return AIMAPPER_ERROR_BAD_VALUE;
         }
 
@@ -235,8 +235,8 @@ AIMapper_Error CrosGrallocMapperV5::lock(buffer_handle_t _Nonnull bufferHandle, 
         }
 
         rect = {static_cast<uint32_t>(region.left), static_cast<uint32_t>(region.top),
-                             static_cast<uint32_t>(region.right - region.left),
-                             static_cast<uint32_t>(region.bottom - region.top)};
+                static_cast<uint32_t>(region.right - region.left),
+                static_cast<uint32_t>(region.bottom - region.top)};
     }
 
     uint8_t* addr[DRV_MAX_PLANES];
