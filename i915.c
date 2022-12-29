@@ -144,6 +144,10 @@ static int i915_add_combinations(struct driver *drv)
 	if (i915->gen == 12)
 		scanout_and_render = unset_flags(scanout_and_render, BO_USE_SCANOUT);
 #endif
+	// In sriov mode, MMAP_GTT will fail for tiled buffer.
+	if ((drv->gpu_grp_type == TWO_GPU_IGPU_VIRTIO) || (drv->gpu_grp_type == THREE_GPU_IGPU_VIRTIO_DGPU))
+		scanout_and_render =
+			unset_flags(scanout_and_render, BO_USE_SW_READ_RARELY | BO_USE_SW_WRITE_RARELY);
 	drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats), &metadata, render);
 	drv_add_combinations(drv, scanout_render_formats, ARRAY_SIZE(scanout_render_formats),
 			     &metadata, scanout_and_render);

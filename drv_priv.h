@@ -49,11 +49,20 @@ struct combination {
 	uint64_t use_flags;
 };
 
+enum CIV_GPU_TYPE {
+	ONE_GPU_INTEL = 1,
+	ONE_GPU_VIRTIO,
+	TWO_GPU_IGPU_VIRTIO,
+	TWO_GPU_IGPU_DGPU,
+	THREE_GPU_IGPU_VIRTIO_DGPU
+};
+
 struct driver {
 	int fd;
 	const struct backend *backend;
 	void *priv;
 	void *buffer_table;
+	uint32_t gpu_grp_type;  	// enum CIV_GPU_TYPE
 	struct drv_array *mappings;
 	struct drv_array *combos;
 	pthread_mutex_t driver_lock;

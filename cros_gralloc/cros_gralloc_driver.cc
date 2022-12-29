@@ -72,6 +72,8 @@ int32_t cros_gralloc_driver::init()
 	int node_fd[render_num];
 	char node_name[render_num][name_length] = { "" };
 	int availabe_node = 0;
+	int virtio_node_idx = -1;
+	uint32_t gpu_grp_type = 0;
 
 	// destroy drivers if exist before re-initializing them
 	if (drv_kms_) {
@@ -102,7 +104,6 @@ int32_t cros_gralloc_driver::init()
 
 		version = drmGetVersion(fd);
 		if (!version) {
-			drmFreeVersion(version);
 			close(fd);
 			continue;
 		}
@@ -119,6 +120,10 @@ int32_t cros_gralloc_driver::init()
 		if (j < ARRAY_SIZE(undesired))
 			continue;
 
+		if (!strcmp(version->name, "virtio_gpu")) {
+			virtio_node_idx = availabe_node;
+		}
+
 		node_fd[availabe_node] = fd;
 		strcpy(node_name[availabe_node], version->name);
 		availabe_node++;
@@ -134,44 +139,63 @@ int32_t cros_gralloc_driver::init()
 			close(node_fd[0]);
 			goto fail;
 		}
-	}
 
-	switch (availabe_node) {
-	// only have one render node, is GVT-d/BM/VirtIO
-	case 1:
-		if (drv_render_) {
-			drv_kms_ = drv_render_;
-		} else
-			goto fail;
-		break;
-	// is SR-IOV or iGPU + dGPU
-	case 2:
-		if (!strcmp(node_name[1], "virtio_gpu")) {
-			drv_kms_ = drv_create(node_fd[1]);
-			if (!drv_kms_) {
-				drv_log("Failed to create driver for virtio device\n");
+		switch (availabe_node) {
+		// only have one render node, is GVT-d/BM/VirtIO
+		case 1:
+			if (drv_render_) {
+				drv_kms_ = drv_render_;
+			} else
+				goto fail;
+			gpu_grp_type = (virtio_node_idx != -1)? ONE_GPU_VIRTIO: ONE_GPU_INTEL;
+			break;
+		// is SR-IOV or iGPU + dGPU
+		case 2:
+			if (virtio_node_idx != -1) {
+				drv_kms_ = drv_create(node_fd[virtio_node_idx]);
+				if (!drv_kms_) {
+					drv_log("Failed to create driver for virtio device\n");
+					close(node_fd[virtio_node_idx]);
+					goto fail;
+				}
+				gpu_grp_type = TWO_GPU_IGPU_VIRTIO;
+			} else {
 				close(node_fd[1]);
+				drv_kms_ = drv_render_;
+				gpu_grp_type = TWO_GPU_IGPU_DGPU;
+			}
+			break;
+		// is SR-IOV + dGPU
+		case 3:
+			if (!strcmp(node_name[1], "i915")) {
+				close(node_fd[1]);
+			}
+			if (virtio_node_idx != -1) {
+				drv_kms_ = drv_create(node_fd[virtio_node_idx]);
+				if (!drv_kms_) {
+					drv_log("Failed to create driver for virtio device\n");
+					close(node_fd[virtio_node_idx]);
+					goto fail;
+				}
+			}
+			gpu_grp_type = THREE_GPU_IGPU_VIRTIO_DGPU;
+			// TO-DO: the 3rd node is i915 or others.
+			break;
+		}
+
+		if (drv_render_) {
+			if (drv_init(drv_render_, gpu_grp_type)) {
+				drv_log("Failed to init render driver\n");
 				goto fail;
 			}
-		} else {
-			close(node_fd[1]);
-			drv_kms_ = drv_render_;
 		}
-		break;
-	// is SR-IOV + dGPU
-	case 3:
-		if (!strcmp(node_name[1], "i915")) {
-			close(node_fd[1]);
-		}
-		if (!strcmp(node_name[2], "virtio_gpu")) {
-			drv_kms_ = drv_create(node_fd[2]);
-			if (!drv_kms_) {
-				drv_log("Failed to create driver for virtio device\n");
-				close(node_fd[2]);
+
+		if (drv_kms_ && (drv_kms_ != drv_render_)) {
+			if (drv_init(drv_kms_, gpu_grp_type)) {
+				drv_log("Failed to init kms driver\n");
 				goto fail;
 			}
 		}
-		// TO-DO: the 3rd node is i915 or others.
 	}
 
 	if (!drv_render_ && !drv_kms_)
