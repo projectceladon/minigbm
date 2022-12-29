@@ -7,7 +7,9 @@
 #ifdef DRV_I915
 
 #include <assert.h>
+#include <dirent.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <i915_drm.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -77,6 +79,49 @@ static uint64_t unset_flags(uint64_t current_flags, uint64_t mask)
 	return value;
 }
 
+static int is_sriov()
+{
+    DIR           *drv_dir;
+    struct dirent *sub_file;
+    int virtio_cnt = 0, i915_cnt = 0;
+    int fd;
+    drmVersionPtr version;
+    char full_path[64];
+
+    drv_dir = opendir("/dev/dri");
+    if (!drv_dir)
+        return 0;
+
+    while ((sub_file = readdir(drv_dir)) != NULL) {
+        if ((sub_file->d_type == DT_CHR)
+            && !strncmp(sub_file->d_name, "renderD", 7)) {
+
+            snprintf(full_path, 64, "/dev/dri/%s", sub_file->d_name);
+            fd = open(full_path, O_RDWR);
+            if (fd < 0)
+                continue;
+
+            version = drmGetVersion(fd);
+            if (!version) {
+                close(fd);
+                continue;
+            }
+
+            if (!strcmp(version->name, "virtio_gpu")) {
+                virtio_cnt ++;
+            } else if (!strcmp(version->name, "i915")) {
+                i915_cnt ++;
+            }
+
+            drmFreeVersion(version);
+            close(fd);
+        }
+    }
+
+    closedir(drv_dir);
+    return ((virtio_cnt > 0) && (i915_cnt > 0));
+}
+
 static int i915_add_combinations(struct driver *drv)
 {
 #ifdef USE_GRALLOC1
@@ -84,6 +129,7 @@ static int i915_add_combinations(struct driver *drv)
 #endif
 	struct format_metadata metadata;
 	uint64_t render, scanout_and_render, texture_only;
+	int is_sriov_mode = is_sriov();
 
 	scanout_and_render = BO_USE_RENDER_MASK | BO_USE_SCANOUT;
 #ifdef USE_GRALLOC1
@@ -144,6 +190,9 @@ static int i915_add_combinations(struct driver *drv)
 	if (i915->gen == 12)
 		scanout_and_render = unset_flags(scanout_and_render, BO_USE_SCANOUT);
 #endif
+    if (is_sriov_mode)
+        scanout_and_render =
+            unset_flags(scanout_and_render, BO_USE_SW_READ_RARELY | BO_USE_SW_WRITE_RARELY);
 	drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats), &metadata, render);
 	drv_add_combinations(drv, scanout_render_formats, ARRAY_SIZE(scanout_render_formats),
 			     &metadata, scanout_and_render);
