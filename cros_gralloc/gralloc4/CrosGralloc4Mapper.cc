@@ -336,11 +336,11 @@ Return<void> CrosGralloc4Mapper::flushLockedBuffer(void* rawHandle, flushLockedB
     }
 
     /*
-	 * From the ANativeWindow::dequeueBuffer documentation:
-	 *
-	 * "A value of -1 indicates that the caller may access the buffer immediately without
-	 * waiting on a fence."
-	 */
+     * From the ANativeWindow::dequeueBuffer documentation:
+     *
+     * "A value of -1 indicates that the caller may access the buffer immediately without
+     * waiting on a fence."
+     */
     int releaseFenceFd = -1;
     int ret = mDriver->flush(bufferHandle);
     if (ret) {
