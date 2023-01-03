@@ -187,7 +187,7 @@ cleanup:
 }
 
 const __DRIuseInvalidateExtension use_invalidate = {
-   .base = { __DRI_USE_INVALIDATE, 1 }
+	.base = { __DRI_USE_INVALIDATE, 1 },
 };
 
 /*
@@ -197,8 +197,7 @@ int dri_init(struct driver *drv, const char *dri_so_path, const char *driver_suf
 {
 	char fname[128];
 	const __DRIextension **(*get_extensions)();
-	const __DRIextension *loader_extensions[] = { &use_invalidate.base, 
-		                                      NULL };
+	const __DRIextension *loader_extensions[] = { &use_invalidate.base, NULL };
 
 	struct dri_driver *dri = drv->priv;
 	char *node_name = drmGetRenderDeviceNameFromFd(drv_get_fd(drv));
