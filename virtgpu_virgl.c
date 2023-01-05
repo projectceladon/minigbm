@@ -992,9 +992,12 @@ static void virgl_3d_resolve_format_and_use_flags(struct driver *drv, uint32_t f
 		if (use_flags & (BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE)) {
 			*out_format = DRM_FORMAT_NV12;
 		} else {
-			/* HACK: See b/28671744 */
+			/* HACK: See b/28671744 and b/264408280 */
 			*out_format = DRM_FORMAT_XBGR8888;
-			*out_use_flags &= ~BO_USE_HW_VIDEO_ENCODER;
+			if (use_flags & BO_USE_HW_VIDEO_ENCODER) {
+				*out_use_flags &= ~BO_USE_HW_VIDEO_ENCODER;
+				*out_use_flags |= BO_USE_LINEAR;
+			}
 		}
 		break;
 	case DRM_FORMAT_FLEX_YCbCr_420_888:
