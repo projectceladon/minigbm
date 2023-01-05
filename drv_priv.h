@@ -125,6 +125,12 @@ struct backend {
 #endif
 
 #define LINEAR_METADATA (struct format_metadata) { 1, 0, DRM_FORMAT_MOD_LINEAR }
+
+#define MESA_LLVMPIPE_MAX_TEXTURE_2D_LEVELS 15
+#define MESA_LLVMPIPE_MAX_TEXTURE_2D_SIZE (1 << (MESA_LLVMPIPE_MAX_TEXTURE_2D_LEVELS - 1))
+#define MESA_LLVMPIPE_TILE_ORDER 6
+#define MESA_LLVMPIPE_TILE_SIZE (1 << MESA_LLVMPIPE_TILE_ORDER)
+
 // clang-format on
 
 #endif

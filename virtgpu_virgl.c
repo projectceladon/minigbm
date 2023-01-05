@@ -22,11 +22,6 @@
 
 #define PIPE_TEXTURE_2D 2
 
-#define MESA_LLVMPIPE_MAX_TEXTURE_2D_LEVELS 15
-#define MESA_LLVMPIPE_MAX_TEXTURE_2D_SIZE (1 << (MESA_LLVMPIPE_MAX_TEXTURE_2D_LEVELS - 1))
-#define MESA_LLVMPIPE_TILE_ORDER 6
-#define MESA_LLVMPIPE_TILE_SIZE (1 << MESA_LLVMPIPE_TILE_ORDER)
-
 // This comes from a combination of SwiftShader's VkPhysicalDeviceLimits::maxFramebufferWidth and
 // VkPhysicalDeviceLimits::maxImageDimension2D (see https://crrev.com/c/1917130).
 #define ANGLE_ON_SWIFTSHADER_MAX_TEXTURE_2D_SIZE 8192
