@@ -65,6 +65,11 @@ uint32_t cros_gralloc_buffer::get_width() const
 	return hnd_->width;
 }
 
+uint32_t cros_gralloc_buffer::get_pixel_stride() const
+{
+	return hnd_->pixel_stride;
+}
+
 uint32_t cros_gralloc_buffer::get_height() const
 {
 	return hnd_->height;
