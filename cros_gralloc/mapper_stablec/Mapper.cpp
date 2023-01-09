@@ -737,6 +737,8 @@ AIMapper_Error CrosGrallocMapperV5::getMutableCrosMetadata(cros_gralloc_buffer* 
     return AIMAPPER_ERROR_NONE;
 }
 
+extern "C" uint32_t ANDROID_HAL_MAPPER_VERSION = AIMAPPER_VERSION_5;
+
 extern "C" AIMapper_Error AIMapper_loadIMapper(AIMapper* _Nullable* _Nonnull outImplementation) {
     static vendor::mapper::IMapperProvider<CrosGrallocMapperV5> provider;
     return provider.load(outImplementation);
