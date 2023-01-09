@@ -1,7 +1,7 @@
 <manifest version="1.0" type="device">
     <hal format="native">
         <name>mapper</name>
-        <version>1.0</version>
+        <version>5.0</version>
         <interface>
             <name>I</name>
             <instance>minigbm</instance>
