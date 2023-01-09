@@ -173,6 +173,10 @@ ndk::ScopedAStatus Allocator::allocate2(const BufferDescriptorInfo& descriptor, 
         return ToBinderStatus(AllocationError::NO_RESOURCES);
     }
 
+    if (!descriptor.additionalOptions.empty()) {
+        return ToBinderStatus(AllocationError::UNSUPPORTED);
+    }
+
     BufferDescriptorInfoV4 descriptionV4 = convertAidlToIMapperV4Descriptor(descriptor);
 
     std::vector<native_handle_t*> handles;
@@ -203,6 +207,11 @@ ndk::ScopedAStatus Allocator::isSupported(const BufferDescriptorInfo& descriptor
     if (!mDriver) {
         ALOGE("Failed to allocate. Driver is uninitialized.\n");
         return ToBinderStatus(AllocationError::NO_RESOURCES);
+    }
+
+    if (!descriptor.additionalOptions.empty()) {
+        *outResult = false;
+        return ndk::ScopedAStatus::ok();
     }
 
     struct cros_gralloc_buffer_descriptor crosDescriptor;
