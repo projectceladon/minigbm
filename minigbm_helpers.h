@@ -6,6 +6,8 @@
 #ifndef _MINIGBM_HELPERS_H_
 #define _MINIGBM_HELPERS_H_
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -17,6 +19,8 @@ extern "C" {
 #define GBM_DEV_TYPE_FLAG_USB (1u << 4)		 /* USB device, udl, evdi. */
 #define GBM_DEV_TYPE_FLAG_BLOCKED (1u << 5)	 /* Unsuitable device e.g. vgem, udl, evdi. */
 #define GBM_DEV_TYPE_FLAG_INTERNAL_LCD (1u << 6) /* Device is driving internal LCD. */
+
+struct gbm_device;
 
 struct gbm_device_info {
 	uint32_t dev_type_flags;
@@ -35,6 +39,12 @@ int gbm_detect_device_info_path(unsigned int detect_flags, const char *dev_node,
  * Select "default" device to use for graphics memory allocator.
  */
 int gbm_get_default_device_fd(void);
+
+/*
+ * Create "default" gbm device.  This can pick a different DRM device than
+ * gbm_get_default_device_fd and should be preferred in most cases.
+ */
+struct gbm_device *minigbm_create_default_device(int *out_fd);
 
 #ifdef __cplusplus
 }
