@@ -985,22 +985,31 @@ static void virgl_3d_resolve_format_and_use_flags(struct driver *drv, uint32_t f
 {
 	*out_format = format;
 	*out_use_flags = use_flags;
+
+	/* resolve flexible format into explicit format */
 	switch (format) {
 	case DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED:
 		/* Camera subsystem requires NV12. */
 		if (use_flags & (BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE)) {
 			*out_format = DRM_FORMAT_NV12;
 		} else {
-			/* HACK: See b/28671744 */
+			/* HACK: See b/28671744 and b/264408280 */
 			*out_format = DRM_FORMAT_XBGR8888;
 			*out_use_flags &= ~BO_USE_HW_VIDEO_ENCODER;
+			*out_use_flags |= BO_USE_LINEAR;
 		}
 		break;
 	case DRM_FORMAT_FLEX_YCbCr_420_888:
 		/* All of our host drivers prefer NV12 as their flexible media format.
 		 * If that changes, this will need to be modified. */
 		*out_format = DRM_FORMAT_NV12;
-		/* fallthrough */
+		break;
+	default:
+		break;
+	}
+
+	/* resolve explicit format */
+	switch (*out_format) {
 	case DRM_FORMAT_NV12:
 	case DRM_FORMAT_ABGR8888:
 	case DRM_FORMAT_ARGB8888:
@@ -1009,8 +1018,8 @@ static void virgl_3d_resolve_format_and_use_flags(struct driver *drv, uint32_t f
 	case DRM_FORMAT_XRGB8888:
 		/* These are the scanout capable formats to the guest. Strip scanout use_flag if the
 		 * host does not natively support scanout on the requested format. */
-		if ((use_flags & BO_USE_SCANOUT) &&
-		    !virgl_supports_combination_natively(drv, format, BO_USE_SCANOUT))
+		if ((*out_use_flags & BO_USE_SCANOUT) &&
+		    !virgl_supports_combination_natively(drv, *out_format, BO_USE_SCANOUT))
 			*out_use_flags &= ~BO_USE_SCANOUT;
 		break;
 	case DRM_FORMAT_YVU420_ANDROID:
