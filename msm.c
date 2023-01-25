@@ -355,6 +355,9 @@ static void *msm_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t m
 	int ret;
 	struct drm_msm_gem_info req = { 0 };
 
+	if (bo->meta.format_modifier)
+		return MAP_FAILED;
+
 	req.handle = bo->handles[0].u32;
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_MSM_GEM_INFO, &req);
 	if (ret) {
