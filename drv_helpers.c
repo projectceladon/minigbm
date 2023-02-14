@@ -459,14 +459,14 @@ int drv_prime_bo_import(struct bo *bo, struct drv_import_fd_data *data)
 	return 0;
 }
 
-void *drv_dumb_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t map_flags)
+void *drv_dumb_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags)
 {
 	int ret;
 	size_t i;
 	struct drm_mode_map_dumb map_dumb;
 
 	memset(&map_dumb, 0, sizeof(map_dumb));
-	map_dumb.handle = bo->handles[plane].u32;
+	map_dumb.handle = bo->handles[0].u32;
 
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_MODE_MAP_DUMB, &map_dumb);
 	if (ret) {
@@ -475,8 +475,7 @@ void *drv_dumb_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t map
 	}
 
 	for (i = 0; i < bo->meta.num_planes; i++)
-		if (bo->handles[i].u32 == bo->handles[plane].u32)
-			vma->length += bo->meta.sizes[i];
+		vma->length += bo->meta.sizes[i];
 
 	return mmap(0, vma->length, drv_get_prot(map_flags), MAP_SHARED, bo->drv->fd,
 		    map_dumb.offset);

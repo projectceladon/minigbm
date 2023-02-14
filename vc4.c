@@ -105,7 +105,7 @@ static int vc4_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint32_t 
 	return vc4_bo_create_for_modifier(bo, width, height, format, modifier);
 }
 
-static void *vc4_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t map_flags)
+static void *vc4_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags)
 {
 	int ret;
 	struct drm_vc4_mmap_bo bo_map = { 0 };

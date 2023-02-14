@@ -352,7 +352,7 @@ static int msm_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint32_
 	return msm_bo_create_for_modifier(bo, width, height, format, combo->metadata.modifier);
 }
 
-static void *msm_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t map_flags)
+static void *msm_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags)
 {
 	int ret;
 	struct drm_msm_gem_info req = { 0 };

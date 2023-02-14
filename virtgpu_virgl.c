@@ -504,7 +504,7 @@ static int virgl_3d_bo_create(struct bo *bo, uint32_t width, uint32_t height, ui
 	return 0;
 }
 
-static void *virgl_3d_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t map_flags)
+static void *virgl_3d_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags)
 {
 	int ret;
 	struct drm_virtgpu_map gem_map = { 0 };
@@ -796,12 +796,12 @@ static int virgl_bo_destroy(struct bo *bo)
 		return drv_dumb_bo_destroy(bo);
 }
 
-static void *virgl_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t map_flags)
+static void *virgl_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags)
 {
 	if (params[param_3d].value)
-		return virgl_3d_bo_map(bo, vma, plane, map_flags);
+		return virgl_3d_bo_map(bo, vma, map_flags);
 	else
-		return drv_dumb_bo_map(bo, vma, plane, map_flags);
+		return drv_dumb_bo_map(bo, vma, map_flags);
 }
 
 static bool is_arc_screen_capture_bo(struct bo *bo)

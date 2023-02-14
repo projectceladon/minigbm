@@ -31,7 +31,7 @@ int drv_dumb_bo_create_ex(struct bo *bo, uint32_t width, uint32_t height, uint32
 int drv_dumb_bo_destroy(struct bo *bo);
 int drv_gem_bo_destroy(struct bo *bo);
 int drv_prime_bo_import(struct bo *bo, struct drv_import_fd_data *data);
-void *drv_dumb_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t map_flags);
+void *drv_dumb_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags);
 int drv_bo_munmap(struct bo *bo, struct vma *vma);
 int drv_get_prot(uint32_t map_flags);
 void drv_add_combination(struct driver *drv, uint32_t format, struct format_metadata *metadata,

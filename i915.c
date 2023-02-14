@@ -813,7 +813,7 @@ static int i915_bo_import(struct bo *bo, struct drv_import_fd_data *data)
 	return 0;
 }
 
-static void *i915_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t map_flags)
+static void *i915_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags)
 {
 	int ret;
 	void *addr = MAP_FAILED;
@@ -833,8 +833,8 @@ static void *i915_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t 
 			/* Get the fake offset back */
 			ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_MMAP_OFFSET, &gem_map);
 			if (ret == 0)
-				addr = mmap(0, bo->meta.total_size, drv_get_prot(map_flags), MAP_SHARED,
-							bo->drv->fd, gem_map.offset);
+				addr = mmap(0, bo->meta.total_size, drv_get_prot(map_flags),
+					    MAP_SHARED, bo->drv->fd, gem_map.offset);
 		} else {
 			struct drm_i915_gem_mmap gem_map = { 0 };
 			/* TODO(b/118799155): We don't seem to have a good way to
@@ -846,8 +846,8 @@ static void *i915_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t 
 			 * Renderscript and camera use cases, as they're
 			 * performance-sensitive. */
 			if ((bo->meta.use_flags & BO_USE_SCANOUT) &&
-					!(bo->meta.use_flags &
-						(BO_USE_RENDERSCRIPT | BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE)))
+			    !(bo->meta.use_flags &
+			      (BO_USE_RENDERSCRIPT | BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE)))
 				gem_map.flags = I915_MMAP_WC;
 
 			gem_map.handle = bo->handles[0].u32;

@@ -266,7 +266,7 @@ static int mediatek_bo_create(struct bo *bo, uint32_t width, uint32_t height, ui
 						 ARRAY_SIZE(modifiers));
 }
 
-static void *mediatek_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t map_flags)
+static void *mediatek_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags)
 {
 	int ret, prime_fd;
 	struct drm_mtk_gem_map_off gem_map = { 0 };

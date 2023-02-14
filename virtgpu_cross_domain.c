@@ -410,7 +410,7 @@ static int cross_domain_bo_create(struct bo *bo, uint32_t width, uint32_t height
 	return 0;
 }
 
-static void *cross_domain_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t map_flags)
+static void *cross_domain_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags)
 {
 	int ret;
 	struct drm_virtgpu_map gem_map = { 0 };

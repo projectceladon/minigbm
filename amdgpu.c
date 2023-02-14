@@ -663,19 +663,19 @@ static int amdgpu_destroy_bo(struct bo *bo)
 		return drv_gem_bo_destroy(bo);
 }
 
-static void *amdgpu_map_bo(struct bo *bo, struct vma *vma, size_t plane, uint32_t map_flags)
+static void *amdgpu_map_bo(struct bo *bo, struct vma *vma, uint32_t map_flags)
 {
 	void *addr = MAP_FAILED;
 	int ret;
 	union drm_amdgpu_gem_mmap gem_map = { { 0 } };
 	struct drm_amdgpu_gem_create_in bo_info = { 0 };
 	struct drm_amdgpu_gem_op gem_op = { 0 };
-	uint32_t handle = bo->handles[plane].u32;
+	uint32_t handle = bo->handles[0].u32;
 	struct amdgpu_linear_vma_priv *priv = NULL;
 	struct amdgpu_priv *drv_priv;
 
 	if (bo->priv)
-		return dri_bo_map(bo, vma, plane, map_flags);
+		return dri_bo_map(bo, vma, 0, map_flags);
 
 	drv_priv = bo->drv->priv;
 	gem_op.handle = handle;
