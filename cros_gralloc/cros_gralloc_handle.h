@@ -27,6 +27,7 @@ struct cros_gralloc_handle {
 	uint32_t strides[DRV_MAX_PLANES];
 	uint32_t offsets[DRV_MAX_PLANES];
 	uint32_t sizes[DRV_MAX_PLANES];
+	bool from_kms;
 	uint32_t id;
 	uint32_t width;
 	uint32_t height;

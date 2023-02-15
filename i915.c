@@ -124,6 +124,12 @@ static int i915_add_combinations(struct driver *drv)
 	metadata.priority = 2;
 	metadata.modifier = I915_FORMAT_MOD_X_TILED;
 
+	// In sriov mode, MMAP_GTT will fail for tiled buffer.
+	if ((drv->gpu_grp_type == TWO_GPU_IGPU_VIRTIO) ||
+	    (drv->gpu_grp_type == THREE_GPU_IGPU_VIRTIO_DGPU))
+		scanout_and_render =
+		    unset_flags(scanout_and_render, BO_USE_SW_READ_RARELY | BO_USE_SW_WRITE_RARELY);
+
 	drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats), &metadata, render);
 	drv_add_combinations(drv, scanout_render_formats, ARRAY_SIZE(scanout_render_formats),
 			     &metadata, scanout_and_render);
@@ -134,6 +140,11 @@ static int i915_add_combinations(struct driver *drv)
 
 	scanout_and_render =
 	    unset_flags(scanout_and_render, BO_USE_SW_READ_RARELY | BO_USE_SW_WRITE_RARELY);
+
+	// dGPU do not support Tiling Y mode
+	if ((drv->gpu_grp_type == TWO_GPU_IGPU_DGPU) || (drv->gpu_grp_type == THREE_GPU_IGPU_VIRTIO_DGPU))
+		 scanout_and_render = unset_flags(scanout_and_render, BO_USE_SCANOUT);
+
 /* Support y-tiled NV12 and P010 for libva */
 #ifdef I915_SCANOUT_Y_TILED
 	drv_add_combination(drv, DRM_FORMAT_NV12, &metadata,

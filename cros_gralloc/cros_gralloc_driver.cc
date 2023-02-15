@@ -19,7 +19,9 @@
 #include "i915_private_android.h"
 #endif
 
-cros_gralloc_driver::cros_gralloc_driver() : drv_(nullptr)
+// drv_kms_ aim to open the display node
+// drv_render_ aim to open the render node
+cros_gralloc_driver::cros_gralloc_driver() : drv_kms_(nullptr), drv_render_(nullptr)
 {
 }
 
@@ -28,10 +30,20 @@ cros_gralloc_driver::~cros_gralloc_driver()
 	buffers_.clear();
 	handles_.clear();
 
-	if (drv_) {
-		int fd = drv_get_fd(drv_);
-		drv_destroy(drv_);
-		drv_ = nullptr;
+	if (drv_kms_) {
+		int fd = drv_get_fd(drv_kms_);
+		drv_destroy(drv_kms_);
+		if (!is_kmsro_enabled()) {
+			drv_render_ = nullptr;
+		}
+		drv_kms_ = nullptr;
+		close(fd);
+	}
+
+	if (drv_render_) {
+		int fd = drv_get_fd(drv_render_);
+		drv_destroy(drv_render_);
+		drv_render_ = nullptr;
 		close(fd);
 	}
 }
@@ -39,12 +51,11 @@ cros_gralloc_driver::~cros_gralloc_driver()
 int32_t cros_gralloc_driver::init()
 {
 	/*
-	 * Create a driver from rendernode while filtering out
+	 * Create a driver from display node or/and render node while filtering out
 	 * the specified undesired driver.
 	 *
 	 * TODO(gsingh): Enable render nodes on udl/evdi.
 	 */
-
 	int fd;
 	drmVersionPtr version;
 	char const *str = "%s/renderD%d";
@@ -52,50 +63,197 @@ int32_t cros_gralloc_driver::init()
 	uint32_t num_nodes = 63;
 	uint32_t min_node = 128;
 	uint32_t max_node = (min_node + num_nodes);
+	uint32_t j;
+	char *node;
 
-	for (uint32_t i = 0; i < ARRAY_SIZE(undesired); i++) {
-		for (uint32_t j = min_node; j < max_node; j++) {
-			char *node;
-			if (asprintf(&node, str, DRM_DIR_NAME, j) < 0)
-				continue;
+	const int render_num = 10;
+	const int name_length = 50;
+	int node_fd[render_num];
+	char node_name[render_num][name_length] = { "" };
+	int availabe_node = 0;
+	int virtio_node_idx = -1;
+	uint32_t gpu_grp_type = 0;
 
-			fd = open(node, O_RDWR, 0);
-			free(node);
-
-			if (fd < 0)
-				continue;
-
-			version = drmGetVersion(fd);
-			if (!version) {
-				close(fd);
-				continue;
-			}
-
-			if (undesired[i] && !strcmp(version->name, undesired[i])) {
-				close(fd);
-				drmFreeVersion(version);
-				continue;
-			}
-
-			drmFreeVersion(version);
-			drv_ = drv_create(fd);
-			if (drv_)
-				return 0;
-
-			close(fd);
+	// destroy drivers if exist before re-initializing them
+	if (drv_kms_) {
+		int fd = drv_get_fd(drv_kms_);
+		drv_destroy(drv_kms_);
+		if (!is_kmsro_enabled()) {
+			drv_render_ = nullptr;
 		}
+		drv_kms_ = nullptr;
+		close(fd);
+	}
+
+	if (drv_render_) {
+		int fd = drv_get_fd(drv_render_);
+		drv_destroy(drv_render_);
+		drv_render_ = nullptr;
+		close(fd);
+	}
+
+	for (uint32_t i = min_node; i < max_node; i++) {
+		if (asprintf(&node, str, DRM_DIR_NAME, i) < 0)
+			continue;
+		fd = open(node, O_RDWR, 0);
+		free(node);
+		if (fd < 0)
+			continue;
+
+		version = drmGetVersion(fd);
+		if (!version) {
+			close(fd);
+			continue;
+		}
+
+		for (j = 0; j < ARRAY_SIZE(undesired); j++) {
+			if (undesired[j] && !strcmp(version->name, undesired[j])) {
+				drmFreeVersion(version);
+				close(fd);
+				break;
+			}
+		}
+
+		// hit any of undesired render node
+		if (j < ARRAY_SIZE(undesired))
+			continue;
+
+		if (!strcmp(version->name, "virtio_gpu")) {
+			virtio_node_idx = availabe_node;
+		}
+
+		node_fd[availabe_node] = fd;
+		strcpy(node_name[availabe_node], version->name);
+		availabe_node++;
+
+		drmFreeVersion(version);
+	}
+
+	// open the first render node
+	if (availabe_node > 0) {
+		drv_render_ = drv_create(node_fd[0]);
+		if (!drv_render_) {
+			drv_log("Failed to create driver for the 1st device\n");
+			close(node_fd[0]);
+			goto fail;
+		}
+
+		switch (availabe_node) {
+		// only have one render node, is GVT-d/BM/VirtIO
+		case 1:
+			if (drv_render_) {
+				drv_kms_ = drv_render_;
+			} else
+				goto fail;
+			gpu_grp_type = (virtio_node_idx != -1) ? ONE_GPU_VIRTIO : ONE_GPU_INTEL;
+			break;
+		// is SR-IOV or iGPU + dGPU
+		case 2:
+			if (virtio_node_idx != -1) {
+				drv_kms_ = drv_create(node_fd[virtio_node_idx]);
+				if (!drv_kms_) {
+					drv_log("Failed to create driver for virtio device\n");
+					close(node_fd[virtio_node_idx]);
+					goto fail;
+				}
+				gpu_grp_type = TWO_GPU_IGPU_VIRTIO;
+			} else {
+				close(node_fd[1]);
+				drv_kms_ = drv_render_;
+				gpu_grp_type = TWO_GPU_IGPU_DGPU;
+			}
+			break;
+		// is SR-IOV + dGPU
+		case 3:
+			if (!strcmp(node_name[1], "i915")) {
+				close(node_fd[1]);
+			}
+			if (virtio_node_idx != -1) {
+				drv_kms_ = drv_create(node_fd[virtio_node_idx]);
+				if (!drv_kms_) {
+					drv_log("Failed to create driver for virtio device\n");
+					close(node_fd[virtio_node_idx]);
+					goto fail;
+				}
+			}
+			gpu_grp_type = THREE_GPU_IGPU_VIRTIO_DGPU;
+			// TO-DO: the 3rd node is i915 or others.
+			break;
+		}
+
+		if (drv_render_) {
+			if (drv_init(drv_render_, gpu_grp_type)) {
+				drv_log("Failed to init render driver\n");
+				goto fail;
+			}
+		}
+
+		if (drv_kms_ && (drv_kms_ != drv_render_)) {
+			if (drv_init(drv_kms_, gpu_grp_type)) {
+				drv_log("Failed to init kms driver\n");
+				goto fail;
+			}
+		}
+	}
+
+	if (!drv_render_ && !drv_kms_)
+		return -ENODEV;
+
+	return 0;
+
+fail:
+	if (drv_kms_) {
+		fd = drv_get_fd(drv_kms_);
+		drv_destroy(drv_kms_);
+		close(fd);
+		drv_kms_ = nullptr;
+	}
+
+	if (drv_render_) {
+		fd = drv_get_fd(drv_render_);
+		drv_destroy(drv_render_);
+		close(fd);
+		drv_render_ = nullptr;
 	}
 
 	return -ENODEV;
 }
 
-bool cros_gralloc_driver::is_supported(const struct cros_gralloc_buffer_descriptor *descriptor)
+bool cros_gralloc_driver::is_supported(struct cros_gralloc_buffer_descriptor *descriptor)
 {
 	struct combination *combo;
 	uint32_t resolved_format;
-	resolved_format = drv_resolve_format(drv_, descriptor->drm_format, descriptor->use_flags);
-	combo = drv_get_combination(drv_, resolved_format, descriptor->use_flags);
-	return (combo != nullptr);
+	bool supported;
+	struct driver *drv = (descriptor->use_flags & BO_USE_SCANOUT) ? drv_kms_ : drv_render_;
+
+	resolved_format = drv_resolve_format(drv, descriptor->drm_format, descriptor->use_flags);
+	combo = drv_get_combination(drv, resolved_format, descriptor->use_flags);
+
+	supported = (combo != nullptr);
+
+	if (!supported && (descriptor->use_flags & BO_USE_SCANOUT)) {
+		if (is_kmsro_enabled()) {
+			/* if kmsro is enabled, it is scanout buffer and not used for video,
+			 * don't need remove scanout flag */
+			if (!IsSupportedYUVFormat(descriptor->droid_format)) {
+				combo = drv_get_combination(drv, resolved_format,
+							    (descriptor->use_flags) &
+								(~BO_USE_SCANOUT));
+				supported = (combo != nullptr);
+			} else {
+				drv = drv_render_;
+				descriptor->use_flags &= ~BO_USE_SCANOUT;
+				combo = drv_get_combination(drv, resolved_format,
+							    descriptor->use_flags);
+				supported = (combo != nullptr);
+			}
+		} else {
+			descriptor->use_flags &= ~BO_USE_SCANOUT;
+			combo = drv_get_combination(drv, resolved_format, descriptor->use_flags);
+			supported = (combo != nullptr);
+		}
+	}
+	return supported;
 }
 
 int32_t create_reserved_region(const std::string &buffer_name, uint64_t reserved_region_size)
@@ -130,11 +288,21 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 	uint64_t use_flags;
 	int32_t reserved_region_fd;
 	char *name;
+	bool from_kms = false;
 
 	struct bo *bo;
 	struct cros_gralloc_handle *hnd;
 
-	resolved_format = drv_resolve_format(drv_, descriptor->drm_format, descriptor->use_flags);
+	struct driver *drv;
+
+	if ((descriptor->use_flags & BO_USE_SCANOUT)) {
+		from_kms = true;
+		drv = drv_kms_;
+	} else {
+		drv = drv_render_;
+	}
+
+	resolved_format = drv_resolve_format(drv, descriptor->drm_format, descriptor->use_flags);
 	use_flags = descriptor->use_flags;
 	/*
 	 * TODO(b/79682290): ARC++ assumes NV12 is always linear and doesn't
@@ -156,14 +324,14 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 
 #ifdef USE_GRALLOC1
 	if (descriptor->modifier == 0) {
-		bo = drv_bo_create(drv_, descriptor->width, descriptor->height, resolved_format,
+		bo = drv_bo_create(drv, descriptor->width, descriptor->height, resolved_format,
 				   use_flags);
 	} else {
-		bo = drv_bo_create_with_modifiers(drv_, descriptor->width, descriptor->height,
+		bo = drv_bo_create_with_modifiers(drv, descriptor->width, descriptor->height,
 						  resolved_format, &descriptor->modifier, 1);
 	}
 #else
-	bo = drv_bo_create(drv_, descriptor->width, descriptor->height, resolved_format, use_flags);
+	bo = drv_bo_create(drv, descriptor->width, descriptor->height, resolved_format, use_flags);
 #endif
 	if (!bo) {
 		drv_log("Failed to create bo.\n");
@@ -209,6 +377,7 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 	 * native_handle_delete().
 	 */
 	hnd = static_cast<struct cros_gralloc_handle *>(malloc(num_bytes));
+	hnd->from_kms = from_kms;
 	hnd->base.version = sizeof(hnd->base);
 	hnd->base.numFds = num_fds;
 	hnd->base.numInts = num_ints;
@@ -264,6 +433,7 @@ int32_t cros_gralloc_driver::retain(buffer_handle_t handle)
 {
 	uint32_t id;
 	std::lock_guard<std::mutex> lock(mutex_);
+	struct driver *drv;
 
 	auto hnd = cros_gralloc_convert_handle(handle);
 	if (!hnd) {
@@ -271,6 +441,7 @@ int32_t cros_gralloc_driver::retain(buffer_handle_t handle)
 		return -EINVAL;
 	}
 
+	drv = (hnd->from_kms) ? drv_kms_ : drv_render_;
 	auto buffer = get_buffer(hnd);
 	if (buffer) {
 		handles_[hnd].second++;
@@ -278,7 +449,7 @@ int32_t cros_gralloc_driver::retain(buffer_handle_t handle)
 		return 0;
 	}
 
-	if (drmPrimeFDToHandle(drv_get_fd(drv_), hnd->fds[0], &id)) {
+	if (drmPrimeFDToHandle(drv_get_fd(drv), hnd->fds[0], &id)) {
 		drv_log("drmPrimeFDToHandle failed.\n");
 		return -errno;
 	}
@@ -302,7 +473,7 @@ int32_t cros_gralloc_driver::retain(buffer_handle_t handle)
 			data.format_modifiers[plane] = hnd->format_modifier;
 		}
 
-		bo = drv_bo_import(drv_, &data);
+		bo = drv_bo_import(drv, &data);
 		if (!bo)
 			return -EFAULT;
 
@@ -531,7 +702,9 @@ int32_t cros_gralloc_driver::get_reserved_region(buffer_handle_t handle,
 
 uint32_t cros_gralloc_driver::get_resolved_drm_format(uint32_t drm_format, uint64_t usage)
 {
-	return drv_resolve_format(drv_, drm_format, usage);
+	struct driver *drv = (usage & BO_USE_SCANOUT) ? drv_kms_ : drv_render_;
+
+	return drv_resolve_format(drv, drm_format, usage);
 }
 
 cros_gralloc_buffer *cros_gralloc_driver::get_buffer(cros_gralloc_handle_t hnd)
@@ -551,4 +724,17 @@ void cros_gralloc_driver::for_each_handle(
 	for (const auto &pair : handles_) {
 		function(pair.first);
 	}
+}
+
+bool cros_gralloc_driver::IsSupportedYUVFormat(uint32_t droid_format)
+{
+	switch (droid_format) {
+	case HAL_PIXEL_FORMAT_YCbCr_420_888:
+	case HAL_PIXEL_FORMAT_YV12:
+	case HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED:
+		return true;
+	default:
+		return i915_private_supported_yuv_format(droid_format);
+	}
+	return false;
 }

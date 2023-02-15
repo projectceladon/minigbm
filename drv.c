@@ -68,8 +68,10 @@ extern const struct backend backend_udl;
 #ifdef DRV_VC4
 extern const struct backend backend_vc4;
 #endif
-extern const struct backend backend_vgem;
+#ifdef DRV_VIRTIO_GPU
 extern const struct backend backend_virtio_gpu;
+#endif
+extern const struct backend backend_vgem;
 
 static const struct backend *drv_get_backend(int fd)
 {
@@ -121,7 +123,11 @@ static const struct backend *drv_get_backend(int fd)
 #ifdef DRV_VC4
 		&backend_vc4,
 #endif
-		&backend_vgem,	    &backend_virtio_gpu,
+#ifdef DRV_VIRTIO_GPU
+		&backend_virtio_gpu,
+#endif
+		&backend_vgem,
+
 	};
 
 	for (i = 0; i < ARRAY_SIZE(backend_list); i++) {
@@ -175,14 +181,6 @@ struct driver *drv_create(int fd)
 	if (!drv->combos)
 		goto free_mappings;
 
-	if (drv->backend->init) {
-		ret = drv->backend->init(drv);
-		if (ret) {
-			drv_array_destroy(drv->combos);
-			goto free_mappings;
-		}
-	}
-
 	return drv;
 
 free_mappings:
@@ -194,6 +192,20 @@ free_lock:
 free_driver:
 	free(drv);
 	return NULL;
+}
+
+int drv_init(struct driver *drv, uint32_t grp_type)
+{
+	int ret = 0;
+	assert(drv);
+	assert(drv->backend);
+
+	drv->gpu_grp_type = grp_type;
+
+	if (drv->backend->init) {
+		ret = drv->backend->init(drv);
+	}
+	return ret;
 }
 
 void drv_destroy(struct driver *drv)
