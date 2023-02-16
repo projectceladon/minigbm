@@ -131,6 +131,8 @@ struct mapping {
 	uint32_t refcount;
 };
 
+void drv_preload(bool load);
+
 struct driver *drv_create(int fd);
 
 void drv_destroy(struct driver *drv);
