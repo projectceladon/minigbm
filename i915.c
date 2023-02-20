@@ -7,6 +7,7 @@
 #ifdef DRV_I915
 
 #include <assert.h>
+#include <cpuid.h>
 #include <errno.h>
 #include <i915_drm.h>
 #include <stdbool.h>
@@ -50,18 +51,57 @@ struct i915_device {
 	uint64_t cursor_width;
 	uint64_t cursor_height;
 #endif
+	int device_id;
+	bool is_adlp;
 };
 
-static uint32_t i915_get_gen(int device_id)
+static void i915_info_from_device_id(struct i915_device *i915)
 {
-	const uint16_t gen3_ids[] = { 0x2582, 0x2592, 0x2772, 0x27A2, 0x27AE,
-				      0x29C2, 0x29B2, 0x29D2, 0xA001, 0xA011 };
-	unsigned i;
-	for (i = 0; i < ARRAY_SIZE(gen3_ids); i++)
-		if (gen3_ids[i] == device_id)
-			return 3;
+	const uint16_t gen9_ids[] = {
+		0x1902, 0x1906, 0x190A, 0x190B, 0x190E, 0x1912, 0x1913, 0x1915, 0x1916, 0x1917,
+		0x191A, 0x191B, 0x191D, 0x191E, 0x1921, 0x1923, 0x1926, 0x1927, 0x192A, 0x192B,
+		0x192D, 0x1932, 0x193A, 0x193B, 0x193D, 0x0A84, 0x1A84, 0x1A85, 0x5A84, 0x5A85,
+		0x3184, 0x3185, 0x5902, 0x5906, 0x590A, 0x5908, 0x590B, 0x590E, 0x5913, 0x5915,
+		0x5917, 0x5912, 0x5916, 0x591A, 0x591B, 0x591D, 0x591E, 0x5921, 0x5923, 0x5926,
+		0x5927, 0x593B, 0x591C, 0x87C0, 0x87CA, 0x3E90, 0x3E93, 0x3E99, 0x3E9C, 0x3E91,
+		0x3E92, 0x3E96, 0x3E98, 0x3E9A, 0x3E9B, 0x3E94, 0x3EA9, 0x3EA5, 0x3EA6, 0x3EA7,
+		0x3EA8, 0x3EA1, 0x3EA4, 0x3EA0, 0x3EA3, 0x3EA2, 0x9B21, 0x9BA0, 0x9BA2, 0x9BA4,
+		0x9BA5, 0x9BA8, 0x9BAA, 0x9BAB, 0x9BAC, 0x9B41, 0x9BC0, 0x9BC2, 0x9BC4, 0x9BC5,
+		0x9BC6, 0x9BC8, 0x9BCA, 0x9BCB, 0x9BCC, 0x9BE6, 0x9BF6
+	};
+	const uint16_t gen12_ids[] = {
+		0x4c8a, 0x4c8b, 0x4c8c, 0x4c90, 0x4c9a, 0x4680, 0x4681, 0x4682, 0x4683, 0x4688,
+		0x4689, 0x4690, 0x4691, 0x4692, 0x4693, 0x4698, 0x4699, 0x4626, 0x4628, 0x462a,
+		0x46a0, 0x46a1, 0x46a2, 0x46a3, 0x46a6, 0x46a8, 0x46aa, 0x46b0, 0x46b1, 0x46b2,
+		0x46b3, 0x46c0, 0x46c1, 0x46c2, 0x46c3, 0x9A40, 0x9A49, 0x9A59, 0x9A60, 0x9A68,
+		0x9A70, 0x9A78, 0x9AC0, 0x9AC9, 0x9AD9, 0x9AF8, 0x4905, 0x4906, 0x4907, 0x4908
+	};
+	const uint16_t adlp_ids[] = { 0x46A0, 0x46A1, 0x46A2, 0x46A3, 0x46A6, 0x46A8, 0x46AA,
+				      0x462A, 0x4626, 0x4628, 0x46B0, 0x46B1, 0x46B2, 0x46B3,
+				      0x46C0, 0x46C1, 0x46C2, 0x46C3, 0x46D0, 0x46D1, 0x46D2 };
 
-	return 4;
+	unsigned i;
+	i915->gen = 12;
+	i915->is_adlp = false;
+
+	for (i = 0; i < ARRAY_SIZE(gen9_ids); i++)
+		if (gen9_ids[i] == i915->device_id) {
+			i915->gen = 9;
+			return;
+		}
+
+	for (i = 0; i < ARRAY_SIZE(adlp_ids); i++)
+		if (adlp_ids[i] == i915->device_id) {
+			i915->gen = 12;
+			i915->is_adlp = true;
+			return;
+		}
+	for (i = 0; i < ARRAY_SIZE(gen12_ids); i++)
+		if (gen12_ids[i] == i915->device_id) {
+			i915->gen = 12;
+			return;
+		}
+	return;
 }
 
 static uint64_t unset_flags(uint64_t current_flags, uint64_t mask)
@@ -70,8 +110,20 @@ static uint64_t unset_flags(uint64_t current_flags, uint64_t mask)
 	return value;
 }
 
+/*
+ * Check if in virtual machine mode, by checking cpuid
+ */
+static inline bool is_in_vm()
+{
+	int ret;
+	uint32_t eax = 0, ebx = 0, ecx = 0, edx = 0;
+	ret = __get_cpuid(1, &eax, &ebx, &ecx, &edx);
+	return ret && (((ecx >> 31) & 1) == 1);
+}
+
 static int i915_add_combinations(struct driver *drv)
 {
+	struct i915_device *i915 = drv->priv;
 	struct format_metadata metadata;
 	uint64_t render, scanout_and_render, texture_only;
 
@@ -119,6 +171,9 @@ static int i915_add_combinations(struct driver *drv)
 
 	render = unset_flags(render, linear_mask);
 	scanout_and_render = unset_flags(scanout_and_render, linear_mask);
+	/* On ADL-P vm mode on 5.10 kernel, BO_USE_SCANOUT is not well supported for tiled bo */
+	if (is_in_vm() && i915->is_adlp)
+		scanout_and_render = unset_flags(scanout_and_render, BO_USE_SCANOUT);
 
 	metadata.tiling = I915_TILING_X;
 	metadata.priority = 2;
@@ -133,17 +188,17 @@ static int i915_add_combinations(struct driver *drv)
 	drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats), &metadata, render);
 	drv_add_combinations(drv, scanout_render_formats, ARRAY_SIZE(scanout_render_formats),
 			     &metadata, scanout_and_render);
+	scanout_and_render =
+	    unset_flags(scanout_and_render, BO_USE_SW_READ_RARELY | BO_USE_SW_WRITE_RARELY);
 
 	metadata.tiling = I915_TILING_Y;
 	metadata.priority = 3;
 	metadata.modifier = I915_FORMAT_MOD_Y_TILED;
 
-	scanout_and_render =
-	    unset_flags(scanout_and_render, BO_USE_SW_READ_RARELY | BO_USE_SW_WRITE_RARELY);
-
 	// dGPU do not support Tiling Y mode
-	if ((drv->gpu_grp_type == TWO_GPU_IGPU_DGPU) || (drv->gpu_grp_type == THREE_GPU_IGPU_VIRTIO_DGPU))
-		 scanout_and_render = unset_flags(scanout_and_render, BO_USE_SCANOUT);
+	if ((drv->gpu_grp_type == TWO_GPU_IGPU_DGPU) ||
+	    (drv->gpu_grp_type == THREE_GPU_IGPU_VIRTIO_DGPU))
+		scanout_and_render = unset_flags(scanout_and_render, BO_USE_SCANOUT);
 
 /* Support y-tiled NV12 and P010 for libva */
 #ifdef I915_SCANOUT_Y_TILED
@@ -153,7 +208,6 @@ static int i915_add_combinations(struct driver *drv)
 	drv_add_combination(drv, DRM_FORMAT_NV12, &metadata,
 			    BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER);
 #endif
-	scanout_and_render = unset_flags(scanout_and_render, BO_USE_SCANOUT);
 	drv_add_combination(drv, DRM_FORMAT_P010, &metadata,
 			    BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER);
 
@@ -169,7 +223,6 @@ static int i915_add_combinations(struct driver *drv)
 static int i915_align_dimensions(struct bo *bo, uint32_t tiling, uint32_t *stride,
 				 uint32_t *aligned_height)
 {
-	struct i915_device *i915 = bo->drv->priv;
 	uint32_t horizontal_alignment;
 	uint32_t vertical_alignment;
 
@@ -193,28 +246,17 @@ static int i915_align_dimensions(struct bo *bo, uint32_t tiling, uint32_t *strid
 		break;
 
 	case I915_TILING_Y:
-		if (i915->gen == 3) {
-			horizontal_alignment = 512;
-			vertical_alignment = 8;
-		} else {
-			horizontal_alignment = 128;
-			vertical_alignment = 32;
-		}
+		horizontal_alignment = 128;
+		vertical_alignment = 32;
 		break;
 	}
 
 	*aligned_height = ALIGN(*aligned_height, vertical_alignment);
-	if (i915->gen > 3) {
+
+#ifdef USE_GRALLOC1
+	if (DRM_FORMAT_R8 != bo->meta.format)
+#endif
 		*stride = ALIGN(*stride, horizontal_alignment);
-	} else {
-		while (*stride > horizontal_alignment)
-			horizontal_alignment <<= 1;
-
-		*stride = horizontal_alignment;
-	}
-
-	if (i915->gen <= 3 && *stride > 8192)
-		return -EINVAL;
 
 	return 0;
 }
@@ -234,7 +276,6 @@ static void i915_clflush(void *start, size_t size)
 static int i915_init(struct driver *drv)
 {
 	int ret;
-	int device_id;
 	struct i915_device *i915;
 	drm_i915_getparam_t get_param;
 
@@ -244,7 +285,7 @@ static int i915_init(struct driver *drv)
 
 	memset(&get_param, 0, sizeof(get_param));
 	get_param.param = I915_PARAM_CHIPSET_ID;
-	get_param.value = &device_id;
+	get_param.value = &i915->device_id;
 	ret = drmIoctl(drv->fd, DRM_IOCTL_I915_GETPARAM, &get_param);
 	if (ret) {
 		drv_log("Failed to get I915_PARAM_CHIPSET_ID\n");
@@ -252,7 +293,8 @@ static int i915_init(struct driver *drv)
 		return -EINVAL;
 	}
 
-	i915->gen = i915_get_gen(device_id);
+	/* must call before i915->gen is used anywhere else */
+	i915_info_from_device_id(i915);
 
 	memset(&get_param, 0, sizeof(get_param));
 	get_param.param = I915_PARAM_HAS_LLC;
