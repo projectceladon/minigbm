@@ -196,11 +196,6 @@ static int cross_domain_metadata_query(struct driver *drv, struct bo_metadata *m
 	metadata->memory_idx = addr[14];
 	metadata->physical_device_idx = addr[15];
 
-	/* Detect buffers, which have no particular stride alignment requirement: */
-	if ((metadata->height == 1) && (metadata->format == DRM_FORMAT_R8)) {
-		metadata->strides[0] = metadata->width;
-	}
-
 	remaining_size = metadata->total_size;
 	for (plane = 0; plane < metadata->num_planes; plane++) {
 		if (plane != 0) {

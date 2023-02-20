@@ -155,7 +155,13 @@ Return<Error> CrosGralloc4Mapper::validateBufferSize(void* rawHandle,
         return Error::BAD_VALUE;
     }
 
-    if (stride != crosHandle->pixel_stride) {
+    if (crosHandle->droid_format == HAL_PIXEL_FORMAT_BLOB) {
+        if (stride > crosHandle->pixel_stride) {
+            ALOGE("Failed to validateBufferSize. Oversized stride (%d vs %d).", stride,
+                  crosHandle->pixel_stride);
+            return Error::BAD_VALUE;
+        }
+    } else if (stride != crosHandle->pixel_stride) {
         ALOGE("Failed to validateBufferSize. Stride mismatch (%d vs %d).", stride,
               crosHandle->pixel_stride);
         return Error::BAD_VALUE;

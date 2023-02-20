@@ -43,6 +43,8 @@ extern "C" {
 #define BO_USE_GPU_DATA_BUFFER		(1ull << 18)
 #define BO_USE_SENSOR_DIRECT_DATA	(1ull << 19)
 
+#define BO_USE_ARC_SCREEN_CAP_PROBED	(1ull << 63)
+
 /* Quirks for allocating a buffer. */
 #define BO_QUIRK_NONE			0
 #define BO_QUIRK_DUMB32BPP		(1ull << 0)
