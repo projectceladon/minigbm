@@ -139,7 +139,6 @@ static void drv_destroy_and_close(struct driver *drv)
 
 cros_gralloc_driver::cros_gralloc_driver() : drv_(init_try_nodes(), drv_destroy_and_close)
 {
-
 	char buf[PROP_VALUE_MAX];
 	property_get("ro.product.device", buf, "unknown");
 	mt8183_camera_quirk_ = !strncmp(buf, "kukui", strlen("kukui"));

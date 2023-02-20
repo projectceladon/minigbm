@@ -314,8 +314,7 @@ PUBLIC int gbm_detect_device_info_path(unsigned int detect_flags, const char *de
 	return ret;
 }
 
-static struct gbm_device *
-try_drm_devices(drmDevicePtr *devs, int dev_count, int type, int *out_fd)
+static struct gbm_device *try_drm_devices(drmDevicePtr *devs, int dev_count, int type, int *out_fd)
 {
 	int i;
 
@@ -340,10 +339,9 @@ try_drm_devices(drmDevicePtr *devs, int dev_count, int type, int *out_fd)
 	return NULL;
 }
 
-PUBLIC struct gbm_device *
-minigbm_create_default_device(int *out_fd)
+PUBLIC struct gbm_device *minigbm_create_default_device(int *out_fd)
 {
-        struct gbm_device *gbm;
+	struct gbm_device *gbm;
 	drmDevicePtr devs[64];
 	int dev_count;
 	int fd;
@@ -362,7 +360,7 @@ minigbm_create_default_device(int *out_fd)
 	dev_count = drmGetDevices2(0, devs, sizeof(devs) / sizeof(devs[0]));
 
 	/* try render nodes and then primary nodes */
-        gbm = try_drm_devices(devs, dev_count, DRM_NODE_RENDER, out_fd);
+	gbm = try_drm_devices(devs, dev_count, DRM_NODE_RENDER, out_fd);
 	if (!gbm)
 		gbm = try_drm_devices(devs, dev_count, DRM_NODE_PRIMARY, out_fd);
 
