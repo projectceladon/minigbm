@@ -6,10 +6,13 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <stdatomic.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 #include <sys/mman.h>
+#include <unistd.h>
 #include <xf86drm.h>
 
 #include "drv_helpers.h"
@@ -21,11 +24,6 @@
 #include "virtgpu.h"
 
 #define PIPE_TEXTURE_2D 2
-
-#define MESA_LLVMPIPE_MAX_TEXTURE_2D_LEVELS 15
-#define MESA_LLVMPIPE_MAX_TEXTURE_2D_SIZE (1 << (MESA_LLVMPIPE_MAX_TEXTURE_2D_LEVELS - 1))
-#define MESA_LLVMPIPE_TILE_ORDER 6
-#define MESA_LLVMPIPE_TILE_SIZE (1 << MESA_LLVMPIPE_TILE_ORDER)
 
 // This comes from a combination of SwiftShader's VkPhysicalDeviceLimits::maxFramebufferWidth and
 // VkPhysicalDeviceLimits::maxImageDimension2D (see https://crrev.com/c/1917130).
@@ -807,6 +805,36 @@ static void *virgl_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t
 		return drv_dumb_bo_map(bo, vma, plane, map_flags);
 }
 
+static bool is_arc_screen_capture_bo(struct bo *bo)
+{
+	struct drm_prime_handle prime_handle = {};
+	int ret, fd;
+	char tmp[256];
+
+	if (bo->meta.num_planes != 1 ||
+	    (bo->meta.format != DRM_FORMAT_ABGR8888 && bo->meta.format != DRM_FORMAT_ARGB8888 &&
+	     bo->meta.format != DRM_FORMAT_XRGB8888 && bo->meta.format != DRM_FORMAT_XBGR8888))
+		return false;
+	prime_handle.handle = bo->handles[0].u32;
+	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_PRIME_HANDLE_TO_FD, &prime_handle);
+	if (ret < 0)
+		return false;
+	snprintf(tmp, sizeof(tmp), "/proc/self/fdinfo/%d", prime_handle.fd);
+	fd = open(tmp, O_RDONLY);
+	if (fd < 0) {
+		close(prime_handle.fd);
+		return false;
+	}
+	ret = read(fd, tmp, sizeof(tmp) - 1);
+	close(prime_handle.fd);
+	close(fd);
+	if (ret < 0)
+		return false;
+	tmp[ret] = 0;
+
+	return strstr(tmp, "ARC-SCREEN-CAP");
+}
+
 static int virgl_bo_invalidate(struct bo *bo, struct mapping *mapping)
 {
 	int ret;
@@ -828,6 +856,15 @@ static int virgl_bo_invalidate(struct bo *bo, struct mapping *mapping)
 		host_write_flags |= BO_USE_HW_VIDEO_ENCODER;
 	else
 		host_write_flags |= BO_USE_HW_VIDEO_DECODER;
+
+	// TODO(b/267892346): Revert this workaround after migrating to virtgpu_cross_domain
+	// backend since it's a special arc only behavior.
+	if (!(bo->meta.use_flags & (BO_USE_ARC_SCREEN_CAP_PROBED | BO_USE_RENDERING))) {
+		bo->meta.use_flags |= BO_USE_ARC_SCREEN_CAP_PROBED;
+		if (is_arc_screen_capture_bo(bo)) {
+			bo->meta.use_flags |= BO_USE_RENDERING;
+		}
+	}
 
 	if ((bo->meta.use_flags & host_write_flags) == 0)
 		return 0;
