@@ -10,6 +10,7 @@
 #include <drm_fourcc.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -517,26 +518,44 @@ static int amdgpu_create_bo_linear(struct bo *bo, uint32_t width, uint32_t heigh
 				   uint64_t use_flags)
 {
 	int ret;
-	size_t num_planes;
+	uint32_t stride_align = 1;
 	uint32_t plane, stride;
 	union drm_amdgpu_gem_create gem_create = { { 0 } };
 	struct amdgpu_priv *priv = bo->drv->priv;
 
 	stride = drv_stride_from_format(format, width, 0);
-	num_planes = drv_num_planes_from_format(format);
 
-	/*
-	 * For multiplane formats, align the stride to 512 to ensure that subsample strides are 256
-	 * aligned. This uses more memory than necessary since the first plane only needs to be
-	 * 256 aligned, but it's acceptable for a short-term fix. It's probably safe for other gpu
-	 * families, but let's restrict it to Raven and Stoney for now (b/171013552, b/190484589).
-	 * This only applies to the Android YUV (multiplane) format.
-	 * */
-	if (format == DRM_FORMAT_YVU420_ANDROID && (priv->dev_info.family == AMDGPU_FAMILY_RV ||
-						    priv->dev_info.family == AMDGPU_FAMILY_CZ))
-		stride = ALIGN(stride, 512);
-	else
-		stride = ALIGN(stride, 256);
+	if (use_flags & BO_USE_HW_MASK) {
+		/* GFX9+ requires the stride to be aligned to 256 bytes */
+		stride_align = 256;
+		stride = ALIGN(stride, stride_align);
+
+		/* Android YV12 requires the UV stride to be half of the Y
+		 * stride.  Before GFX10, we can double the alignment for the
+		 * Y stride, which makes sure the UV stride is still aligned
+		 * to 256 bytes after halving.
+		 *
+		 * GFX10+ additionally requires the stride to be as small as
+		 * possible.  It is impossible to support the format in some
+		 * cases.  Instead, we force DRM_FORMAT_YVU420 and knowingly
+		 * vioate Android YV12 stride requirement.  This is done
+		 * because
+		 *
+		 *  - we would like to know what breaks, and
+		 *  - when used as a classic resource by virglrenderer, the
+		 *    requirement hopefully does not matter
+		 */
+		bool double_align = format == DRM_FORMAT_YVU420_ANDROID;
+		if (double_align && priv->dev_info.family >= AMDGPU_FAMILY_NV &&
+		    (use_flags & BO_USE_GPU_HW) && ((stride / stride_align) & 1)) {
+			drv_loge("allocating %dx%d YV12 bo (usage 0x%" PRIx64 ") with bad strides",
+				 width, height, use_flags);
+			format = DRM_FORMAT_YVU420;
+			double_align = false;
+		}
+		if (double_align)
+			stride = ALIGN(stride, stride_align * 2);
+	}
 
 	/*
 	 * Currently, allocator used by chrome aligns the height for Encoder/
@@ -548,7 +567,7 @@ static int amdgpu_create_bo_linear(struct bo *bo, uint32_t width, uint32_t heigh
 	if (use_flags & (BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER))
 		height = ALIGN(height, CHROME_HEIGHT_ALIGN);
 
-	drv_bo_from_format(bo, stride, 1, height, format);
+	drv_bo_from_format(bo, stride, stride_align, height, format);
 
 	gem_create.in.bo_size =
 	    ALIGN(bo->meta.total_size, priv->dev_info.virtual_address_alignment);
