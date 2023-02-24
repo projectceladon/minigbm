@@ -548,7 +548,7 @@ static int amdgpu_create_bo_linear(struct bo *bo, uint32_t width, uint32_t heigh
 	if (use_flags & (BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER))
 		height = ALIGN(height, CHROME_HEIGHT_ALIGN);
 
-	drv_bo_from_format(bo, stride, height, format);
+	drv_bo_from_format(bo, stride, 1, height, format);
 
 	gem_create.in.bo_size =
 	    ALIGN(bo->meta.total_size, priv->dev_info.virtual_address_alignment);

@@ -151,7 +151,7 @@ static void msm_calculate_layout(struct bo *bo)
 		stride = drv_stride_from_format(bo->meta.format, alignw, 0);
 
 		/* Calculate size and assign stride, size, offset to each plane based on format */
-		drv_bo_from_format(bo, stride, alignh, bo->meta.format);
+		drv_bo_from_format(bo, stride, 1, alignh, bo->meta.format);
 
 		/* For all RGB UBWC formats */
 		if (bo->meta.tiling == MSM_UBWC_TILING) {

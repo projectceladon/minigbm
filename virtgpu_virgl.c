@@ -454,7 +454,7 @@ static int virgl_3d_bo_create(struct bo *bo, uint32_t width, uint32_t height, ui
 
 	if (virgl_supports_combination_natively(bo->drv, format, use_flags)) {
 		stride = drv_stride_from_format(format, width, 0);
-		drv_bo_from_format(bo, stride, height, format);
+		drv_bo_from_format(bo, stride, 1, height, format);
 	} else {
 		assert(virgl_supports_combination_through_emulation(bo->drv, format, use_flags));
 
@@ -695,7 +695,7 @@ static int virgl_bo_create_blob(struct driver *drv, struct bo *bo)
 
 	cur_blob_id = atomic_fetch_add(&priv->next_blob_id, 1);
 	stride = drv_stride_from_format(bo->meta.format, bo->meta.width, 0);
-	drv_bo_from_format(bo, stride, bo->meta.height, bo->meta.format);
+	drv_bo_from_format(bo, stride, 1, bo->meta.height, bo->meta.format);
 	bo->meta.total_size = ALIGN(bo->meta.total_size, PAGE_SIZE);
 	bo->meta.tiling = blob_flags;
 

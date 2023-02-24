@@ -630,7 +630,7 @@ static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t heig
 		 * aligning to 32 bytes here.
 		 */
 		uint32_t stride = ALIGN(width, 32);
-		return drv_bo_from_format(bo, stride, height, format);
+		return drv_bo_from_format(bo, stride, 1, height, format);
 	} else if (modifier == I915_FORMAT_MOD_Y_TILED_CCS) {
 		/*
 		 * For compressed surfaces, we need a color control surface

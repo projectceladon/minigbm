@@ -64,7 +64,7 @@ static int vc4_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t he
 	 */
 	stride = drv_stride_from_format(format, width, 0);
 	stride = ALIGN(stride, 64);
-	drv_bo_from_format(bo, stride, height, format);
+	drv_bo_from_format(bo, stride, 1, height, format);
 
 	bo_create.size = bo->meta.total_size;
 
