@@ -26,13 +26,16 @@
 // DRM Card nodes start at 0
 #define DRM_CARD_NODE_START 0
 
-class cros_gralloc_driver_preloader {
-public:
-	cros_gralloc_driver_preloader() {
+class cros_gralloc_driver_preloader
+{
+      public:
+	cros_gralloc_driver_preloader()
+	{
 		drv_preload(true);
 	}
 
-	~cros_gralloc_driver_preloader() {
+	~cros_gralloc_driver_preloader()
+	{
 		drv_preload(false);
 	}
 };
