@@ -177,6 +177,7 @@ bool cros_gralloc_driver::get_resolved_format_and_use_flags(
 	struct combination *combo;
 
 	if (mt8183_camera_quirk_ && (descriptor->use_flags & BO_USE_CAMERA_READ) &&
+	    !(descriptor->use_flags & BO_USE_SCANOUT) &&
 	    descriptor->drm_format == DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED) {
 		*out_use_flags = descriptor->use_flags;
 		*out_format = DRM_FORMAT_MTISP_SXYZW10;
