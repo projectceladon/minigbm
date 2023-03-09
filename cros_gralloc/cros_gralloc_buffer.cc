@@ -119,7 +119,7 @@ int32_t cros_gralloc_buffer::lock(uint32_t map_flags, uint8_t *addr[DRV_MAX_PLAN
                         drv_bo_invalidate(bo_, lock_data_[0]);
 			vaddr = lock_data_[0]->vma->addr;
                 } else {
-                        struct rectangle r;
+                        struct rectangle r = {0, 0, 0, 0};
 
                         if (!r.width && !r.height && !r.x && !r.y) {
                                 /*

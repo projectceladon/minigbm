@@ -466,16 +466,19 @@ int32_t CrosGralloc1::lock(buffer_handle_t bufferHandle, gralloc1_producer_usage
 
 	if (driver->lock(bufferHandle, acquireFence, map_flags, addr)) {
                 drv_log("Plz switch to mapper 4.0 or call importBuffer & freeBuffer with mapper 2.0 before lock");
-                buffer_handle_t buffer_handle = native_handle_clone(bufferHandle);
+                native_handle_t* buffer_handle = native_handle_clone(bufferHandle);
                 auto error = retain(buffer_handle);
                 if (error != GRALLOC1_ERROR_NONE) {
-                        delete buffer_handle;
+                        native_handle_close(buffer_handle);
+                        native_handle_delete(buffer_handle);
                         return error;
                 }
                 bufferHandle = buffer_handle;
                 if (driver->lock(bufferHandle, acquireFence, map_flags, addr))
                         return CROS_GRALLOC_ERROR_BAD_HANDLE;
                 delete buffer_handle;
+                native_handle_close(buffer_handle);
+                native_handle_delete(buffer_handle);
         }
 
 	*outData = addr[0];
@@ -567,17 +570,19 @@ int32_t CrosGralloc1::lockYCbCr(buffer_handle_t bufferHandle,
 
 	if (driver->lock(bufferHandle, acquireFence, map_flags, addr)) {
 		drv_log("Plz switch to mapper 4.0 or call importBuffer & freeBuffer with mapper 2.0 before lockFlex");
-		buffer_handle_t buffer_handle = native_handle_clone(bufferHandle);
+		native_handle_t* buffer_handle = native_handle_clone(bufferHandle);
 		auto error = retain(buffer_handle);
 		if (error != GRALLOC1_ERROR_NONE) {
-			delete buffer_handle;
+			native_handle_close(buffer_handle);
+			native_handle_delete(buffer_handle);
 			return error;
 		}
 		bufferHandle = buffer_handle;
 		if (driver->lock(bufferHandle, acquireFence, map_flags, addr))
 			return CROS_GRALLOC_ERROR_BAD_HANDLE;
 		driver->release(buffer_handle);
-		delete buffer_handle;
+		native_handle_close(buffer_handle);
+		native_handle_delete(buffer_handle);
 	}
 
 	switch (hnd->format) {

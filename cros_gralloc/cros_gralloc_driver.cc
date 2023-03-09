@@ -68,9 +68,8 @@ int32_t cros_gralloc_driver::init()
 	char *node;
 
 	const int render_num = 10;
-	const int name_length = 50;
 	int node_fd[render_num];
-	char node_name[render_num][name_length] = { "" };
+	char *node_name[render_num] = {};
 	int availabe_node = 0;
 	int virtio_node_idx = -1;
 	uint32_t gpu_grp_type = 0;
@@ -125,6 +124,8 @@ int32_t cros_gralloc_driver::init()
 		}
 
 		node_fd[availabe_node] = fd;
+		int len = snprintf(NULL, 0, version->name);
+		node_name[availabe_node] = (char *)malloc(len + 1);
 		strcpy(node_name[availabe_node], version->name);
 		availabe_node++;
 
@@ -198,6 +199,10 @@ int32_t cros_gralloc_driver::init()
 		}
 	}
 
+	for (int i = 0; i < availabe_node; i++) {
+		free(node_name[i]);
+	}
+
 	if (!drv_render_ && !drv_kms_)
 		return -ENODEV;
 
@@ -208,14 +213,16 @@ fail:
 		fd = drv_get_fd(drv_kms_);
 		drv_destroy(drv_kms_);
 		close(fd);
-		drv_kms_ = nullptr;
 	}
 
 	if (drv_render_) {
 		fd = drv_get_fd(drv_render_);
 		drv_destroy(drv_render_);
 		close(fd);
-		drv_render_ = nullptr;
+	}
+
+	for (int i = 0; i < availabe_node; i++) {
+		free(node_name[i]);
 	}
 
 	return -ENODEV;
