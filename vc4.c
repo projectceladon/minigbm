@@ -64,7 +64,7 @@ static int vc4_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t he
 	 */
 	stride = drv_stride_from_format(format, width, 0);
 	stride = ALIGN(stride, 64);
-	drv_bo_from_format(bo, stride, height, format);
+	drv_bo_from_format(bo, stride, 1, height, format);
 
 	bo_create.size = bo->meta.total_size;
 
@@ -105,7 +105,7 @@ static int vc4_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint32_t 
 	return vc4_bo_create_for_modifier(bo, width, height, format, modifier);
 }
 
-static void *vc4_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t map_flags)
+static void *vc4_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags)
 {
 	int ret;
 	struct drm_vc4_mmap_bo bo_map = { 0 };

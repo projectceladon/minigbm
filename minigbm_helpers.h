@@ -36,13 +36,7 @@ int gbm_detect_device_info_path(unsigned int detect_flags, const char *dev_node,
 				struct gbm_device_info *info);
 
 /*
- * Select "default" device to use for graphics memory allocator.
- */
-int gbm_get_default_device_fd(void);
-
-/*
- * Create "default" gbm device.  This can pick a different DRM device than
- * gbm_get_default_device_fd and should be preferred in most cases.
+ * Create "default" gbm device.
  */
 struct gbm_device *minigbm_create_default_device(int *out_fd);
 

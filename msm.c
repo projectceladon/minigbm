@@ -151,7 +151,7 @@ static void msm_calculate_layout(struct bo *bo)
 		stride = drv_stride_from_format(bo->meta.format, alignw, 0);
 
 		/* Calculate size and assign stride, size, offset to each plane based on format */
-		drv_bo_from_format(bo, stride, alignh, bo->meta.format);
+		drv_bo_from_format(bo, stride, 1, alignh, bo->meta.format);
 
 		/* For all RGB UBWC formats */
 		if (bo->meta.tiling == MSM_UBWC_TILING) {
@@ -352,7 +352,7 @@ static int msm_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint32_
 	return msm_bo_create_for_modifier(bo, width, height, format, combo->metadata.modifier);
 }
 
-static void *msm_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t map_flags)
+static void *msm_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags)
 {
 	int ret;
 	struct drm_msm_gem_info req = { 0 };

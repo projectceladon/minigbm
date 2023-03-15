@@ -62,6 +62,7 @@ struct i915_device {
 	/*TODO : cleanup is_mtl to avoid adding variables for every new platforms */
 	bool is_mtl;
 	int32_t num_fences_avail;
+	bool has_mmap_offset;
 };
 
 static void i915_info_from_device_id(struct i915_device *i915)
@@ -412,7 +413,7 @@ static void i915_clflush(void *start, size_t size)
 
 static int i915_init(struct driver *drv)
 {
-	int ret;
+	int ret, val;
 	struct i915_device *i915;
 	drm_i915_getparam_t get_param = { 0 };
 
@@ -449,8 +450,21 @@ static int i915_init(struct driver *drv)
 	ret = drmIoctl(drv->fd, DRM_IOCTL_I915_GETPARAM, &get_param);
 	if (ret) {
 		drv_loge("Failed to get I915_PARAM_NUM_FENCES_AVAIL\n");
+		free(i915);
 		return -EINVAL;
 	}
+
+	memset(&get_param, 0, sizeof(get_param));
+	get_param.param = I915_PARAM_MMAP_GTT_VERSION;
+	get_param.value = &val;
+
+	ret = drmIoctl(drv->fd, DRM_IOCTL_I915_GETPARAM, &get_param);
+	if (ret) {
+		drv_loge("Failed to get I915_PARAM_MMAP_GTT_VERSION\n");
+		free(i915);
+		return -EINVAL;
+	}
+	i915->has_mmap_offset = (val >= 4);
 
 	if (i915->graphics_version >= 12)
 		i915->has_hw_protection = 1;
@@ -616,7 +630,7 @@ static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t heig
 		 * aligning to 32 bytes here.
 		 */
 		uint32_t stride = ALIGN(width, 32);
-		return drv_bo_from_format(bo, stride, height, format);
+		return drv_bo_from_format(bo, stride, 1, height, format);
 	} else if (modifier == I915_FORMAT_MOD_Y_TILED_CCS) {
 		/*
 		 * For compressed surfaces, we need a color control surface
@@ -799,10 +813,11 @@ static int i915_bo_import(struct bo *bo, struct drv_import_fd_data *data)
 	return 0;
 }
 
-static void *i915_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t map_flags)
+static void *i915_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags)
 {
 	int ret;
 	void *addr = MAP_FAILED;
+	struct i915_device *i915 = bo->drv->priv;
 
 	if ((bo->meta.format_modifier == I915_FORMAT_MOD_Y_TILED_CCS) ||
 	    (bo->meta.format_modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS) ||
@@ -810,34 +825,46 @@ static void *i915_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t 
 		return MAP_FAILED;
 
 	if (bo->meta.tiling == I915_TILING_NONE) {
-		struct drm_i915_gem_mmap gem_map = { 0 };
-		/* TODO(b/118799155): We don't seem to have a good way to
-		 * detect the use cases for which WC mapping is really needed.
-		 * The current heuristic seems overly coarse and may be slowing
-		 * down some other use cases unnecessarily.
-		 *
-		 * For now, care must be taken not to use WC mappings for
-		 * Renderscript and camera use cases, as they're
-		 * performance-sensitive. */
-		if ((bo->meta.use_flags & BO_USE_SCANOUT) &&
-		    !(bo->meta.use_flags &
-		      (BO_USE_RENDERSCRIPT | BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE)))
-			gem_map.flags = I915_MMAP_WC;
+		if (i915->has_mmap_offset) {
+			struct drm_i915_gem_mmap_offset gem_map = { 0 };
+			gem_map.handle = bo->handles[0].u32;
+			gem_map.flags = I915_MMAP_OFFSET_WB;
 
-		gem_map.handle = bo->handles[0].u32;
-		gem_map.offset = 0;
-		gem_map.size = bo->meta.total_size;
+			/* Get the fake offset back */
+			ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_MMAP_OFFSET, &gem_map);
+			if (ret == 0)
+				addr = mmap(0, bo->meta.total_size, drv_get_prot(map_flags),
+					    MAP_SHARED, bo->drv->fd, gem_map.offset);
+		} else {
+			struct drm_i915_gem_mmap gem_map = { 0 };
+			/* TODO(b/118799155): We don't seem to have a good way to
+			 * detect the use cases for which WC mapping is really needed.
+			 * The current heuristic seems overly coarse and may be slowing
+			 * down some other use cases unnecessarily.
+			 *
+			 * For now, care must be taken not to use WC mappings for
+			 * Renderscript and camera use cases, as they're
+			 * performance-sensitive. */
+			if ((bo->meta.use_flags & BO_USE_SCANOUT) &&
+			    !(bo->meta.use_flags &
+			      (BO_USE_RENDERSCRIPT | BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE)))
+				gem_map.flags = I915_MMAP_WC;
 
-		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_MMAP, &gem_map);
-		/* DRM_IOCTL_I915_GEM_MMAP mmaps the underlying shm
-		 * file and returns a user space address directly, ie,
-		 * doesn't go through mmap. If we try that on a
-		 * dma-buf that doesn't have a shm file, i915.ko
-		 * returns ENXIO.  Fall through to
-		 * DRM_IOCTL_I915_GEM_MMAP_GTT in that case, which
-		 * will mmap on the drm fd instead. */
-		if (ret == 0)
-			addr = (void *)(uintptr_t)gem_map.addr_ptr;
+			gem_map.handle = bo->handles[0].u32;
+			gem_map.offset = 0;
+			gem_map.size = bo->meta.total_size;
+
+			ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_MMAP, &gem_map);
+			/* DRM_IOCTL_I915_GEM_MMAP mmaps the underlying shm
+			 * file and returns a user space address directly, ie,
+			 * doesn't go through mmap. If we try that on a
+			 * dma-buf that doesn't have a shm file, i915.ko
+			 * returns ENXIO.  Fall through to
+			 * DRM_IOCTL_I915_GEM_MMAP_GTT in that case, which
+			 * will mmap on the drm fd instead. */
+			if (ret == 0)
+				addr = (void *)(uintptr_t)gem_map.addr_ptr;
+		}
 	}
 
 	if (addr == MAP_FAILED) {

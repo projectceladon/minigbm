@@ -136,7 +136,7 @@ static int rockchip_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint
 		uint32_t aligned_width = w_mbs * 16;
 		uint32_t aligned_height = h_mbs * 16;
 
-		drv_bo_from_format(bo, aligned_width, aligned_height, format);
+		drv_bo_from_format(bo, aligned_width, 1, aligned_height, format);
 		/*
 		 * drv_bo_from_format updates total_size. Add an extra data space for rockchip video
 		 * driver to store motion vectors.
@@ -166,7 +166,7 @@ static int rockchip_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint
 		else
 			stride = ALIGN(stride, 64);
 
-		drv_bo_from_format(bo, stride, height, format);
+		drv_bo_from_format(bo, stride, 1, height, format);
 	}
 
 	gem_create.size = bo->meta.total_size;
@@ -192,7 +192,7 @@ static int rockchip_bo_create(struct bo *bo, uint32_t width, uint32_t height, ui
 						 ARRAY_SIZE(modifiers));
 }
 
-static void *rockchip_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t map_flags)
+static void *rockchip_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags)
 {
 	int ret;
 	struct rockchip_private_map_data *priv;

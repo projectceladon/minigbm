@@ -211,7 +211,7 @@ done:
 	return 0;
 }
 
-PUBLIC int gbm_get_default_device_fd(void)
+static int gbm_get_default_device_fd(void)
 {
 	DIR *dir;
 	int ret, fd, dfd = -1;
@@ -329,6 +329,11 @@ static struct gbm_device *try_drm_devices(drmDevicePtr *devs, int dev_count, int
 		if (fd >= 0) {
 			struct gbm_device *gbm = gbm_create_device(fd);
 			if (gbm) {
+				// DRM master might be taken by accident on a primary node even
+				// if master is not needed for GBM. Drop it so that programs
+				// that actually need DRM master (e.g. Chrome) won't be blocked.
+				if (type == DRM_NODE_PRIMARY && drmIsMaster(fd))
+					drmDropMaster(fd);
 				*out_fd = fd;
 				return gbm;
 			}

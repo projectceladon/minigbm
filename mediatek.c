@@ -201,7 +201,7 @@ static int mediatek_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint
 					 (32 / drv_vertical_subsampling_from_format(format, plane));
 		}
 
-		drv_bo_from_format_and_padding(bo, stride, aligned_height, format, padding);
+		drv_bo_from_format_and_padding(bo, stride, 1, aligned_height, format, padding);
 	} else {
 #ifdef SUPPORTS_YUV422
 		/*
@@ -212,7 +212,7 @@ static int mediatek_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint
 		if (format == DRM_FORMAT_NV12)
 			height = ALIGN(height, 16);
 #endif
-		drv_bo_from_format(bo, stride, height, format);
+		drv_bo_from_format(bo, stride, 1, height, format);
 
 #ifdef USE_EXTRA_PADDING_FOR_YVU420
 		/*
@@ -266,7 +266,7 @@ static int mediatek_bo_create(struct bo *bo, uint32_t width, uint32_t height, ui
 						 ARRAY_SIZE(modifiers));
 }
 
-static void *mediatek_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t map_flags)
+static void *mediatek_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags)
 {
 	int ret, prime_fd;
 	struct drm_mtk_gem_map_off gem_map = { 0 };

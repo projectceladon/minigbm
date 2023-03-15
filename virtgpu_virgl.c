@@ -455,7 +455,7 @@ static int virgl_3d_bo_create(struct bo *bo, uint32_t width, uint32_t height, ui
 
 	if (virgl_supports_combination_natively(bo->drv, format, use_flags)) {
 		stride = drv_stride_from_format(format, width, 0);
-		drv_bo_from_format(bo, stride, height, format);
+		drv_bo_from_format(bo, stride, 1, height, format);
 	} else {
 		assert(virgl_supports_combination_through_emulation(bo->drv, format, use_flags));
 
@@ -505,7 +505,7 @@ static int virgl_3d_bo_create(struct bo *bo, uint32_t width, uint32_t height, ui
 	return 0;
 }
 
-static void *virgl_3d_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t map_flags)
+static void *virgl_3d_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags)
 {
 	int ret;
 	struct drm_virtgpu_map gem_map = { 0 };
@@ -696,7 +696,7 @@ static int virgl_bo_create_blob(struct driver *drv, struct bo *bo)
 
 	cur_blob_id = atomic_fetch_add(&priv->next_blob_id, 1);
 	stride = drv_stride_from_format(bo->meta.format, bo->meta.width, 0);
-	drv_bo_from_format(bo, stride, bo->meta.height, bo->meta.format);
+	drv_bo_from_format(bo, stride, 1, bo->meta.height, bo->meta.format);
 	bo->meta.total_size = ALIGN(bo->meta.total_size, PAGE_SIZE);
 	bo->meta.tiling = blob_flags;
 
@@ -797,12 +797,12 @@ static int virgl_bo_destroy(struct bo *bo)
 		return drv_dumb_bo_destroy(bo);
 }
 
-static void *virgl_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t map_flags)
+static void *virgl_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags)
 {
 	if (params[param_3d].value)
-		return virgl_3d_bo_map(bo, vma, plane, map_flags);
+		return virgl_3d_bo_map(bo, vma, map_flags);
 	else
-		return drv_dumb_bo_map(bo, vma, plane, map_flags);
+		return drv_dumb_bo_map(bo, vma, map_flags);
 }
 
 static bool is_arc_screen_capture_bo(struct bo *bo)

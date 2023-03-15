@@ -250,18 +250,30 @@ uint32_t drv_size_from_format(uint32_t format, uint32_t stride, uint32_t height,
 	return stride * drv_height_from_format(format, height, plane);
 }
 
-static uint32_t subsample_stride(uint32_t stride, uint32_t format, size_t plane)
+static uint32_t subsample_stride(uint32_t stride, uint32_t stride_align, uint32_t format,
+				 size_t plane)
 {
+	uint32_t plane_stride = stride;
+
 	if (plane != 0) {
 		switch (format) {
 		case DRM_FORMAT_YVU420:
 		case DRM_FORMAT_YVU420_ANDROID:
-			stride = DIV_ROUND_UP(stride, 2);
+			plane_stride = DIV_ROUND_UP(plane_stride, 2);
 			break;
 		}
 	}
 
-	return stride;
+	plane_stride = ALIGN(plane_stride, stride_align);
+
+	if (format == DRM_FORMAT_YVU420_ANDROID) {
+		if (plane != 0)
+			assert(plane_stride == ALIGN(stride / 2, 16));
+		else
+			assert(plane_stride % 16 == 0);
+	}
+
+	return plane_stride;
 }
 
 /*
@@ -269,14 +281,17 @@ static uint32_t subsample_stride(uint32_t stride, uint32_t format, size_t plane)
  * the first plane, height and a format. This function assumes there is just
  * one kernel buffer per buffer object.
  */
-int drv_bo_from_format(struct bo *bo, uint32_t stride, uint32_t aligned_height, uint32_t format)
+int drv_bo_from_format(struct bo *bo, uint32_t stride, uint32_t stride_align,
+		       uint32_t aligned_height, uint32_t format)
 {
 	uint32_t padding[DRV_MAX_PLANES] = { 0 };
-	return drv_bo_from_format_and_padding(bo, stride, aligned_height, format, padding);
+	return drv_bo_from_format_and_padding(bo, stride, stride_align, aligned_height, format,
+					      padding);
 }
 
-int drv_bo_from_format_and_padding(struct bo *bo, uint32_t stride, uint32_t aligned_height,
-				   uint32_t format, uint32_t padding[DRV_MAX_PLANES])
+int drv_bo_from_format_and_padding(struct bo *bo, uint32_t stride, uint32_t stride_align,
+				   uint32_t aligned_height, uint32_t format,
+				   uint32_t padding[DRV_MAX_PLANES])
 {
 	size_t p, num_planes;
 	uint32_t offset = 0;
@@ -287,16 +302,18 @@ int drv_bo_from_format_and_padding(struct bo *bo, uint32_t stride, uint32_t alig
 	/*
 	 * HAL_PIXEL_FORMAT_YV12 requires that (see <system/graphics.h>):
 	 *  - the aligned height is same as the buffer's height.
-	 *  - the chroma stride is 16 bytes aligned, i.e., the luma's strides
-	 *    is 32 bytes aligned.
+	 *  - the luma stride is 16 bytes aligned
+	 *  - the chroma stride is ALIGN(luma_stride / 2, 16)
 	 */
 	if (format == DRM_FORMAT_YVU420_ANDROID) {
 		assert(aligned_height == bo->meta.height);
-		assert(stride == ALIGN(stride, 32));
+		/* force 16 if the caller has no requirement */
+		if (stride_align <= 1)
+			stride_align = 16;
 	}
 
 	for (p = 0; p < num_planes; p++) {
-		bo->meta.strides[p] = subsample_stride(stride, format, p);
+		bo->meta.strides[p] = subsample_stride(stride, stride_align, format, p);
 		bo->meta.sizes[p] =
 		    drv_size_from_format(format, bo->meta.strides[p], aligned_height, p) +
 		    padding[p];
@@ -368,7 +385,7 @@ int drv_dumb_bo_create_ex(struct bo *bo, uint32_t width, uint32_t height, uint32
 		return -errno;
 	}
 
-	drv_bo_from_format(bo, create_dumb.pitch, height, format);
+	drv_bo_from_format(bo, create_dumb.pitch, 1, height, format);
 
 	for (plane = 0; plane < bo->meta.num_planes; plane++)
 		bo->handles[plane].u32 = create_dumb.handle;
@@ -459,14 +476,14 @@ int drv_prime_bo_import(struct bo *bo, struct drv_import_fd_data *data)
 	return 0;
 }
 
-void *drv_dumb_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t map_flags)
+void *drv_dumb_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags)
 {
 	int ret;
 	size_t i;
 	struct drm_mode_map_dumb map_dumb;
 
 	memset(&map_dumb, 0, sizeof(map_dumb));
-	map_dumb.handle = bo->handles[plane].u32;
+	map_dumb.handle = bo->handles[0].u32;
 
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_MODE_MAP_DUMB, &map_dumb);
 	if (ret) {
@@ -475,8 +492,7 @@ void *drv_dumb_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t map
 	}
 
 	for (i = 0; i < bo->meta.num_planes; i++)
-		if (bo->handles[i].u32 == bo->handles[plane].u32)
-			vma->length += bo->meta.sizes[i];
+		vma->length += bo->meta.sizes[i];
 
 	return mmap(0, vma->length, drv_get_prot(map_flags), MAP_SHARED, bo->drv->fd,
 		    map_dumb.offset);

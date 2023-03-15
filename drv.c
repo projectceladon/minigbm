@@ -52,6 +52,35 @@ extern const struct backend backend_virtgpu;
 extern const struct backend backend_udl;
 extern const struct backend backend_vkms;
 
+static const struct backend *drv_backend_list[] = {
+#ifdef DRV_AMDGPU
+	&backend_amdgpu,
+#endif
+#ifdef DRV_I915
+	&backend_i915,
+#endif
+#ifdef DRV_MSM
+	&backend_msm,
+#endif
+#ifdef DRV_VC4
+	&backend_vc4,
+#endif
+	&backend_evdi,	    &backend_komeda,	&backend_marvell, &backend_mediatek,
+	&backend_meson,	    &backend_nouveau,	&backend_radeon,  &backend_rockchip,
+	&backend_sun4i_drm, &backend_synaptics, &backend_udl,	  &backend_virtgpu,
+	&backend_vkms
+};
+
+void drv_preload(bool load)
+{
+	unsigned int i;
+	for (i = 0; i < ARRAY_SIZE(drv_backend_list); i++) {
+		const struct backend *b = drv_backend_list[i];
+		if (b->preload)
+			b->preload(load);
+	}
+}
+
 static const struct backend *drv_get_backend(int fd)
 {
 	drmVersionPtr drm_version;
@@ -62,27 +91,8 @@ static const struct backend *drv_get_backend(int fd)
 	if (!drm_version)
 		return NULL;
 
-	const struct backend *backend_list[] = {
-#ifdef DRV_AMDGPU
-		&backend_amdgpu,
-#endif
-#ifdef DRV_I915
-		&backend_i915,
-#endif
-#ifdef DRV_MSM
-		&backend_msm,
-#endif
-#ifdef DRV_VC4
-		&backend_vc4,
-#endif
-		&backend_evdi,	    &backend_komeda,	&backend_marvell, &backend_mediatek,
-		&backend_meson,	    &backend_nouveau,	&backend_radeon,  &backend_rockchip,
-		&backend_sun4i_drm, &backend_synaptics, &backend_udl,	  &backend_virtgpu,
-		&backend_vkms
-	};
-
-	for (i = 0; i < ARRAY_SIZE(backend_list); i++) {
-		const struct backend *b = backend_list[i];
+	for (i = 0; i < ARRAY_SIZE(drv_backend_list); i++) {
+		const struct backend *b = drv_backend_list[i];
 		if (!strcmp(drm_version->name, b->name)) {
 			drmFreeVersion(drm_version);
 			return b;
@@ -513,7 +523,7 @@ void *drv_bo_map(struct bo *bo, const struct rectangle *rect, uint32_t map_flags
 	}
 
 	memcpy(mapping.vma->map_strides, bo->meta.strides, sizeof(mapping.vma->map_strides));
-	addr = drv->backend->bo_map(bo, mapping.vma, plane, map_flags);
+	addr = drv->backend->bo_map(bo, mapping.vma, map_flags);
 	if (addr == MAP_FAILED) {
 		*map_data = NULL;
 		free(mapping.vma);
