@@ -141,6 +141,8 @@ static int i915_add_combinations(struct driver *drv)
 	uint64_t linear_mask = BO_USE_RENDERSCRIPT | BO_USE_LINEAR | BO_USE_PROTECTED |
 			       BO_USE_SW_READ_OFTEN | BO_USE_SW_WRITE_OFTEN;
 
+	uint64_t camera_mask = BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE;
+
 	metadata.tiling = I915_TILING_NONE;
 	metadata.priority = 1;
 	metadata.modifier = DRM_FORMAT_MOD_LINEAR;
@@ -178,58 +180,49 @@ static int i915_add_combinations(struct driver *drv)
 	drv_modify_combination(drv, DRM_FORMAT_R8, &metadata,
 			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE);
 
-	/* Only support tiling none on SR-IOV */
-	if ((drv->gpu_grp_type != TWO_GPU_IGPU_VIRTIO) &&
-	    (drv->gpu_grp_type != THREE_GPU_IGPU_VIRTIO_DGPU)) {
+	render = unset_flags(render, linear_mask | camera_mask);
+	scanout_and_render = unset_flags(scanout_and_render, linear_mask |camera_mask);
 
-		render = unset_flags(render, linear_mask);
-		scanout_and_render = unset_flags(scanout_and_render, linear_mask);
-		/* On ADL-P vm mode on 5.10 kernel, BO_USE_SCANOUT is not well supported for tiled
-		 * bo */
-		if (is_in_vm() && i915->is_adlp)
-			scanout_and_render = unset_flags(scanout_and_render, BO_USE_SCANOUT);
+	/* On ADL-P vm mode on 5.10 kernel, BO_USE_SCANOUT is not well supported for tiled bo */
+	if (is_in_vm() && i915->is_adlp)
+	    scanout_and_render = unset_flags(scanout_and_render, BO_USE_SCANOUT);
 
-		metadata.tiling = I915_TILING_X;
-		metadata.priority = 2;
-		metadata.modifier = I915_FORMAT_MOD_X_TILED;
+	metadata.tiling = I915_TILING_X;
+	metadata.priority = 2;
+	metadata.modifier = I915_FORMAT_MOD_X_TILED;
 
-		drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats), &metadata,
-				     render);
-		drv_add_combinations(drv, scanout_render_formats,
-				     ARRAY_SIZE(scanout_render_formats), &metadata,
-				     scanout_and_render);
+	drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats), &metadata, render);
+	drv_add_combinations(drv, scanout_render_formats, ARRAY_SIZE(scanout_render_formats),
+			     &metadata, scanout_and_render);
 
-		scanout_and_render =
-		    unset_flags(scanout_and_render, BO_USE_SW_READ_RARELY | BO_USE_SW_WRITE_RARELY);
+	scanout_and_render =
+	    unset_flags(scanout_and_render, BO_USE_SW_READ_RARELY | BO_USE_SW_WRITE_RARELY);
 
-		metadata.tiling = I915_TILING_Y;
-		metadata.priority = 3;
-		metadata.modifier = I915_FORMAT_MOD_Y_TILED;
+	metadata.tiling = I915_TILING_Y;
+	metadata.priority = 3;
+	metadata.modifier = I915_FORMAT_MOD_Y_TILED;
 
-		// dGPU do not support Tiling Y mode
-		if (drv->gpu_grp_type == TWO_GPU_IGPU_DGPU)
-			scanout_and_render = unset_flags(scanout_and_render, BO_USE_SCANOUT);
+	// dGPU do not support Tiling Y mode
+	if ((drv->gpu_grp_type == TWO_GPU_IGPU_DGPU) || (drv->gpu_grp_type == THREE_GPU_IGPU_VIRTIO_DGPU))
+		 scanout_and_render = unset_flags(scanout_and_render, BO_USE_SCANOUT);
 
 /* Support y-tiled NV12 and P010 for libva */
 #ifdef I915_SCANOUT_Y_TILED
-		drv_add_combination(drv, DRM_FORMAT_NV12, &metadata,
-				    BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER | BO_USE_SCANOUT);
+	drv_add_combination(drv, DRM_FORMAT_NV12, &metadata,
+			    BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER | BO_USE_SCANOUT);
 #else
-		drv_add_combination(drv, DRM_FORMAT_NV12, &metadata,
-				    BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER);
+	drv_add_combination(drv, DRM_FORMAT_NV12, &metadata,
+			    BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER);
 #endif
-		drv_add_combination(drv, DRM_FORMAT_P010, &metadata,
-				    BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER);
+	drv_add_combination(drv, DRM_FORMAT_P010, &metadata,
+			    BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER);
 
-		drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats), &metadata,
-				     render);
-		drv_add_combinations(drv, scanout_render_formats,
-				     ARRAY_SIZE(scanout_render_formats), &metadata,
-				     scanout_and_render);
+	drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats), &metadata, render);
+	drv_add_combinations(drv, scanout_render_formats, ARRAY_SIZE(scanout_render_formats),
+			     &metadata, scanout_and_render);
 #ifdef USE_GRALLOC1
-		i915_private_add_combinations(drv);
+	i915_private_add_combinations(drv);
 #endif
-	}
 	return 0;
 }
 
@@ -560,7 +553,6 @@ static void *i915_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t 
 
 		addr = (void *)(uintptr_t)gem_map.addr_ptr;
 	} else {
-
 		struct drm_i915_gem_mmap_gtt gem_map;
 		memset(&gem_map, 0, sizeof(gem_map));
 
@@ -568,8 +560,26 @@ static void *i915_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t 
 
 		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_MMAP_GTT, &gem_map);
 		if (ret) {
-			drv_log("DRM_IOCTL_I915_GEM_MMAP_GTT failed\n");
-			return MAP_FAILED;
+			struct drm_i915_gem_mmap gem_map;
+			memset(&gem_map, 0, sizeof(gem_map));
+
+			if ((bo->meta.use_flags & BO_USE_SCANOUT) &&
+			    !(bo->meta.use_flags &
+			      (BO_USE_RENDERSCRIPT | BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE)))
+				gem_map.flags = I915_MMAP_WC;
+			gem_map.handle = bo->handles[0].u32;
+			gem_map.offset = 0;
+			gem_map.size = bo->meta.total_size;
+			ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_MMAP, &gem_map);
+
+			if (ret) {
+			        drv_log("DRM_IOCTL_I915_GEM_MMAP failed\n");
+			        return MAP_FAILED;
+			}
+			addr = (void *)(uintptr_t)gem_map.addr_ptr;
+
+			vma->length = bo->meta.total_size;
+			return addr;
 		}
 
 		addr = mmap(0, bo->meta.total_size, drv_get_prot(map_flags), MAP_SHARED,
