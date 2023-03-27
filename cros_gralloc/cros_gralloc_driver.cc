@@ -213,12 +213,14 @@ fail:
 		fd = drv_get_fd(drv_kms_);
 		drv_destroy(drv_kms_);
 		close(fd);
+		drv_kms_ = nullptr;
 	}
 
 	if (drv_render_) {
 		fd = drv_get_fd(drv_render_);
 		drv_destroy(drv_render_);
 		close(fd);
+		drv_render_ = nullptr;
 	}
 
 	for (int i = 0; i < availabe_node; i++) {
