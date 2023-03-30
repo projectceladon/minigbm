@@ -7,5 +7,6 @@
 #define I915_PRIVATE_TYPES
 
 #define DRM_FORMAT_NV12_Y_TILED_INTEL fourcc_code('9', '9', '9', '6')
+#define DRM_FORMAT_NV12_X_TILED_INTEL fourcc_code('9', '9', '9', '5')
 
 #endif
