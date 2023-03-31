@@ -56,10 +56,7 @@ uint32_t cros_gralloc_convert_format(int format)
 	 * equal to their size in bytes.
 	 */
 	case HAL_PIXEL_FORMAT_BLOB:
-	/*
-	 * TODO(b/259551816): re-enable after ANGLE and SwiftShader are updated.
-	 * case HAL_PIXEL_FORMAT_R8:
-	 */
+	case HAL_PIXEL_FORMAT_R8:
 		return DRM_FORMAT_R8;
 	case HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED:
 		return DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED;
