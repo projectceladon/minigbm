@@ -690,6 +690,26 @@ uint32_t drv_resolve_format(struct driver *drv, uint32_t format, uint64_t use_fl
 	return format;
 }
 
+uint32_t drv_resolved_common_drm_format(uint32_t format)
+{
+	uint32_t ret = format;
+	switch (format) {
+		case DRM_FORMAT_NV12_Y_TILED_INTEL:
+		case DRM_FORMAT_FLEX_YCbCr_420_888:
+		case DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED:
+			ret = DRM_FORMAT_NV12;
+			drv_log("drv_resolved_common_drm_format: DRM_FORMAT_NV12");
+			break;
+		case DRM_FORMAT_YVU420_ANDROID:
+			ret = DRM_FORMAT_YVU420;
+			drv_log("drv_resolved_common_drm_format: DRM_FORMAT_YVU420");
+			break;
+		default:
+			break;
+	}
+	return ret;
+}
+
 uint32_t drv_num_buffers_per_bo(struct bo *bo)
 {
 	uint32_t count = 0;
