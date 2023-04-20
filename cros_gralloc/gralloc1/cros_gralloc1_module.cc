@@ -56,7 +56,7 @@ uint64_t cros_gralloc1_convert_usage(uint64_t producer_flags, uint64_t consumer_
 	if ((consumer_flags & GRALLOC1_CONSUMER_USAGE_HWCOMPOSER) ||
 	    (consumer_flags & GRALLOC1_CONSUMER_USAGE_CLIENT_TARGET)) {
 		/* HWC wants to use display hardware, but can defer to OpenGL. */
-		usage |= BO_USE_SCANOUT | BO_USE_TEXTURE;
+		usage |= BO_USE_TEXTURE;
 	} else if (consumer_flags & GRALLOC1_CONSUMER_USAGE_GPU_TEXTURE) {
 		usage |= BO_USE_TEXTURE;
 	}
@@ -1093,7 +1093,7 @@ int32_t CrosGralloc1::getBufferInfo(buffer_handle_t buffer, cros_gralloc_buffer_
 		    break;
 	    default:
 		    outInfo->drm_fourcc = hnd->format;
-                    outInfo->modifier = 0;
+			outInfo->modifier = (((uint64_t) hnd->format_modifiers[0]) << 32) | (((uint64_t) hnd->format_modifiers[1]) & 0xffffffff);
 		    break;
     }
     outInfo->num_fds = hnd->base.numFds;
