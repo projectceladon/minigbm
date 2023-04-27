@@ -133,6 +133,7 @@ namespace android
 static CrosGralloc1 *pCrosGralloc1 = NULL;
 static uint32_t ref_count = 0;
 //static SpinLock global_lock_;
+static std::mutex global_mutex_;
 
 CrosGralloc1::CrosGralloc1()
 {
@@ -744,7 +745,7 @@ int CrosGralloc1::HookDevOpen(const struct hw_module_t *mod, const char *name,
 	}
 
 	//ScopedSpinLock lock(global_lock_);
-	std::lock_guard<std::mutex> lock(std::mutex);
+	std::lock_guard<std::mutex> lock(global_mutex_);
 	ref_count++;
 
 	if (pCrosGralloc1 != NULL) {
@@ -774,7 +775,7 @@ int CrosGralloc1::HookDevOpen(const struct hw_module_t *mod, const char *name,
 int CrosGralloc1::HookDevClose(hw_device_t * /*dev*/)
 {
 	//ScopedSpinLock lock(global_lock_);
-	std::lock_guard<std::mutex> lock(std::mutex);
+	std::lock_guard<std::mutex> lock(global_mutex_);
 	if (ref_count > 0) {
 		ref_count--;
 	}
