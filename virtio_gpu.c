@@ -17,6 +17,7 @@
 #include "util.h"
 #include "virgl_hw.h"
 #include "virtgpu_drm.h"
+#include <i915_drm.h>
 
 #ifndef PAGE_SIZE
 #define PAGE_SIZE 0x1000
@@ -585,6 +586,11 @@ static int virtio_gpu_init(struct driver *drv)
 
 	virtio_gpu_init_features_and_caps(drv);
 
+	struct format_metadata metadata;
+	metadata.tiling = I915_TILING_Y;
+	metadata.priority = 3;
+	metadata.modifier = I915_FORMAT_MOD_Y_TILED;
+
 	if (features[feat_3d].enabled) {
 		/* This doesn't mean host can scanout everything, it just means host
 		 * hypervisor can show it. */
@@ -595,21 +601,22 @@ static int virtio_gpu_init(struct driver *drv)
 					    ARRAY_SIZE(texture_source_formats), &LINEAR_METADATA,
 					    BO_USE_TEXTURE_MASK);
 	} else {
+
+		uint64_t render = BO_USE_RENDER_MASK | ~BO_USE_LINEAR;
 		/* Virtio primary plane only allows this format. */
-		virtio_gpu_add_combination(drv, DRM_FORMAT_XRGB8888, &LINEAR_METADATA,
-					   BO_USE_RENDER_MASK | BO_USE_SCANOUT);
+		virtio_gpu_add_combination(drv, DRM_FORMAT_XRGB8888, &metadata,
+					   render | BO_USE_SCANOUT);
 		/* Virtio cursor plane only allows this format and Chrome cannot live without
 		 * ARGB888 renderable format. */
-		virtio_gpu_add_combination(drv, DRM_FORMAT_ARGB8888, &LINEAR_METADATA,
-					   BO_USE_RENDER_MASK | BO_USE_CURSOR);
+		virtio_gpu_add_combination(drv, DRM_FORMAT_ARGB8888, &metadata,
+					   render | BO_USE_CURSOR);
 		/* Android needs more, but they cannot be bound as scanouts anymore after
 		 * "drm/virtio: fix DRM_FORMAT_* handling" */
 		virtio_gpu_add_combinations(drv, render_target_formats,
-					    ARRAY_SIZE(render_target_formats), &LINEAR_METADATA,
-					    BO_USE_RENDER_MASK);
+					    ARRAY_SIZE(render_target_formats), &metadata, render);
 		virtio_gpu_add_combinations(drv, dumb_texture_source_formats,
-					    ARRAY_SIZE(dumb_texture_source_formats),
-					    &LINEAR_METADATA, BO_USE_TEXTURE_MASK);
+					    ARRAY_SIZE(dumb_texture_source_formats), &metadata,
+					    render);
 		virtio_gpu_add_combination(drv, DRM_FORMAT_NV12, &LINEAR_METADATA,
 					   BO_USE_SW_MASK | BO_USE_LINEAR);
 		virtio_gpu_add_combination(drv, DRM_FORMAT_NV21, &LINEAR_METADATA,
@@ -639,11 +646,14 @@ static int virtio_gpu_init(struct driver *drv)
 	drv_modify_combination(drv, DRM_FORMAT_R16, &LINEAR_METADATA,
 			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER);
 #ifdef USE_GRALLOC1
-	drv_modify_combination(drv, DRM_FORMAT_ABGR8888, &LINEAR_METADATA,
+	drv_modify_combination(drv, DRM_FORMAT_ABGR8888, &metadata,
 			       BO_USE_CAMERA_WRITE | BO_USE_CAMERA_READ);
 #endif
 
-	return drv_modify_linear_combinations(drv);
+	drv_modify_combination(drv, DRM_FORMAT_XRGB8888, &metadata, BO_USE_CURSOR | BO_USE_SCANOUT);
+	drv_modify_combination(drv, DRM_FORMAT_ARGB8888, &metadata, BO_USE_CURSOR | BO_USE_SCANOUT);
+
+	return 0;
 }
 
 static void virtio_gpu_close(struct driver *drv)
@@ -655,10 +665,26 @@ static void virtio_gpu_close(struct driver *drv)
 static int virtio_gpu_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint32_t format,
 				uint64_t use_flags)
 {
-	if (features[feat_3d].enabled)
+	struct combination *combo = drv_get_combination(bo->drv, format, use_flags);
+	if (!combo)
+		return -EINVAL;
+	uint64_t modifier = combo->metadata.modifier;
+	switch (modifier) {
+	case DRM_FORMAT_MOD_LINEAR:
+		bo->meta.tiling = I915_TILING_NONE;
+		break;
+	case I915_FORMAT_MOD_Y_TILED:
+		bo->meta.tiling = I915_TILING_Y;
+		break;
+	}
+
+	bo->meta.format_modifiers[0] = modifier;
+
+	if (features[feat_3d].enabled) {
 		return virtio_virgl_bo_create(bo, width, height, format, use_flags);
-	else
+	} else {
 		return virtio_dumb_bo_create(bo, width, height, format, use_flags);
+	}
 }
 
 static int virtio_gpu_bo_destroy(struct bo *bo)
