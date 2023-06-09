@@ -19,6 +19,10 @@
 #include "drv_priv.h"
 #include "util.h"
 
+#ifdef USE_GRALLOC1
+#include "i915_private.h"
+#endif
+
 struct planar_layout {
 	size_t num_planes;
 	int horizontal_subsampling[DRV_MAX_PLANES];
@@ -104,6 +108,9 @@ static const struct planar_layout *layout_from_format(uint32_t format)
 
 	case DRM_FORMAT_NV12:
 	case DRM_FORMAT_NV21:
+#ifdef USE_GRALLOC1
+	case DRM_FORMAT_NV12_Y_TILED_INTEL:
+#endif
 		return &biplanar_yuv_420_layout;
 
 	case DRM_FORMAT_P010:

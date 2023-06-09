@@ -16,6 +16,10 @@
 #include "cros_gralloc/cros_gralloc_helpers.h"
 #include "cros_gralloc/gralloc4/CrosGralloc4Utils.h"
 
+#ifdef USE_GRALLOC1
+#include "cros_gralloc/i915_private_android_types.h"
+#endif
+
 using aidl::android::hardware::graphics::common::BlendMode;
 using aidl::android::hardware::graphics::common::Dataspace;
 using aidl::android::hardware::graphics::common::PlaneLayout;
@@ -138,8 +142,16 @@ Return<Error> CrosGralloc4Mapper::validateBufferSize(void* rawHandle,
     }
 
     PixelFormat crosHandleFormat = static_cast<PixelFormat>(crosHandle->droid_format);
+#ifdef USE_GRALLOC1
+    int32_t yuvFormat = static_cast<int32_t>(descriptor.format);
+    if (descriptor.format != crosHandleFormat && yuvFormat != crosHandle->droid_format &&
+            !(descriptor.format == PixelFormat::YCBCR_420_888 &&
+            crosHandle->droid_format == HAL_PIXEL_FORMAT_NV12)) {
+        ALOGE("Failed to validateBufferSize. Format mismatch.\n");
+#else
     if (descriptor.format != crosHandleFormat) {
         ALOGE("Failed to validateBufferSize. Format mismatch.");
+#endif
         return Error::BAD_BUFFER;
     }
 

@@ -18,6 +18,10 @@
 
 #include "cros_gralloc/cros_gralloc_helpers.h"
 
+#ifdef USE_GRALLOC1
+#include "cros_gralloc/i915_private_android.h"
+#endif
+
 using aidl::android::hardware::graphics::common::PlaneLayout;
 using aidl::android::hardware::graphics::common::PlaneLayoutComponent;
 using aidl::android::hardware::graphics::common::PlaneLayoutComponentType;
@@ -55,6 +59,22 @@ int convertToBufferUsage(uint64_t grallocUsage, uint64_t* outBufferUsage) {
     return 0;
 }
 
+#ifdef USE_GRALLOC1
+bool IsSupportedYUVFormat(uint32_t droid_format) {
+    switch (droid_format) {
+        case HAL_PIXEL_FORMAT_YCbCr_420_888:
+        case HAL_PIXEL_FORMAT_YV12:
+        case HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED:
+            return true;
+        default:
+            return i915_private_supported_yuv_format(droid_format);
+    }
+
+    return false;
+}
+
+#endif
+
 int convertToCrosDescriptor(const BufferDescriptorInfo& descriptor,
                             struct cros_gralloc_buffer_descriptor* outCrosDescriptor) {
     outCrosDescriptor->name = descriptor.name;
@@ -68,9 +88,20 @@ int convertToCrosDescriptor(const BufferDescriptorInfo& descriptor,
         return -EINVAL;
     }
     if (convertToDrmFormat(descriptor.format, &outCrosDescriptor->drm_format)) {
+#ifdef USE_GRALLOC1
+        ALOGE("Failed to convert descriptor by convertToDrmFormat");
+        if (!IsSupportedYUVFormat(static_cast<uint32_t>(descriptor.format))) {
+            std::string pixelFormatString = getPixelFormatString(descriptor.format);
+            ALOGE("Failed to convert descriptor. Unsupported fomat %s\n", pixelFormatString.c_str());
+            return -EINVAL;
+        } else {
+            outCrosDescriptor->drm_format = cros_gralloc_convert_format(static_cast<int32_t>(descriptor.format));
+        }
+#else
         std::string pixelFormatString = getPixelFormatString(descriptor.format);
         ALOGE("Failed to convert descriptor. Unsupported format %s", pixelFormatString.c_str());
         return -EINVAL;
+#endif
     }
     if (convertToBufferUsage(descriptor.usage, &outCrosDescriptor->use_flags)) {
         std::string usageString = getUsageString(descriptor.usage);
@@ -237,6 +268,30 @@ const std::unordered_map<uint32_t, std::vector<PlaneLayout>>& GetPlaneLayoutsMap
                               .horizontalSubsampling = 2,
                               .verticalSubsampling = 2,
                       }}},
+
+#ifdef USE_GRALLOC1
+                    {DRM_FORMAT_NV12_Y_TILED_INTEL,
+                     {{
+                              .components = {{.type = android::gralloc4::PlaneLayoutComponentType_Y,
+                                              .offsetInBits = 0,
+                                              .sizeInBits = 8}},
+                              .sampleIncrementInBits = 8,
+                              .horizontalSubsampling = 1,
+                              .verticalSubsampling = 1,
+                      },
+                      {
+                              .components =
+                                      {{.type = android::gralloc4::PlaneLayoutComponentType_CB,
+                                        .offsetInBits = 0,
+                                        .sizeInBits = 8},
+                                        {.type = android::gralloc4::PlaneLayoutComponentType_CR,
+                                        .offsetInBits = 8,
+                                        .sizeInBits = 8}},
+                              .sampleIncrementInBits = 16,
+                              .horizontalSubsampling = 2,
+                              .verticalSubsampling = 2,
+                      }}},
+#endif
 
                     {DRM_FORMAT_P010,
                      {{
