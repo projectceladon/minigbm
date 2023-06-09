@@ -256,6 +256,9 @@ static int i915_add_combinations(struct driver *drv)
 
 	/* Android CTS tests require this. */
 	drv_add_combination(drv, DRM_FORMAT_BGR888, &metadata_linear, BO_USE_SW_MASK);
+#ifdef USE_GRALLOC1
+	drv_modify_combination(drv, DRM_FORMAT_ABGR2101010, &metadata_linear, BO_USE_SW_MASK);
+#endif
 
 	/*
 	 * R8 format is used for Android's HAL_PIXEL_FORMAT_BLOB and is used for JPEG snapshots
