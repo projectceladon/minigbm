@@ -226,7 +226,7 @@ static int i915_add_combinations(struct driver *drv)
 {
 	struct i915_device *i915 = drv->priv;
 
-	const uint64_t scanout_and_render = BO_USE_RENDER_MASK | BO_USE_SCANOUT;
+	uint64_t scanout_and_render = BO_USE_RENDER_MASK | BO_USE_SCANOUT;
 	uint64_t render = BO_USE_RENDER_MASK;
 	const uint64_t texture_only = BO_USE_TEXTURE_MASK;
 	// HW protected buffers also need to be scanned out.
@@ -285,6 +285,11 @@ static int i915_add_combinations(struct driver *drv)
 	struct format_metadata metadata_x_tiled = { .tiling = I915_TILING_X,
 						    .priority = 2,
 						    .modifier = I915_FORMAT_MOD_X_TILED };
+
+#ifdef USE_GRALLOC1
+	if (i915->graphics_version == 12)
+		scanout_and_render = unset_flags(scanout_and_render, BO_USE_SCANOUT);
+#endif
 
 	drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats), &metadata_x_tiled,
 			     render_not_linear);
