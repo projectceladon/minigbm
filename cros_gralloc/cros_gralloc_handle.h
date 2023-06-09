@@ -40,6 +40,21 @@ struct cros_gralloc_handle : public native_handle_t {
 	uint32_t num_planes;
 	uint64_t reserved_region_size;
 	uint64_t total_size; /* Total allocation size */
+#ifdef USE_GRALLOC1
+	uint32_t consumer_usage;
+	uint32_t producer_usage;
+	uint32_t yuv_color_range;   // YUV Color range.
+	uint32_t is_updated;        // frame updated flag
+	uint32_t is_encoded;        // frame encoded flag
+	uint32_t is_encrypted;
+	uint32_t is_key_frame;
+	uint32_t is_interlaced;
+	uint32_t is_mmc_capable;
+	uint32_t compression_mode;
+	uint32_t compression_hint;
+	uint32_t codec;
+	uint32_t format_modifiers[2 * DRV_MAX_PLANES];
+#endif
 } __attribute__((packed));
 
 typedef const struct cros_gralloc_handle *cros_gralloc_handle_t;

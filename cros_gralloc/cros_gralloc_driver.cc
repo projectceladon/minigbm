@@ -16,6 +16,10 @@
 
 #include "../util.h"
 
+#ifdef USE_GRALLOC1
+#include "i915_private_android.h"
+#endif
+
 // Constants taken from pipe_loader_drm.c in Mesa
 
 #define DRM_NUM_NODES 63
@@ -250,6 +254,9 @@ int cros_gralloc_driver::create_reserved_region(const std::string &buffer_name,
 int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descriptor *descriptor,
 				      native_handle_t **out_handle)
 {
+#ifdef USE_GRALLOC1
+	uint64_t mod;
+#endif
 	int ret = 0;
 	size_t num_planes;
 	size_t num_fds;
@@ -266,8 +273,18 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 		return -EINVAL;
 	}
 
+#ifdef USE_GRALLOC1
+	if (descriptor->modifier == 0) {
+		bo = drv_bo_create(drv_.get(), descriptor->width, descriptor->height, resolved_format,
+				   resolved_use_flags);
+	} else {
+		bo = drv_bo_create_with_modifiers(drv_.get(), descriptor->width, descriptor->height,
+						  resolved_format, &descriptor->modifier, 1);
+	}
+#else
 	bo = drv_bo_create(drv_.get(), descriptor->width, descriptor->height, resolved_format,
 			   resolved_use_flags);
+#endif
 	if (!bo) {
 		ALOGE("Failed to create bo.");
 		return -errno;
@@ -308,6 +325,11 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 		hnd->strides[plane] = drv_bo_get_plane_stride(bo, plane);
 		hnd->offsets[plane] = drv_bo_get_plane_offset(bo, plane);
 		hnd->sizes[plane] = drv_bo_get_plane_size(bo, plane);
+#ifdef USE_GRALLOC1
+		mod = drv_bo_get_format_modifier(bo);
+		hnd->format_modifiers[2 * plane] = static_cast<uint32_t>(mod >> 32);
+		hnd->format_modifiers[2 * plane + 1] = static_cast<uint32_t>(mod);
+#endif
 	}
 
 	hnd->reserved_region_size = descriptor->reserved_region_size;
@@ -330,7 +352,19 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 	bytes_per_pixel = drv_bytes_per_pixel_from_format(hnd->format, 0);
 	hnd->pixel_stride = DIV_ROUND_UP(hnd->strides[0], bytes_per_pixel);
 	hnd->magic = cros_gralloc_magic;
+#ifdef USE_GRALLOC1
+	hnd->producer_usage = descriptor->producer_usage;
+	hnd->consumer_usage = descriptor->consumer_usage;
+	{
+		int32_t format = i915_private_invert_format(hnd->format);
+		if (format == 0) {
+			format =  descriptor->droid_format;
+		}
+		hnd->droid_format = format;
+	}
+#else
 	hnd->droid_format = descriptor->droid_format;
+#endif
 	hnd->usage = descriptor->droid_usage;
 	hnd->total_size = descriptor->reserved_region_size + drv_bo_get_total_size(bo);
 
@@ -487,6 +521,31 @@ int32_t cros_gralloc_driver::lock(buffer_handle_t handle, int32_t acquire_fence,
 	return buffer->lock(rect, map_flags, addr);
 }
 
+#ifdef USE_GRALLOC1
+int32_t cros_gralloc_driver::lock(buffer_handle_t handle, int32_t acquire_fence, uint32_t map_flags,
+				  uint8_t *addr[DRV_MAX_PLANES])
+{
+	int32_t ret = cros_gralloc_sync_wait(acquire_fence);
+	if (ret)
+		return ret;
+
+	std::lock_guard<std::mutex> lock(mutex_);
+	auto hnd = cros_gralloc_convert_handle(handle);
+	if (!hnd) {
+		ALOGE("Invalid handle.");
+		return -EINVAL;
+	}
+
+	auto buffer = get_buffer(hnd);
+	if (!buffer) {
+		ALOGE("Invalid Reference.");
+		return -EINVAL;
+	}
+
+	return buffer->lock(map_flags, addr);
+}
+#endif
+
 int32_t cros_gralloc_driver::unlock(buffer_handle_t handle, int32_t *release_fence)
 {
 	std::lock_guard<std::mutex> lock(mutex_);
@@ -561,6 +620,9 @@ int32_t cros_gralloc_driver::get_backing_store(buffer_handle_t handle, uint64_t 
 		return -EINVAL;
 	}
 
+#ifdef USE_GRALLOC1
+	*out_store = static_cast<uint64_t>(hnd->id);
+#else
 	auto buffer = get_buffer(hnd);
 	if (!buffer) {
 		ALOGE("Invalid reference (get_backing_store() called on unregistered handle).");
@@ -568,6 +630,7 @@ int32_t cros_gralloc_driver::get_backing_store(buffer_handle_t handle, uint64_t 
 	}
 
 	*out_store = static_cast<uint64_t>(buffer->get_id());
+#endif
 	return 0;
 }
 

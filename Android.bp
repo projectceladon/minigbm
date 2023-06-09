@@ -67,6 +67,11 @@ filegroup {
     srcs: ["cros_gralloc/gralloc0/gralloc0.cc"],
 }
 
+filegroup {
+    name: "minigbm_gralloc1_files",
+    srcs: ["cros_gralloc/gralloc1/cros_gralloc1_module.cc"],
+}
+
 cc_defaults {
     name: "minigbm_defaults",
 
@@ -83,7 +88,7 @@ cc_defaults {
 
     product_variables: {
         platform_sdk_version: {
-            cflags: ["-DANDROID_API_LEVEL=%d"],
+            cflags: ["-DANDROID_API_LEVEL=33"],
         },
     },
 }
@@ -140,6 +145,21 @@ cc_defaults {
     srcs: [":minigbm_gralloc0_files"],
 }
 
+cc_defaults {
+    name: "minigbm_cros_gralloc1_defaults",
+
+    defaults: ["minigbm_cros_gralloc_defaults"],
+    relative_install_path: "hw",
+
+    srcs: [":minigbm_gralloc1_files"],
+    cflags: [
+        "-Wno-switch",
+        "-Wno-cast-qual",
+        "-DUSE_GRALLOC1",
+    ],
+
+}
+
 cc_library {
     name: "libgbm",
     defaults: ["minigbm_defaults"],
@@ -192,8 +212,20 @@ cc_library_shared {
 cc_library_shared {
     name: "libminigbm_gralloc_intel",
     defaults: ["minigbm_cros_gralloc_library_defaults"],
-    cflags: ["-DDRV_I915"],
+    srcs: [
+        "i915_private.c",
+        "cros_gralloc/i915_private_android.cc",
+    ],
+    cflags: [
+        "-DDRV_I915",
+        "-DUSE_GRALLOC1",
+        "-Wno-cast-qual",
+        "-DHAVE_MEMFD_CREATE",
+    ],
     enabled: false,
+    local_include_dirs: [
+        "cros_gralloc",
+    ],
     arch: {
         x86: {
             enabled: true,
@@ -209,6 +241,24 @@ cc_library_shared {
     defaults: ["minigbm_cros_gralloc0_defaults"],
     shared_libs: ["libminigbm_gralloc_intel"],
     enabled: false,
+    arch: {
+        x86: {
+            enabled: true,
+        },
+        x86_64: {
+            enabled: true,
+        },
+    },
+}
+
+cc_library_shared {
+    name: "gralloc.intel",
+    defaults: ["minigbm_cros_gralloc1_defaults"],
+    shared_libs: ["libminigbm_gralloc_intel"],
+    enabled: false,
+    local_include_dirs: [
+        "cros_gralloc",
+    ],
     arch: {
         x86: {
             enabled: true,

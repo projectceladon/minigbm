@@ -9,6 +9,10 @@
 #include <hardware/gralloc.h>
 #include <sync/sync.h>
 
+#ifdef USE_GRALLOC1
+#include "i915_private_android.h"
+#endif
+
 /* Define to match AIDL BufferUsage::VIDEO_DECODER. */
 #define BUFFER_USAGE_VIDEO_DECODER (1 << 22)
 
@@ -20,6 +24,20 @@
 
 /* Define to match AIDL PixelFormat::R_8. */
 #define HAL_PIXEL_FORMAT_R8 0x38
+
+#ifdef USE_GRALLOC1
+bool is_flex_format(uint32_t format)
+{
+	switch (format) {
+	case DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED:
+	case DRM_FORMAT_FLEX_YCbCr_420_888:
+		return true;
+	default:
+		return false;
+	}
+	return false;
+}
+#endif
 
 uint32_t cros_gralloc_convert_format(int format)
 {
@@ -80,7 +98,11 @@ uint32_t cros_gralloc_convert_format(int format)
 #endif
 	}
 
+#ifdef USE_GRALLOC1
+	return i915_private_convert_format(format);
+#else
 	return DRM_FORMAT_NONE;
+#endif
 }
 
 static inline void handle_usage(uint64_t *gralloc_usage, uint64_t gralloc_mask,
@@ -189,6 +211,36 @@ int32_t cros_gralloc_sync_wait(int32_t fence, bool close_fence)
 
 	return 0;
 }
+
+#ifdef USE_GRALLOC1
+int32_t cros_gralloc_sync_wait(int32_t acquire_fence)
+{
+	if (acquire_fence < 0)
+		return 0;
+
+	/*
+	 * Wait initially for 1000 ms, and then wait indefinitely. The SYNC_IOC_WAIT
+	 * documentation states the caller waits indefinitely on the fence if timeout < 0.
+	 */
+	int err = sync_wait(acquire_fence, 1000);
+	if (err < 0) {
+		ALOGE("Timed out on sync wait, err = %s", strerror(errno));
+		err = sync_wait(acquire_fence, -1);
+		if (err < 0) {
+			ALOGE("sync wait error = %s", strerror(errno));
+			return -errno;
+		}
+	}
+
+	err = close(acquire_fence);
+	if (err) {
+		ALOGE("Unable to close fence fd, err = %s", strerror(errno));
+		return -errno;
+	}
+
+	return 0;
+}
+#endif
 
 std::string get_drm_format_string(uint32_t drm_format)
 {

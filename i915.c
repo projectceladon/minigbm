@@ -20,6 +20,10 @@
 #include "external/i915_drm.h"
 #include "util.h"
 
+#ifdef USE_GRALLOC1
+#include "i915_private.h"
+#endif
+
 #define I915_CACHELINE_SIZE 64
 #define I915_CACHELINE_MASK (I915_CACHELINE_SIZE - 1)
 
@@ -63,6 +67,10 @@ struct i915_device {
 	bool is_mtl;
 	int32_t num_fences_avail;
 	bool has_mmap_offset;
+#ifdef USE_GRALLOC1
+	uint64_t cursor_width;
+	uint64_t cursor_height;
+#endif
 };
 
 static void i915_info_from_device_id(struct i915_device *i915)
@@ -317,6 +325,10 @@ static int i915_add_combinations(struct driver *drv)
 				     ARRAY_SIZE(scanout_render_formats), &metadata_y_tiled,
 				     render_not_linear);
 	}
+
+#ifdef USE_GRALLOC1
+	i915_private_add_combinations(drv);
+#endif
 	return 0;
 }
 
@@ -470,6 +482,11 @@ static int i915_init(struct driver *drv)
 		i915->has_hw_protection = 1;
 
 	drv->priv = i915;
+
+#ifdef USE_GRALLOC1
+	i915_private_init(drv, &i915->cursor_width, &i915->cursor_height);
+#endif
+
 	return i915_add_combinations(drv);
 }
 
