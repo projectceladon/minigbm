@@ -409,6 +409,9 @@ static int i915_align_dimensions(struct bo *bo, uint32_t format, uint32_t tiling
 
 	*aligned_height = ALIGN(*aligned_height, vertical_alignment);
 	if (i915->graphics_version > 3) {
+#ifdef USE_GRALLOC1
+		if (DRM_FORMAT_R8 != bo->meta.format)
+#endif
 		*stride = ALIGN(*stride, horizontal_alignment);
 	} else {
 		while (*stride > horizontal_alignment)
