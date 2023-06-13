@@ -24,6 +24,10 @@
 #include "drv_priv.h"
 #include "util.h"
 
+#ifdef USE_GRALLOC1
+#include "i915_private.h"
+#endif
+
 #ifdef DRV_AMDGPU
 extern const struct backend backend_amdgpu;
 #endif
@@ -106,7 +110,6 @@ static const struct backend *drv_get_backend(int fd)
 struct driver *drv_create(int fd)
 {
 	struct driver *drv;
-	int ret;
 
 	drv = (struct driver *)calloc(1, sizeof(*drv));
 
@@ -141,14 +144,6 @@ struct driver *drv_create(int fd)
 	if (!drv->combos)
 		goto free_mappings;
 
-	if (drv->backend->init) {
-		ret = drv->backend->init(drv);
-		if (ret) {
-			drv_array_destroy(drv->combos);
-			goto free_mappings;
-		}
-	}
-
 	return drv;
 
 free_mappings:
@@ -162,6 +157,20 @@ free_buffer_table_lock:
 free_driver:
 	free(drv);
 	return NULL;
+}
+
+int drv_init(struct driver * drv, uint32_t grp_type)
+{
+	int ret = 0;
+	assert(drv);
+	assert(drv->backend);
+
+	drv->gpu_grp_type = grp_type;
+
+	if (drv->backend->init) {
+		ret = drv->backend->init(drv);
+	}
+	return ret;
 }
 
 void drv_destroy(struct driver *drv)
@@ -725,6 +734,26 @@ void drv_resolve_format_and_use_flags(struct driver *drv, uint32_t format, uint6
 
 	drv->backend->resolve_format_and_use_flags(drv, format, use_flags, out_format,
 						   out_use_flags);
+}
+
+uint32_t drv_resolved_common_drm_format(uint32_t format)
+{
+	uint32_t ret = format;
+	switch (format) {
+		case DRM_FORMAT_NV12_Y_TILED_INTEL:
+		case DRM_FORMAT_FLEX_YCbCr_420_888:
+		case DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED:
+			ret = DRM_FORMAT_NV12;
+			ALOGI("drv_resolved_common_drm_format: DRM_FORMAT_NV12");
+			break;
+		case DRM_FORMAT_YVU420_ANDROID:
+			ret = DRM_FORMAT_YVU420;
+			ALOGI("drv_resolved_common_drm_format: DRM_FORMAT_YVU420");
+			break;
+		default:
+			break;
+	}
+	return ret;
 }
 
 uint32_t drv_num_buffers_per_bo(struct bo *bo)

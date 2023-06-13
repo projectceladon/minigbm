@@ -135,6 +135,8 @@ void drv_preload(bool load);
 
 struct driver *drv_create(int fd);
 
+int drv_init(struct driver * drv, uint32_t grp_type);
+
 void drv_destroy(struct driver *drv);
 
 int drv_get_fd(struct driver *drv);
@@ -203,6 +205,8 @@ void drv_resolve_format_and_use_flags(struct driver *drv, uint32_t format, uint6
 				      uint32_t *out_format, uint64_t *out_use_flags);
 
 uint64_t drv_resolve_use_flags(struct driver *drv, uint32_t format, uint64_t use_flags);
+
+uint32_t drv_resolved_common_drm_format(uint32_t format);
 
 size_t drv_num_planes_from_format(uint32_t format);
 

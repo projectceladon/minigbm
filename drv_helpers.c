@@ -605,6 +605,14 @@ void drv_resolve_format_and_use_flags_helper(struct driver *drv, uint32_t format
 {
 	*out_format = format;
 	*out_use_flags = use_flags;
+#ifdef USE_GRALLOC1
+	uint32_t resolved_format;
+	if (i915_private_resolve_format(format, use_flags, &resolved_format)) {
+		*out_format = resolved_format;
+		return;
+	}
+#endif
+
 	switch (format) {
 	case DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED:
 		/* Common camera implementation defined format. */
