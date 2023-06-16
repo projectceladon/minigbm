@@ -39,6 +39,8 @@ struct driver;
 
 #define DRM_FORMAT_NV12_Y_TILED_INTEL fourcc_code('9', '9', '9', '6')
 
+bool i915_has_tile4(struct driver *drv);
+
 int i915_private_init(struct driver *drv, uint64_t *cursor_width, uint64_t *cursor_height);
 
 int i915_private_add_combinations(struct driver *drv);

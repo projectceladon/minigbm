@@ -216,6 +216,12 @@ static void i915_get_modifier_order(struct i915_device *i915)
 	}
 }
 
+bool i915_has_tile4(struct driver *drv)
+{
+	struct i915_device *i915 = drv->priv;
+	return i915->is_mtl;
+}
+
 static uint64_t unset_flags(uint64_t current_flags, uint64_t mask)
 {
 	uint64_t value = current_flags & ~mask;
