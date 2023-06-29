@@ -32,7 +32,8 @@ static const uint32_t scanout_render_formats[] = { DRM_FORMAT_ABGR2101010, DRM_F
 static const uint32_t render_formats[] = { DRM_FORMAT_ABGR16161616F };
 
 static const uint32_t texture_only_formats[] = { DRM_FORMAT_R8, DRM_FORMAT_NV12, DRM_FORMAT_P010,
-						 DRM_FORMAT_YVU420, DRM_FORMAT_YVU420_ANDROID };
+						 DRM_FORMAT_YVU420, DRM_FORMAT_YVU420_ANDROID,
+						 DRM_FORMAT_YUYV };
 
 static const uint32_t linear_source_formats[] = { DRM_FORMAT_R16,    DRM_FORMAT_NV16,
                                                  DRM_FORMAT_YUV420, DRM_FORMAT_YUV422,
@@ -274,7 +275,7 @@ static int i915_add_combinations(struct driver *drv)
 
 	/* Android CTS tests require this. */
 	drv_add_combination(drv, DRM_FORMAT_BGR888, &metadata_linear, BO_USE_SW_MASK);
-	drv_modify_combination(drv, DRM_FORMAT_ABGR2101010, &metadatai_linear, BO_USE_SW_MASK);
+	drv_modify_combination(drv, DRM_FORMAT_ABGR2101010, &metadata_linear, BO_USE_SW_MASK);
 
 	/*
 	 * R8 format is used for Android's HAL_PIXEL_FORMAT_BLOB and is used for JPEG snapshots

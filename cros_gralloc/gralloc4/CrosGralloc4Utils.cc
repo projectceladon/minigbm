@@ -72,9 +72,14 @@ int convertToCrosDescriptor(const BufferDescriptorInfo& descriptor,
         return -EINVAL;
     }
     if (convertToDrmFormat(descriptor.format, &outCrosDescriptor->drm_format)) {
-        std::string pixelFormatString = getPixelFormatString(descriptor.format);
-        ALOGE("Failed to convert descriptor. Unsupported format %s", pixelFormatString.c_str());
-        return -EINVAL;
+        ALOGE("Failed to convert descriptor by convertToDrmFormat");
+        if (!IsSupportedYUVFormat(static_cast<uint32_t>(descriptor.format))) {
+            std::string pixelFormatString = getPixelFormatString(descriptor.format);
+            ALOGE("Failed to convert descriptor. Unsupported fomat %s\n", pixelFormatString.c_str());
+            return -1;
+        } else {
+            outCrosDescriptor->drm_format = cros_gralloc_convert_format(static_cast<int32_t>(descriptor.format));
+        }
     }
     if (convertToBufferUsage(descriptor.usage, &outCrosDescriptor->use_flags)) {
         std::string usageString = getUsageString(descriptor.usage);
