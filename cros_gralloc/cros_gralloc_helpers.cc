@@ -190,6 +190,36 @@ int32_t cros_gralloc_sync_wait(int32_t fence, bool close_fence)
 	return 0;
 }
 
+#ifdef USE_GRALLOC1
+int32_t cros_gralloc_sync_wait(int32_t acquire_fence)
+{
+	if (acquire_fence < 0)
+		return 0;
+
+	/*
+	 * Wait initially for 1000 ms, and then wait indefinitely. The SYNC_IOC_WAIT
+	 * documentation states the caller waits indefinitely on the fence if timeout < 0.
+	 */
+	int err = sync_wait(acquire_fence, 1000);
+	if (err < 0) {
+		ALOGE("Timed out on sync wait, err = %s", strerror(errno));
+		err = sync_wait(acquire_fence, -1);
+		if (err < 0) {
+			ALOGE("sync wait error = %s", strerror(errno));
+			return -errno;
+		}
+	}
+
+	err = close(acquire_fence);
+	if (err) {
+		ALOGE("Unable to close fence fd, err = %s", strerror(errno));
+		return -errno;
+	}
+
+	return 0;
+}
+#endif
+
 std::string get_drm_format_string(uint32_t drm_format)
 {
 	char *sequence = (char *)&drm_format;

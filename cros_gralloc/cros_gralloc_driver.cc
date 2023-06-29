@@ -330,6 +330,10 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 	bytes_per_pixel = drv_bytes_per_pixel_from_format(hnd->format, 0);
 	hnd->pixel_stride = DIV_ROUND_UP(hnd->strides[0], bytes_per_pixel);
 	hnd->magic = cros_gralloc_magic;
+#ifdef USE_GRALLOC1
+	hnd->producer_usage = descriptor->producer_usage;
+	hnd->consumer_usage = descriptor->consumer_usage;
+#endif
 	hnd->droid_format = descriptor->droid_format;
 	hnd->usage = descriptor->droid_usage;
 	hnd->total_size = descriptor->reserved_region_size + drv_bo_get_total_size(bo);
@@ -487,6 +491,31 @@ int32_t cros_gralloc_driver::lock(buffer_handle_t handle, int32_t acquire_fence,
 	return buffer->lock(rect, map_flags, addr);
 }
 
+#ifdef USE_GRALLOC1
+int32_t cros_gralloc_driver::lock(buffer_handle_t handle, int32_t acquire_fence, uint32_t map_flags,
+				  uint8_t *addr[DRV_MAX_PLANES])
+{
+	int32_t ret = cros_gralloc_sync_wait(acquire_fence);
+	if (ret)
+		return ret;
+
+	std::lock_guard<std::mutex> lock(mutex_);
+	auto hnd = cros_gralloc_convert_handle(handle);
+	if (!hnd) {
+		ALOGE("Invalid handle.");
+		return -EINVAL;
+	}
+
+	auto buffer = get_buffer(hnd);
+	if (!buffer) {
+		ALOGE("Invalid Reference.");
+		return -EINVAL;
+	}
+
+	return buffer->lock(map_flags, addr);
+}
+#endif
+
 int32_t cros_gralloc_driver::unlock(buffer_handle_t handle, int32_t *release_fence)
 {
 	std::lock_guard<std::mutex> lock(mutex_);
@@ -561,13 +590,7 @@ int32_t cros_gralloc_driver::get_backing_store(buffer_handle_t handle, uint64_t 
 		return -EINVAL;
 	}
 
-	auto buffer = get_buffer(hnd);
-	if (!buffer) {
-		ALOGE("Invalid reference (get_backing_store() called on unregistered handle).");
-		return -EINVAL;
-	}
-
-	*out_store = static_cast<uint64_t>(buffer->get_id());
+	*out_store = static_cast<uint64_t>(hnd->id);
 	return 0;
 }
 

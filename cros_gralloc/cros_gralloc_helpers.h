@@ -33,6 +33,10 @@ struct cros_gralloc_buffer_descriptor {
 	uint64_t use_flags;
 	uint64_t reserved_region_size;
 	std::string name;
+#ifdef USE_GRALLOC1
+	uint32_t consumer_usage;
+	uint32_t producer_usage;
+#endif
 };
 
 constexpr uint32_t cros_gralloc_magic = 0xABCDDCBA;
@@ -48,6 +52,10 @@ uint32_t cros_gralloc_convert_map_usage(uint64_t usage);
 cros_gralloc_handle_t cros_gralloc_convert_handle(buffer_handle_t handle);
 
 int32_t cros_gralloc_sync_wait(int32_t fence, bool close_fence);
+
+#ifdef USE_GRALLOC1
+int32_t cros_gralloc_sync_wait(int32_t acquire_fence);
+#endif
 
 std::string get_drm_format_string(uint32_t drm_format);
 
