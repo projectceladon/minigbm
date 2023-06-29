@@ -179,7 +179,25 @@ size_t drv_num_planes_from_format(uint32_t format)
 	 * format is supported and that the return value is non-NULL.
 	 */
 
-	return layout ? layout->num_planes : 0;
+       if (layout) {
+               return layout->num_planes;
+       } else {
+               switch (format) {
+               case DRM_FORMAT_R16:
+                       return 1;
+               case DRM_FORMAT_NV12_Y_TILED_INTEL:
+               case DRM_FORMAT_NV16:
+               case DRM_FORMAT_P010:
+                       return 2;
+               case DRM_FORMAT_YUV420:
+               case DRM_FORMAT_YUV422:
+               case DRM_FORMAT_YUV444:
+                       return 3;
+               }
+               drv_loge("drv: UNKNOWN FORMAT %d\n", format);
+               return 0;
+       }
+
 }
 
 size_t drv_num_planes_from_modifier(struct driver *drv, uint32_t format, uint64_t modifier)
@@ -603,6 +621,8 @@ void drv_resolve_format_and_use_flags_helper(struct driver *drv, uint32_t format
 		/* Common camera implementation defined format. */
 		if (use_flags & (BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE)) {
 			*out_format = DRM_FORMAT_NV12;
+		} else if (use_flags & BO_USE_TEXTURE) {
+			*out_format = DRM_FORMAT_ABGR8888;
 		} else {
 			/* HACK: See b/28671744 */
 			*out_format = DRM_FORMAT_XBGR8888;

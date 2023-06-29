@@ -34,6 +34,27 @@ static const uint32_t render_formats[] = { DRM_FORMAT_ABGR16161616F };
 static const uint32_t texture_only_formats[] = { DRM_FORMAT_R8, DRM_FORMAT_NV12, DRM_FORMAT_P010,
 						 DRM_FORMAT_YVU420, DRM_FORMAT_YVU420_ANDROID };
 
+static const uint32_t linear_source_formats[] = { DRM_FORMAT_R16,    DRM_FORMAT_NV16,
+                                                 DRM_FORMAT_YUV420, DRM_FORMAT_YUV422,
+                                                 DRM_FORMAT_YUV444, DRM_FORMAT_NV21,
+                                                 DRM_FORMAT_P010 };
+
+static const uint32_t source_formats[] = { DRM_FORMAT_P010, DRM_FORMAT_NV12_Y_TILED_INTEL };
+
+#if !defined(DRM_CAP_CURSOR_WIDTH)
+#define DRM_CAP_CURSOR_WIDTH 0x8
+#endif
+
+#if !defined(DRM_CAP_CURSOR_HEIGHT)
+#define DRM_CAP_CURSOR_HEIGHT 0x9
+#endif
+
+static const uint32_t kDefaultCursorWidth = 64;
+static const uint32_t kDefaultCursorHeight = 64;
+
+#define BO_USE_CAMERA_MASK BO_USE_CAMERA_READ | BO_USE_SCANOUT | BO_USE_CAMERA_WRITE
+
+
 static const uint64_t gen_modifier_order[] = { I915_FORMAT_MOD_Y_TILED_CCS, I915_FORMAT_MOD_Y_TILED,
 					       I915_FORMAT_MOD_X_TILED, DRM_FORMAT_MOD_LINEAR };
 
@@ -63,6 +84,8 @@ struct i915_device {
 	bool is_mtl;
 	int32_t num_fences_avail;
 	bool has_mmap_offset;
+	uint64_t cursor_width;
+	uint64_t cursor_height;
 };
 
 static void i915_info_from_device_id(struct i915_device *i915)
@@ -216,6 +239,9 @@ static int i915_add_combinations(struct driver *drv)
 	const uint64_t scanout_and_render = BO_USE_RENDER_MASK | BO_USE_SCANOUT;
 	const uint64_t render = BO_USE_RENDER_MASK;
 	const uint64_t texture_only = BO_USE_TEXTURE_MASK;
+	uint64_t render_flags = BO_USE_RENDER_MASK;
+	uint64_t texture_flags = BO_USE_TEXTURE_MASK;
+
 	// HW protected buffers also need to be scanned out.
 	const uint64_t hw_protected =
 	    i915->has_hw_protection ? (BO_USE_PROTECTED | BO_USE_SCANOUT) : 0;
@@ -257,9 +283,31 @@ static int i915_add_combinations(struct driver *drv)
 			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER |
 				   BO_USE_HW_VIDEO_ENCODER | BO_USE_GPU_DATA_BUFFER |
 				   BO_USE_SENSOR_DIRECT_DATA);
+       drv_modify_combination(drv, DRM_FORMAT_ABGR8888, &metadata_linear, BO_USE_CURSOR | BO_USE_SCANOUT);
+       drv_modify_combination(drv, DRM_FORMAT_NV12, &metadata_linear,
+                              BO_USE_RENDERING | BO_USE_TEXTURE | BO_USE_CAMERA_MASK);
+       drv_modify_combination(drv, DRM_FORMAT_YUYV, &metadata_linear,
+                              BO_USE_TEXTURE | BO_USE_CAMERA_MASK | BO_USE_RENDERING);
+       drv_modify_combination(drv, DRM_FORMAT_VYUY, &metadata_linear,
+                              BO_USE_TEXTURE | BO_USE_CAMERA_MASK | BO_USE_RENDERING);
+       drv_modify_combination(drv, DRM_FORMAT_UYVY, &metadata_linear,
+                              BO_USE_TEXTURE | BO_USE_CAMERA_MASK | BO_USE_RENDERING);
+       drv_modify_combination(drv, DRM_FORMAT_YVYU, &metadata_linear,
+                              BO_USE_TEXTURE | BO_USE_CAMERA_MASK | BO_USE_RENDERING);
+       drv_modify_combination(drv, DRM_FORMAT_YVU420_ANDROID, &metadata_linear,
+                              BO_USE_TEXTURE | BO_USE_CAMERA_MASK);
+
+       /* Media/Camera expect these formats support. */
+       drv_add_combinations(drv, linear_source_formats, ARRAY_SIZE(linear_source_formats),
+                            &metadata_linear, texture_flags | BO_USE_CAMERA_MASK);
+
 
 	const uint64_t render_not_linear = unset_flags(render, linear_mask);
 	const uint64_t scanout_and_render_not_linear = render_not_linear | BO_USE_SCANOUT;
+	uint64_t texture_flags_video =
+           unset_flags(texture_flags, BO_USE_RENDERSCRIPT | BO_USE_SW_WRITE_OFTEN |
+                                          BO_USE_SW_READ_OFTEN | BO_USE_LINEAR);
+
 
 	struct format_metadata metadata_x_tiled = { .tiling = I915_TILING_X,
 						    .priority = 2,
@@ -269,6 +317,9 @@ static int i915_add_combinations(struct driver *drv)
 			     render_not_linear);
 	drv_add_combinations(drv, scanout_render_formats, ARRAY_SIZE(scanout_render_formats),
 			     &metadata_x_tiled, scanout_and_render_not_linear);
+	drv_add_combinations(drv, linear_source_formats, ARRAY_SIZE(linear_source_formats),
+                             &metadata_x_tiled, texture_flags_video | BO_USE_CAMERA_MASK);
+
 
 	if (i915->is_mtl) {
 		struct format_metadata metadata_4_tiled = { .tiling = I915_TILING_4,
@@ -291,6 +342,9 @@ static int i915_add_combinations(struct driver *drv)
 		drv_add_combinations(drv, scanout_render_formats,
 				     ARRAY_SIZE(scanout_render_formats), &metadata_4_tiled,
 				     render_not_linear);
+                drv_add_combinations(drv, source_formats, ARRAY_SIZE(source_formats), &metadata_4_tiled,
+                                     texture_flags | BO_USE_NON_GPU_HW);
+
 	} else {
 		struct format_metadata metadata_y_tiled = { .tiling = I915_TILING_Y,
 							    .priority = 3,
@@ -316,6 +370,9 @@ static int i915_add_combinations(struct driver *drv)
 		drv_add_combinations(drv, scanout_render_formats,
 				     ARRAY_SIZE(scanout_render_formats), &metadata_y_tiled,
 				     render_not_linear);
+		drv_add_combinations(drv, source_formats, ARRAY_SIZE(source_formats), &metadata_y_tiled,
+				     texture_flags | BO_USE_NON_GPU_HW);
+
 	}
 	return 0;
 }
@@ -468,6 +525,21 @@ static int i915_init(struct driver *drv)
 
 	if (i915->graphics_version >= 12)
 		i915->has_hw_protection = 1;
+
+	uint64_t width = 0, height = 0;
+	if (drmGetCap(drv->fd, DRM_CAP_CURSOR_WIDTH, &width)) {
+		drv_loge("cannot get cursor width. \n");
+	} else if (drmGetCap(drv->fd, DRM_CAP_CURSOR_HEIGHT, &height)) {
+		drv_loge("cannot get cursor height. \n");
+	}
+
+	if (!width)
+		width = kDefaultCursorWidth;
+	i915->cursor_width = width;
+
+	if (!height)
+		height = kDefaultCursorHeight;
+	i915->cursor_height = height;
 
 	drv->priv = i915;
 	return i915_add_combinations(drv);

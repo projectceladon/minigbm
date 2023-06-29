@@ -59,4 +59,9 @@ int32_t cros_gralloc_sync_wait(int32_t acquire_fence);
 
 std::string get_drm_format_string(uint32_t drm_format);
 
+const char *drmFormat2Str(int format);
+
+int32_t cros_gralloc_invert_format(int format);
+
+bool IsSupportedYUVFormat(uint32_t droid_format);
 #endif
