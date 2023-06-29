@@ -18,6 +18,10 @@
 
 #include "cros_gralloc/cros_gralloc_helpers.h"
 
+#ifdef USE_GRALLOC1
+#include "cros_gralloc/i915_private_android_types.h"
+#endif
+
 using aidl::android::hardware::graphics::common::PlaneLayout;
 using aidl::android::hardware::graphics::common::PlaneLayoutComponent;
 using aidl::android::hardware::graphics::common::PlaneLayoutComponentType;
@@ -404,3 +408,25 @@ int getPlaneLayouts(uint32_t drmFormat, std::vector<PlaneLayout>* outPlaneLayout
     *outPlaneLayouts = it->second;
     return 0;
 }
+
+#ifdef USE_GRALLOC1
+bool IsSupportedYUVFormat(uint32_t droid_format) {
+   switch (droid_format) {
+       case HAL_PIXEL_FORMAT_YCbCr_420_888:
+       case HAL_PIXEL_FORMAT_YV12:
+       case HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED:
+       case HAL_PIXEL_FORMAT_NV12:
+       case HAL_PIXEL_FORMAT_NV12_Y_TILED_INTEL:
+       case HAL_PIXEL_FORMAT_YCbCr_422_I:
+       case HAL_PIXEL_FORMAT_YCbCr_422_888:
+       case HAL_PIXEL_FORMAT_YCbCr_444_888:
+       case HAL_PIXEL_FORMAT_YCrCb_420_SP:
+       case HAL_PIXEL_FORMAT_Y16:
+       case HAL_PIXEL_FORMAT_P010_INTEL:
+               return true;
+       default:
+               return false;
+       }
+       return false;
+}
+#endif
