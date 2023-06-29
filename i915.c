@@ -680,6 +680,9 @@ static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t heig
 		break;
 	case I915_FORMAT_MOD_Y_TILED:
 	case I915_FORMAT_MOD_Y_TILED_CCS:
+       case I915_FORMAT_MOD_Yf_TILED:
+       case I915_FORMAT_MOD_Yf_TILED_CCS:
+
 	/* For now support only I915_TILING_Y as this works with all
 	 * IPs(render/media/display)
 	 */
