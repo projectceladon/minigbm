@@ -45,6 +45,10 @@ struct cros_gralloc_buffer_descriptor {
 	    aidl::android::hardware::graphics::common::Dataspace::UNKNOWN;
 	aidl::android::hardware::graphics::common::BlendMode blend =
 	    aidl::android::hardware::graphics::common::BlendMode::INVALID;
+#ifdef USE_GRALLOC1
+	uint32_t consumer_usage;
+	uint32_t producer_usage;
+#endif
 };
 
 constexpr uint32_t cros_gralloc_magic = 0xABCDDCBA;
@@ -60,6 +64,10 @@ uint32_t cros_gralloc_convert_map_usage(uint64_t usage);
 cros_gralloc_handle_t cros_gralloc_convert_handle(buffer_handle_t handle);
 
 int32_t cros_gralloc_sync_wait(int32_t fence, bool close_fence);
+
+#ifdef USE_GRALLOC1
+int32_t cros_gralloc_sync_wait(int32_t acquire_fence);
+#endif
 
 std::string get_drm_format_string(uint32_t drm_format);
 
