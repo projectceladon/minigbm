@@ -36,6 +36,7 @@ struct cros_gralloc_buffer_descriptor {
 #ifdef USE_GRALLOC1
 	uint32_t consumer_usage;
 	uint32_t producer_usage;
+	uint64_t modifier;
 #endif
 };
 
@@ -60,6 +61,8 @@ int32_t cros_gralloc_sync_wait(int32_t acquire_fence);
 std::string get_drm_format_string(uint32_t drm_format);
 
 const char *drmFormat2Str(int format);
+
+bool is_flex_format(uint32_t format);
 
 int32_t cros_gralloc_invert_format(int format);
 

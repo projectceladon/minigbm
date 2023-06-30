@@ -43,6 +43,7 @@ struct cros_gralloc_handle : public native_handle_t {
 #ifdef USE_GRALLOC1
 	uint32_t consumer_usage;
 	uint32_t producer_usage;
+	uint32_t format_modifiers[2 * DRV_MAX_PLANES];
 #endif
 } __attribute__((packed));
 
