@@ -171,8 +171,10 @@ void CrosGralloc1::doGetCapabilities(uint32_t *outCount, int32_t *outCapabilitie
 gralloc1_function_pointer_t CrosGralloc1::doGetFunction(int32_t intDescriptor)
 {
 	constexpr auto lastDescriptor = static_cast<int32_t>(GRALLOC1_LAST_FUNCTION);
-	if (intDescriptor < 0 || intDescriptor > lastDescriptor) {
-		ALOGE("Invalid function descriptor");
+	if (intDescriptor < 0 ||
+	    ((intDescriptor > lastDescriptor) &&
+	     ((intDescriptor < 100) || (intDescriptor > GRALLOC1_LAST_CUSTOM)))) {
+		ALOGE("Invalid function descriptor %d", intDescriptor);
 		return nullptr;
 	}
 
@@ -204,6 +206,10 @@ gralloc1_function_pointer_t CrosGralloc1::doGetFunction(int32_t intDescriptor)
 		return asFP<GRALLOC1_PFN_GET_PRODUCER_USAGE>(getProducerUsageHook);
 	case GRALLOC1_FUNCTION_GET_STRIDE:
 		return asFP<GRALLOC1_PFN_GET_STRIDE>(getStrideHook);
+	case GRALLOC1_FUNCTION_GET_BYTE_STRIDE:
+		return asFP<GRALLOC1_PFN_GET_BYTE_STRIDE>(getByteStrideHook);
+	case GRALLOC1_FUNCTION_GET_PRIME:
+		return asFP<GRALLOC1_PFN_GET_PRIME>(getPrimeHook);
 	case GRALLOC1_FUNCTION_ALLOCATE:
 		if (driver) {
 			return asFP<GRALLOC1_PFN_ALLOCATE>(allocateBuffers);
@@ -223,6 +229,14 @@ gralloc1_function_pointer_t CrosGralloc1::doGetFunction(int32_t intDescriptor)
 		    lockHook<struct android_flex_layout, &CrosGralloc1::lockFlex>);
 	case GRALLOC1_FUNCTION_UNLOCK:
 		return asFP<GRALLOC1_PFN_UNLOCK>(unlockHook);
+	case GRALLOC1_FUNCTION_SET_MODIFIER:
+		return asFP<GRALLOC1_PFN_SET_MODIFIER>(setModifierHook);
+	case GRALLOC1_FUNCTION_VALIDATE_BUFFER_SIZE:
+		return asFP<GRALLOC1_PFN_VALIDATE_BUFFER_SIZE>(validateBufferSizeHook);
+	case GRALLOC1_FUNCTION_GET_TRANSPORT_SIZE:
+		return asFP<GRALLOC1_PFN_GET_TRANSPORT_SIZE>(getTransportSizeHook);
+	case GRALLOC1_FUNCTION_IMPORT_BUFFER:
+		return asFP<GRALLOC1_PFN_IMPORT_BUFFER>(importBufferHook);
 	case GRALLOC1_FUNCTION_INVALID:
 		ALOGE("Invalid function descriptor");
 		return nullptr;
@@ -283,6 +297,67 @@ int32_t CrosGralloc1::setFormat(gralloc1_buffer_descriptor_t descriptorId, int32
 	hnd->droid_format = format;
 	hnd->drm_format = cros_gralloc_convert_format(format);
 	return CROS_GRALLOC_ERROR_NONE;
+}
+
+int32_t CrosGralloc1::setModifier(gralloc1_buffer_descriptor_t descriptorId, uint64_t modifier)
+{
+	auto hnd = (struct cros_gralloc_buffer_descriptor *)descriptorId;
+	hnd->modifier = modifier;
+	return CROS_GRALLOC_ERROR_NONE;
+}
+
+int32_t CrosGralloc1::validateBufferSize(buffer_handle_t buffer,
+					 const gralloc1_buffer_descriptor_info_t *descriptorInfo,
+					 uint32_t stride)
+{
+	auto hnd = (cros_gralloc_handle *)cros_gralloc_convert_handle(buffer);
+	if (!hnd) {
+		return CROS_GRALLOC_ERROR_BAD_HANDLE;
+	}
+
+	if (!is_flex_format(cros_gralloc_convert_format(descriptorInfo->format)) &&
+	    cros_gralloc_convert_format(descriptorInfo->format) != hnd->format) {
+		return CROS_GRALLOC_ERROR_BAD_VALUE;
+	}
+
+	// Do not support GRALLOC1_CAPABILITY_LAYERED_BUFFERS, only allocate buffers with a
+	// single layer.
+	if (descriptorInfo->layerCount != 1) {
+		return CROS_GRALLOC_ERROR_BAD_VALUE;
+	}
+	if (stride > hnd->pixel_stride || descriptorInfo->width > hnd->width ||
+	    descriptorInfo->height > hnd->height) {
+		return CROS_GRALLOC_ERROR_BAD_VALUE;
+	}
+	return CROS_GRALLOC_ERROR_NONE;
+}
+int32_t CrosGralloc1::getTransportSize(buffer_handle_t buffer, uint32_t *outNumFds,
+				       uint32_t *outNumInts)
+{
+	native_handle_t *bufferHandle =
+	    const_cast<native_handle_t *>(reinterpret_cast<const native_handle_t *>(buffer));
+	if (!bufferHandle) {
+		return CROS_GRALLOC_ERROR_BAD_HANDLE;
+	}
+	*outNumFds = bufferHandle->numFds;
+	*outNumInts = bufferHandle->numInts;
+	return CROS_GRALLOC_ERROR_NONE;
+}
+
+int32_t CrosGralloc1::importBuffer(const buffer_handle_t rawHandle, buffer_handle_t *outBuffer)
+{
+	if (!rawHandle) {
+		*outBuffer = NULL;
+		return GRALLOC1_ERROR_BAD_HANDLE;
+	}
+	auto error = driver->retain(rawHandle);
+	if (error != GRALLOC1_ERROR_NONE) {
+		*outBuffer = NULL;
+		return error;
+	}
+
+	*outBuffer = rawHandle;
+	return GRALLOC1_ERROR_NONE;
 }
 
 int32_t CrosGralloc1::allocate(struct cros_gralloc_buffer_descriptor *descriptor,
@@ -349,10 +424,18 @@ int32_t CrosGralloc1::retain(buffer_handle_t bufferHandle)
 
 int32_t CrosGralloc1::release(buffer_handle_t bufferHandle)
 {
-	if (driver->release(bufferHandle))
-		return CROS_GRALLOC_ERROR_BAD_HANDLE;
+	if (!bufferHandle) {
+		ALOGE("Failed to freeBuffer, empty handle.\n");
+		return GRALLOC1_ERROR_BAD_HANDLE;
+	}
 
-	return CROS_GRALLOC_ERROR_NONE;
+	int ret = driver->release(bufferHandle);
+	if (ret) {
+		ALOGE("Failed to release handle, bad handle.\n");
+		return GRALLOC1_ERROR_BAD_HANDLE;
+	}
+
+	return GRALLOC1_ERROR_NONE;
 }
 
 int32_t CrosGralloc1::lock(buffer_handle_t bufferHandle, gralloc1_producer_usage_t producerUsage,
@@ -376,15 +459,27 @@ int32_t CrosGralloc1::lock(buffer_handle_t bufferHandle, gralloc1_producer_usage
 
 	map_flags = cros_gralloc1_convert_map_usage(producerUsage, consumerUsage);
 
-	if (driver->lock(bufferHandle, acquireFence, map_flags, addr))
-		return CROS_GRALLOC_ERROR_BAD_HANDLE;
+	if (driver->lock(bufferHandle, acquireFence, map_flags, addr)) {
+		ALOGE("Plz switch to mapper 4.0 or call importBuffer & freeBuffer with mapper "
+		      "2.0 before lock");
+		buffer_handle_t buffer_handle = native_handle_clone(bufferHandle);
+		auto error = retain(buffer_handle);
+		if (error != GRALLOC1_ERROR_NONE) {
+			delete buffer_handle;
+			return error;
+		}
+		bufferHandle = buffer_handle;
+		if (driver->lock(bufferHandle, acquireFence, map_flags, addr))
+			return CROS_GRALLOC_ERROR_BAD_HANDLE;
+		delete buffer_handle;
+	}
 
 	*outData = addr[0];
 
 	return CROS_GRALLOC_ERROR_NONE;
 }
 
-android_flex_plane_t ycbcrplanes[3];
+thread_local android_flex_plane_t ycbcrplanes[3];
 
 int32_t update_flex_layout(struct android_ycbcr *ycbcr, struct android_flex_layout *outFlexLayout)
 {
@@ -465,8 +560,21 @@ int32_t CrosGralloc1::lockYCbCr(buffer_handle_t bufferHandle,
 	}
 
 	map_flags = cros_gralloc1_convert_map_usage(producerUsage, consumerUsage);
-	if (driver->lock(bufferHandle, acquireFence, map_flags, addr))
-		return CROS_GRALLOC_ERROR_BAD_HANDLE;
+	if (driver->lock(bufferHandle, acquireFence, map_flags, addr)) {
+		ALOGE("Plz switch to mapper 4.0 or call importBuffer & freeBuffer with mapper "
+		      "2.0 before lockFlex");
+		buffer_handle_t buffer_handle = native_handle_clone(bufferHandle);
+		auto error = retain(buffer_handle);
+		if (error != GRALLOC1_ERROR_NONE) {
+			delete buffer_handle;
+			return error;
+		}
+		bufferHandle = buffer_handle;
+		if (driver->lock(bufferHandle, acquireFence, map_flags, addr))
+			return CROS_GRALLOC_ERROR_BAD_HANDLE;
+		driver->release(buffer_handle);
+		delete buffer_handle;
+	}
 
 	switch (hnd->format) {
 	case DRM_FORMAT_NV12:
@@ -592,6 +700,37 @@ int32_t CrosGralloc1::getStride(buffer_handle_t buffer, uint32_t *outStride)
 	}
 
 	*outStride = hnd->pixel_stride;
+	return CROS_GRALLOC_ERROR_NONE;
+}
+
+int32_t CrosGralloc1::getByteStride(buffer_handle_t buffer, uint32_t *outStride, uint32_t size)
+{
+	auto hnd = cros_gralloc_convert_handle(buffer);
+
+	if (!outStride)
+		return -EINVAL;
+
+	if (!hnd) {
+		return CROS_GRALLOC_ERROR_BAD_HANDLE;
+	}
+
+	if (size != drv_num_planes_from_format(hnd->format)) {
+		ALOGE("Invalid array size- %d", size);
+		return -EINVAL;
+	}
+
+	memcpy(outStride, hnd->strides, sizeof(*outStride) * size);
+	return CROS_GRALLOC_ERROR_NONE;
+}
+
+int32_t CrosGralloc1::getPrime(buffer_handle_t buffer, uint32_t *prime)
+{
+	auto hnd = cros_gralloc_convert_handle(buffer);
+	if (!hnd) {
+		return CROS_GRALLOC_ERROR_BAD_HANDLE;
+	}
+
+	*prime = hnd->fds[0];
 	return CROS_GRALLOC_ERROR_NONE;
 }
 

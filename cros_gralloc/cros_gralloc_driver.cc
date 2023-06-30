@@ -250,6 +250,9 @@ int cros_gralloc_driver::create_reserved_region(const std::string &buffer_name,
 int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descriptor *descriptor,
 				      native_handle_t **out_handle)
 {
+#ifdef USE_GRALLOC1
+	uint64_t mod;
+#endif
 	int ret = 0;
 	size_t num_planes;
 	size_t num_fds;
@@ -267,8 +270,14 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 		return -EINVAL;
 	}
 
-	bo = drv_bo_create(drv_.get(), descriptor->width, descriptor->height, resolved_format,
-			   resolved_use_flags);
+	if (descriptor->modifier == 0) {
+		bo = drv_bo_create(drv_.get(), descriptor->width, descriptor->height,
+				   resolved_format, resolved_use_flags);
+	} else {
+		bo = drv_bo_create_with_modifiers(drv_.get(), descriptor->width, descriptor->height,
+						  resolved_format, &descriptor->modifier, 1);
+	}
+
 	if (!bo) {
 		ALOGE("Failed to create bo.");
 		return -errno;
@@ -309,6 +318,11 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 		hnd->strides[plane] = drv_bo_get_plane_stride(bo, plane);
 		hnd->offsets[plane] = drv_bo_get_plane_offset(bo, plane);
 		hnd->sizes[plane] = drv_bo_get_plane_size(bo, plane);
+#ifdef USE_GRALLOC1
+		mod = drv_bo_get_format_modifier(bo);
+		hnd->format_modifiers[2 * plane] = static_cast<uint32_t>(mod >> 32);
+		hnd->format_modifiers[2 * plane + 1] = static_cast<uint32_t>(mod);
+#endif
 	}
 
 	hnd->reserved_region_size = descriptor->reserved_region_size;
