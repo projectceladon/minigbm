@@ -488,8 +488,8 @@ Return<void> CrosGralloc4Mapper::get(const cros_gralloc_buffer* crosBuffer,
         PixelFormat pixelFormat = static_cast<PixelFormat>(crosBuffer->get_android_format());
         status = android::gralloc4::encodePixelFormatRequested(pixelFormat, &encodedMetadata);
     } else if (metadataType == android::gralloc4::MetadataType_PixelFormatFourCC) {
-        status = android::gralloc4::encodePixelFormatFourCC(
-                drv_get_standard_fourcc(crosBuffer->get_format()), &encodedMetadata);
+        uint32_t format = mDriver->get_resolved_common_drm_format(crosBuffer->get_format());
+        status = android::gralloc4::encodePixelFormatFourCC(format, &encodedMetadata);
     } else if (metadataType == android::gralloc4::MetadataType_PixelFormatModifier) {
         status = android::gralloc4::encodePixelFormatModifier(crosBuffer->get_format_modifier(),
                                                               &encodedMetadata);

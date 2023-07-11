@@ -54,6 +54,11 @@ class cros_gralloc_driver
 	void with_buffer(cros_gralloc_handle_t hnd,
 			 const std::function<void(cros_gralloc_buffer *)> &function);
 	void with_each_buffer(const std::function<void(cros_gralloc_buffer *)> &function);
+	uint32_t get_resolved_common_drm_format(uint32_t drm_format);
+	bool is_kmsro_enabled()
+	{
+		return drv_kms_ != drv_render_;
+	};
 
       private:
 	cros_gralloc_driver();
@@ -71,8 +76,6 @@ class cros_gralloc_driver
 	BufferAllocator allocator_;
 #endif
 
-	std::unique_ptr<struct driver, void (*)(struct driver *)> drv_;
-
 	struct cros_gralloc_imported_handle_info {
 		/*
 		 * The underlying buffer for referred to by this handle (as multiple handles can
@@ -84,6 +87,8 @@ class cros_gralloc_driver
 		int32_t refcount = 1;
 	};
 
+	struct driver *drv_kms_;
+	struct driver *drv_render_;
 	std::mutex mutex_;
 	std::unordered_map<uint32_t, std::unique_ptr<cros_gralloc_buffer>> buffers_;
 	std::unordered_map<cros_gralloc_handle_t, cros_gralloc_imported_handle_info> handles_;

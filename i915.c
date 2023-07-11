@@ -305,11 +305,15 @@ static int i915_add_combinations(struct driver *drv)
 
 
 	const uint64_t render_not_linear = unset_flags(render, linear_mask);
-	const uint64_t scanout_and_render_not_linear = render_not_linear | BO_USE_SCANOUT;
+	uint64_t scanout_and_render_not_linear = render_not_linear | BO_USE_SCANOUT;
 	uint64_t texture_flags_video =
            unset_flags(texture_flags, BO_USE_RENDERSCRIPT | BO_USE_SW_WRITE_OFTEN |
                                           BO_USE_SW_READ_OFTEN | BO_USE_LINEAR);
 
+	// In sriov mode, MMAP_GTT will fail for tiled buffer.
+	if ((drv->gpu_grp_type == TWO_GPU_IGPU_VIRTIO) || (drv->gpu_grp_type == THREE_GPU_IGPU_VIRTIO_DGPU))
+		scanout_and_render_not_linear =
+			unset_flags(scanout_and_render, BO_USE_SW_READ_RARELY | BO_USE_SW_WRITE_RARELY);
 
 	struct format_metadata metadata_x_tiled = { .tiling = I915_TILING_X,
 						    .priority = 2,
