@@ -15,6 +15,7 @@
 
 #include "cros_gralloc/gralloc4/CrosGralloc4Utils.h"
 #include "helpers.h"
+#include "cros_gralloc/cros_gralloc_helpers.h"
 
 #ifdef USE_GRALLOC1
 #include "cros_gralloc/i915_private_android_types.h"
@@ -149,16 +150,9 @@ Return<Error> CrosGralloc4Mapper::validateBufferSize(void* rawHandle,
     }
 
     PixelFormat crosHandleFormat = static_cast<PixelFormat>(crosHandle->droid_format);
-#ifdef USE_GRALLOC1
-    int32_t yuvFormat = static_cast<int32_t>(descriptor.format);
-    if (descriptor.format != crosHandleFormat && yuvFormat != crosHandle->droid_format &&
-        !(descriptor.format == PixelFormat::YCBCR_420_888 &&
-            crosHandle->droid_format == HAL_PIXEL_FORMAT_NV12)) {
+    if (descriptor.format != crosHandleFormat &&
+        !flex_format_match((uint32_t)descriptor.format, (uint32_t)crosHandleFormat, descriptor.usage)) {
         drv_log("Failed to validateBufferSize. Format mismatch.\n");
-#else
-    if (descriptor.format != crosHandleFormat) {
-        drv_log("Failed to validateBufferSize. Format mismatch.\n");
-#endif
         return Error::BAD_BUFFER;
     }
 
