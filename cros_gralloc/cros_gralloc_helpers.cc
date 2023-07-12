@@ -5,6 +5,8 @@
  */
 
 #include "cros_gralloc_helpers.h"
+#include <hardware/gralloc.h>
+#include "i915_private_android_types.h"
 
 #include <sync/sync.h>
 
@@ -31,6 +33,21 @@ bool is_flex_format(uint32_t format)
         return false;
 }
 #endif
+
+bool flex_format_match(uint32_t descriptor_format, uint32_t handle_format, uint64_t usage)
+{
+	bool flag = usage & (GRALLOC_USAGE_HW_CAMERA_READ | GRALLOC_USAGE_HW_CAMERA_WRITE);
+
+	/* HACK: See b/28671744 */
+	if (HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED == descriptor_format &&
+		((HAL_PIXEL_FORMAT_NV12 == handle_format && flag) ||
+		(HAL_PIXEL_FORMAT_RGBX_8888 == handle_format && !flag)))
+		return true;
+	else if (HAL_PIXEL_FORMAT_YCBCR_420_888 == descriptor_format && HAL_PIXEL_FORMAT_NV12 == handle_format)
+		return true;
+	else
+		return false;
+}
 
 uint32_t cros_gralloc_convert_format(int format)
 {
