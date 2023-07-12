@@ -55,6 +55,12 @@ int convertToDrmFormat(PixelFormat format, uint32_t* outDrmFormat) {
 }
 
 int convertToBufferUsage(uint64_t grallocUsage, uint64_t* outBufferUsage) {
+    if ((grallocUsage & BufferUsage::GPU_MIPMAP_COMPLETE) ||
+            (grallocUsage & BufferUsage::GPU_CUBE_MAP)) {
+        ALOGE("GPU_MIPMAP_COMPLETE or GPU_CUBE_MAP not supported");
+        return -EINVAL;
+    }
+
     *outBufferUsage = cros_gralloc_convert_usage(grallocUsage);
     return 0;
 }
