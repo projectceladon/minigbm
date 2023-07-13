@@ -38,7 +38,7 @@ cc_binary {
         "libgralloctypes",
         "libhidlbase",
         "liblog",
-        "libminigbm_gralloc",
+        "libminigbm_gralloc_intel",
         "libminigbm_gralloc4_utils",
     ],
     static_libs: [
@@ -48,4 +48,5 @@ cc_binary {
         "Allocator.cpp",
         "Main.cpp",
     ],
+    cflags: ["-DUSE_GRALLOC1",],
 }

@@ -29,7 +29,7 @@ cc_library_shared {
     vintf_fragments: ["mapper.minigbm.xml"],
     shared_libs: [
         "android.hardware.graphics.allocator-V2-ndk",
-        "libminigbm_gralloc",
+        "libminigbm_gralloc_intel",
     ],
     header_libs: [
         "libbase_headers",
@@ -41,4 +41,5 @@ cc_library_shared {
         "Mapper.cpp",
     ],
     cpp_std: "c++20",
+    cflags: ["-DUSE_GRALLOC1",],
 }
