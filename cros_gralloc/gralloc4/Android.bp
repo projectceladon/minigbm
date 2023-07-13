@@ -51,7 +51,7 @@ cc_library {
         "android.hardware.graphics.mapper@4.0",
         "libgralloctypes",
         "libhidlbase",
-        "libminigbm_gralloc",
+        "libminigbm_gralloc_intel",
     ],
 }
 
