@@ -142,7 +142,8 @@ static inline int vm_type()
 			sig.sig32[2] = edx;
 			if (!strncmp(sig.text, "ACRNACRNACRN", 12))
 				type |= HYPERTYPE_TYPE_ACRN;
-			else if (!strncmp(sig.text, "KVMKVMKVM", 9))
+			else if ((!strncmp(sig.text, "KVMKVMKVM", 9)) ||
+				 (!strncmp(sig.text, "EVMMEVMMEVMM", 12)))
 				type |= HYPERTYPE_TYPE_KVM;
 		}
 	}
