@@ -20,6 +20,8 @@
 #include "cros_gralloc/gralloc4/CrosGralloc4Metadata.h"
 #include "cros_gralloc/gralloc4/CrosGralloc4Utils.h"
 
+#include "cros_gralloc/i915_private_android_types.h"
+
 using namespace ::aidl::android::hardware::graphics::common;
 using namespace ::android::hardware::graphics::mapper;
 using ::aidl::android::hardware::graphics::allocator::BufferDescriptorInfo;
@@ -358,7 +360,9 @@ int32_t CrosGrallocMapperV5::getStandardMetadata(const cros_gralloc_buffer* cros
         return provide(1);
     }
     if constexpr (metadataType == StandardMetadataType::PIXEL_FORMAT_REQUESTED) {
-        return provide(static_cast<PixelFormat>(crosBuffer->get_android_format()));
+        int32_t format = crosBuffer->get_android_format();
+        return provide(static_cast<PixelFormat>(
+                       (format == HAL_PIXEL_FORMAT_NV12) ? HAL_PIXEL_FORMAT_YCbCr_420_888 : format));
     }
     if constexpr (metadataType == StandardMetadataType::PIXEL_FORMAT_FOURCC) {
         return provide(drv_get_standard_fourcc(crosBuffer->get_format()));
