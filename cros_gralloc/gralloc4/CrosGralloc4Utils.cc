@@ -454,7 +454,7 @@ int convertToCrosDescriptor(const BufferDescriptorInfo& descriptor,
 
     if (convertToDrmFormat(descriptor.format, &outCrosDescriptor->drm_format)) {
 #ifdef USE_GRALLOC1
-        drv_log("Failed to convert descriptor by convertToDrmFormat");
+        //drv_log("Failed to convert descriptor by convertToDrmFormat");
         if (!IsSupportedYUVFormat(static_cast<uint32_t>(descriptor.format))) {
             std::string pixelFormatString = getPixelFormatString(descriptor.format);
             drv_log("Failed to convert descriptor. Unsupported fomat %s\n", pixelFormatString.c_str());
