@@ -78,7 +78,7 @@ int32_t i915_private_invert_format(int format)
 	case DRM_FORMAT_YUV422:
 		return HAL_PIXEL_FORMAT_YCbCr_422_888;
 	default:
-		drv_log("Unhandled DRM format %4.4s", drmFormat2Str(format));
+		drv_info("Unhandled DRM format %4.4s", drmFormat2Str(format));
 	}
 
 	return 0;

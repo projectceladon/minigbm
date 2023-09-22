@@ -642,7 +642,7 @@ static int i915_bo_invalidate(struct bo *bo, struct mapping *mapping)
 
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_SET_DOMAIN, &set_domain);
 	if (ret) {
-		drv_log("DRM_IOCTL_I915_GEM_SET_DOMAIN with %d\n", ret);
+		drv_info("DRM_IOCTL_I915_GEM_SET_DOMAIN with %d\n", ret);
 		return ret;
 	}
 

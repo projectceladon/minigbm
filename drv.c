@@ -17,7 +17,6 @@
 #include <xf86drm.h>
 
 #ifdef __ANDROID__
-#include <cutils/log.h>
 #include <libgen.h>
 #endif
 
@@ -711,7 +710,7 @@ uint32_t drv_num_buffers_per_bo(struct bo *bo)
 	return count;
 }
 
-void drv_log_prefix(const char *prefix, const char *file, int line, const char *format, ...)
+void drv_log_prefix(const char *prefix, const char *file, int line, android_LogPriority level, const char *format, ...)
 {
 	char buf[50];
 	snprintf(buf, sizeof(buf), "[%s:%s(%d)]", prefix, basename(file), line);
@@ -719,7 +718,7 @@ void drv_log_prefix(const char *prefix, const char *file, int line, const char *
 	va_list args;
 	va_start(args, format);
 #ifdef __ANDROID__
-	__android_log_vprint(ANDROID_LOG_ERROR, buf, format, args);
+	__android_log_vprint(level, buf, format, args);
 #else
 	fprintf(stderr, "%s ", buf);
 	vfprintf(stderr, format, args);

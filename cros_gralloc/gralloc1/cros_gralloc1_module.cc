@@ -243,7 +243,7 @@ gralloc1_function_pointer_t CrosGralloc1::doGetFunction(int32_t intDescriptor)
 
 void CrosGralloc1::dump(uint32_t *outSize, char *outBuffer)
 {
-	drv_log("dump(%u (%p), %p", outSize ? *outSize : 0, outSize, outBuffer);
+	drv_info("dump(%u (%p), %p", outSize ? *outSize : 0, outSize, outBuffer);
 }
 
 int32_t CrosGralloc1::createDescriptor(gralloc1_buffer_descriptor_t *outDescriptor)
@@ -466,18 +466,21 @@ int32_t CrosGralloc1::lock(buffer_handle_t bufferHandle, gralloc1_producer_usage
 	map_flags = cros_gralloc1_convert_map_usage(producerUsage, consumerUsage);
 
 	if (driver->lock(bufferHandle, acquireFence, map_flags, addr)) {
-                drv_log("Plz switch to mapper 4.0 or call importBuffer & freeBuffer with mapper 2.0 before lock");
-                buffer_handle_t buffer_handle = native_handle_clone(bufferHandle);
-                auto error = retain(buffer_handle);
-                if (error != GRALLOC1_ERROR_NONE) {
-                        delete buffer_handle;
-                        return error;
-                }
-                bufferHandle = buffer_handle;
-                if (driver->lock(bufferHandle, acquireFence, map_flags, addr))
-                        return CROS_GRALLOC_ERROR_BAD_HANDLE;
-                delete buffer_handle;
-        }
+		drv_info("Plz switch to mapper 4.0 or call importBuffer & freeBuffer with mapper 2.0 before lock");
+		buffer_handle_t buffer_handle = native_handle_clone(bufferHandle);
+		auto error = retain(buffer_handle);
+		if (error != GRALLOC1_ERROR_NONE) {
+			drv_log("Retain failed");
+			delete buffer_handle;
+			return error;
+		}
+		bufferHandle = buffer_handle;
+		if (driver->lock(bufferHandle, acquireFence, map_flags, addr)) {
+			drv_log("lock failed");
+			return CROS_GRALLOC_ERROR_BAD_HANDLE;
+		}
+		delete buffer_handle;
+	}
 
 	*outData = addr[0];
 
@@ -567,16 +570,19 @@ int32_t CrosGralloc1::lockYCbCr(buffer_handle_t bufferHandle,
 	map_flags = cros_gralloc1_convert_map_usage(producerUsage, consumerUsage);
 
 	if (driver->lock(bufferHandle, acquireFence, map_flags, addr)) {
-		drv_log("Plz switch to mapper 4.0 or call importBuffer & freeBuffer with mapper 2.0 before lockFlex");
+		drv_info("Plz switch to mapper 4.0 or call importBuffer & freeBuffer with mapper 2.0 before lockFlex");
 		buffer_handle_t buffer_handle = native_handle_clone(bufferHandle);
 		auto error = retain(buffer_handle);
 		if (error != GRALLOC1_ERROR_NONE) {
+			drv_log("Retain failed");
 			delete buffer_handle;
 			return error;
 		}
 		bufferHandle = buffer_handle;
-		if (driver->lock(bufferHandle, acquireFence, map_flags, addr))
+		if (driver->lock(bufferHandle, acquireFence, map_flags, addr)) {
+			drv_log("lock failed");
 			return CROS_GRALLOC_ERROR_BAD_HANDLE;
+		}
 		driver->release(buffer_handle);
 		delete buffer_handle;
 	}

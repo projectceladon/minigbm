@@ -360,7 +360,7 @@ static void virtio_gpu_add_combination(struct driver *drv, uint32_t drm_format,
 	if (features[feat_3d].enabled && priv->caps.max_version >= 1) {
 		if ((use_flags & BO_USE_SCANOUT) && priv->caps_is_v2 &&
 		    !virtio_gpu_supports_combination_natively(drv, drm_format, use_flags)) {
-			drv_log("Scanout format: %d\n", drm_format);
+			drv_info("Scanout format: %d\n", drm_format);
 			use_flags &= ~BO_USE_SCANOUT;
 		}
 
@@ -430,7 +430,7 @@ static uint32_t use_flags_to_bind(uint64_t use_flags)
 	handle_flag(&use_flags, BO_USE_CAMERA_WRITE, &bind, VIRGL_BIND_LINEAR);
 
 	if (use_flags) {
-		drv_log("Unhandled bo use flag: %llx\n", (unsigned long long)use_flags);
+		drv_info("Unhandled bo use flag: %llx\n", (unsigned long long)use_flags);
 	}
 
 	return bind;

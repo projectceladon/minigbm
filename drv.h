@@ -15,6 +15,10 @@ extern "C" {
 #include <stdbool.h>
 #include <stdint.h>
 
+#ifdef __ANDROID__
+#include <cutils/log.h>
+#endif
+
 #define DRV_MAX_PLANES 4
 
 // clang-format off
@@ -192,11 +196,16 @@ uint32_t drv_bo_get_stride_or_tiling(struct bo *bo);
 
 #define drv_log(format, ...)                                                                       \
 	do {                                                                                       \
-		drv_log_prefix("minigbm", __FILE__, __LINE__, format, ##__VA_ARGS__);              \
+		drv_log_prefix("minigbm", __FILE__, __LINE__, ANDROID_LOG_ERROR, format, ##__VA_ARGS__);              \
 	} while (0)
 
-__attribute__((format(printf, 4, 5))) void drv_log_prefix(const char *prefix, const char *file,
-							  int line, const char *format, ...);
+#define drv_info(format, ...)                                                                       \
+	do {                                                                                       \
+		drv_log_prefix("minigbm", __FILE__, __LINE__, ANDROID_LOG_INFO, format, ##__VA_ARGS__);              \
+	} while (0)
+
+__attribute__((format(printf, 5, 6))) void drv_log_prefix(const char *prefix, const char *file,
+							  int line,  android_LogPriority level, const char *format, ...);
 
 #ifdef __cplusplus
 }
