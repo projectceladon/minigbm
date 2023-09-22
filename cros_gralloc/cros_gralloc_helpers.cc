@@ -117,7 +117,7 @@ int32_t cros_gralloc_sync_wait(int32_t fence, bool close_fence)
 	 */
 	int err = sync_wait(fence, 1000);
 	if (err < 0) {
-		drv_log("Timed out on sync wait, err = %s\n", strerror(errno));
+		drv_info("Timed out on sync wait, err = %s\n", strerror(errno));
 		err = sync_wait(fence, -1);
 		if (err < 0) {
 			drv_log("sync wait error = %s\n", strerror(errno));
@@ -148,7 +148,7 @@ int32_t cros_gralloc_sync_wait(int32_t acquire_fence)
          */
         int err = sync_wait(acquire_fence, 1000);
         if (err < 0) {
-                drv_log("Timed out on sync wait, err = %s", strerror(errno));
+                drv_info("Timed out on sync wait, err = %s", strerror(errno));
                 err = sync_wait(acquire_fence, -1);
                 if (err < 0) {
                         drv_log("sync wait error = %s", strerror(errno));

@@ -38,6 +38,7 @@ Error CrosGralloc4Allocator::allocate(const BufferDescriptorInfo& descriptor, ui
     }
 
     if (!outStride || !outHandle) {
+        drv_log("Invalid params.\n");
         return Error::NO_RESOURCES;
     }
 
@@ -63,6 +64,7 @@ Error CrosGralloc4Allocator::allocate(const BufferDescriptorInfo& descriptor, ui
 
     cros_gralloc_handle_t crosHandle = cros_gralloc_convert_handle(handle);
     if (!crosHandle) {
+        drv_log("Invalid handle");
         return Error::NO_RESOURCES;
     }
 
