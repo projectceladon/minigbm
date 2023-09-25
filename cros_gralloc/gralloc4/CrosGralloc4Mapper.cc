@@ -150,7 +150,20 @@ Return<Error> CrosGralloc4Mapper::validateBufferSize(void* rawHandle,
     }
 
     PixelFormat crosHandleFormat = static_cast<PixelFormat>(crosHandle->droid_format);
-    if (descriptor.format != crosHandleFormat &&
+
+    uint32_t descriptor_drmFormat = 0, handle_drmFormat = 0;
+
+    if (convertToDrmFormat(descriptor.format, &descriptor_drmFormat)) {
+        drv_log("Failed to convertToDrmFormat, descriptor.format = %d", (uint32_t)descriptor.format);
+        return Error::BAD_VALUE;
+    }
+
+    if (convertToDrmFormat(crosHandleFormat, &handle_drmFormat)) {
+        drv_log("Failed to convertToDrmFormat, crosHandleFormat = %d", (uint32_t)crosHandleFormat);
+        return Error::BAD_VALUE;
+    }
+
+    if (descriptor_drmFormat  != handle_drmFormat  &&
         !flex_format_match((uint32_t)descriptor.format, (uint32_t)crosHandleFormat, descriptor.usage)) {
         drv_log("Failed to validateBufferSize. Format mismatch.\n");
         return Error::BAD_BUFFER;
