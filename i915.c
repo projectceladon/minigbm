@@ -114,48 +114,11 @@ static uint64_t unset_flags(uint64_t current_flags, uint64_t mask)
 	return value;
 }
 
-/*
- * Check virtual machine type, by checking cpuid
- */
-enum {
-	HYPERTYPE_NONE 	    = 0,
-	HYPERTYPE_ANY       = 0x1,
-	HYPERTYPE_TYPE_ACRN = 0x2,
-	HYPERTYPE_TYPE_KVM  = 0x4
-};
-static inline int vm_type()
-{
-	int type = HYPERTYPE_NONE;
-	union {
-		uint32_t sig32[3];
-		char text[13];
-	} sig = {};
-
-	uint32_t eax=0, ebx=0, ecx=0, edx=0;
-	if(__get_cpuid(1, &eax, &ebx, &ecx, &edx)) {
-		if (((ecx >> 31) & 1) == 1) {
-			type |= HYPERTYPE_ANY;
-
-			__cpuid(0x40000000U, eax, ebx, ecx, edx);
-			sig.sig32[0] = ebx;
-			sig.sig32[1] = ecx;
-			sig.sig32[2] = edx;
-			if (!strncmp(sig.text, "ACRNACRNACRN", 12))
-				type |= HYPERTYPE_TYPE_ACRN;
-			else if ((!strncmp(sig.text, "KVMKVMKVM", 9)) ||
-				 (!strncmp(sig.text, "EVMMEVMMEVMM", 12)))
-				type |= HYPERTYPE_TYPE_KVM;
-		}
-	}
-	return type;
-}
-
 static int i915_add_combinations(struct driver *drv)
 {
 	struct i915_device *i915 = drv->priv;
 	struct format_metadata metadata;
 	uint64_t render, scanout_and_render, texture_only;
-	bool is_kvm = vm_type() & HYPERTYPE_TYPE_KVM;
 
 	scanout_and_render = BO_USE_RENDER_MASK | BO_USE_SCANOUT;
 #ifdef USE_GRALLOC1
@@ -208,11 +171,7 @@ static int i915_add_combinations(struct driver *drv)
 
 	render = unset_flags(render, linear_mask | camera_mask);
 	scanout_and_render = unset_flags(scanout_and_render, linear_mask |camera_mask);
-
-	/* On ADL-P vm mode on 5.10 kernel, BO_USE_SCANOUT is not well supported for tiled bo */
-	if (is_kvm && i915->is_adlp) {
-	    scanout_and_render = unset_flags(scanout_and_render, BO_USE_SCANOUT);
-	}
+	scanout_and_render = unset_flags(scanout_and_render, BO_USE_SCANOUT);
 
 	metadata.tiling = I915_TILING_X;
 	metadata.priority = 2;
