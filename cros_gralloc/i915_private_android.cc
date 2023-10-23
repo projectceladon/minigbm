@@ -32,6 +32,8 @@ uint32_t i915_private_convert_format(int format)
 		return DRM_FORMAT_NV16;
 	case HAL_PIXEL_FORMAT_YCbCr_422_888:
 		return DRM_FORMAT_YUV422;
+	case DRM_FORMAT_ABGR16161616F:
+		return HAL_PIXEL_FORMAT_RGBA_FP16;
 	case HAL_PIXEL_FORMAT_P010_INTEL:
 		return DRM_FORMAT_P010;
 	}
