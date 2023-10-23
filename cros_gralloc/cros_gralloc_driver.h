@@ -50,6 +50,10 @@ class cros_gralloc_driver
 
 	void for_each_handle(const std::function<void(cros_gralloc_handle_t)> &function);
 
+	bool is_kmsro_enabled()
+	{
+		return drv_kms_ != drv_render_;
+	};
 	bool IsSupportedYUVFormat(uint32_t droid_format);
 
       private:
@@ -57,6 +61,7 @@ class cros_gralloc_driver
 	cros_gralloc_driver operator=(cros_gralloc_driver const &);
 	cros_gralloc_buffer *get_buffer(cros_gralloc_handle_t hnd);
 
+	struct driver *drv_kms_;
 	struct driver *drv_render_;
 	std::mutex mutex_;
 	std::unordered_map<uint32_t, cros_gralloc_buffer *> buffers_;
