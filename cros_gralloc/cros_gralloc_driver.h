@@ -48,6 +48,8 @@ class cros_gralloc_driver
 
 	uint32_t get_resolved_drm_format(uint32_t drm_format, uint64_t usage);
 
+	uint32_t get_resolved_common_drm_format(uint32_t drm_format);
+
 	void for_each_handle(const std::function<void(cros_gralloc_handle_t)> &function);
 
 	bool IsSupportedYUVFormat(uint32_t droid_format);
