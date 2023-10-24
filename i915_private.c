@@ -98,9 +98,16 @@ int i915_private_add_combinations(struct driver *drv)
 			     ARRAY_SIZE(private_linear_source_formats), &metadata,
 			     texture_flags | BO_USE_CAMERA_MASK);
 
-	metadata.tiling = I915_TILING_Y;
-	metadata.priority = 3;
-	metadata.modifier = I915_FORMAT_MOD_Y_TILED;
+	if (i915_has_tile4(drv)) {
+		metadata.tiling = I915_TILING_4;
+		metadata.priority = 3;
+		metadata.modifier = I915_FORMAT_MOD_4_TILED;
+	} else {
+		metadata.tiling = I915_TILING_Y;
+		metadata.priority = 3;
+		metadata.modifier = I915_FORMAT_MOD_Y_TILED;
+	}
+
 	drv_add_combinations(drv, private_source_formats, ARRAY_SIZE(private_source_formats),
 			     &metadata, texture_flags | BO_USE_NON_GPU_HW);
 
@@ -191,8 +198,8 @@ uint32_t i915_private_resolve_format(uint32_t format, uint64_t usage, uint32_t *
 		/* KBL camera subsystem requires NV12. */
 		if (usage & (BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE)) {
 			*resolved_format = DRM_FORMAT_NV12;
-                        return 1;
-                }
+			return 1;
+		}
 
 		if (usage & BO_USE_TEXTURE) {
 			*resolved_format = DRM_FORMAT_ABGR8888;
