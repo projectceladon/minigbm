@@ -3,13 +3,14 @@
  * Use of this source code is governed by a BSD-style license that can be
  * found in the LICENSE file.
  */
+
 #include <assert.h>
+#include <drm_fourcc.h>
 #include <errno.h>
 #include <i915_drm.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/mman.h>
-#include <drm_fourcc.h>
 #include <xf86drm.h>
 
 #include "drv_priv.h"
@@ -23,6 +24,8 @@ static const uint32_t private_linear_source_formats[] = { DRM_FORMAT_R16,    DRM
 							  DRM_FORMAT_P010 };
 
 static const uint32_t private_source_formats[] = { DRM_FORMAT_P010, DRM_FORMAT_NV12_Y_TILED_INTEL };
+
+static const uint32_t private_rgb24_formats[] = { DRM_FORMAT_RGB888, DRM_FORMAT_BGR888 };
 
 #if !defined(DRM_CAP_CURSOR_WIDTH)
 #define DRM_CAP_CURSOR_WIDTH 0x8
@@ -89,6 +92,7 @@ int i915_private_add_combinations(struct driver *drv)
 			       BO_USE_TEXTURE | BO_USE_CAMERA_MASK | BO_USE_RENDERING);
 	drv_modify_combination(drv, DRM_FORMAT_YVU420_ANDROID, &metadata,
 			       BO_USE_TEXTURE | BO_USE_CAMERA_MASK);
+	drv_modify_combination(drv, DRM_FORMAT_RGB565, &metadata, BO_USE_CAMERA_MASK);
 
 	/* Media/Camera expect these formats support. */
 	metadata.tiling = I915_TILING_NONE;
@@ -111,6 +115,10 @@ int i915_private_add_combinations(struct driver *drv)
 	drv_add_combinations(drv, private_source_formats, ARRAY_SIZE(private_source_formats),
 			     &metadata, texture_flags | BO_USE_NON_GPU_HW);
 
+	/* Android CTS tests require this. */
+	drv_add_combinations(drv, private_rgb24_formats, ARRAY_SIZE(private_rgb24_formats),
+			     &metadata, BO_USE_SW_MASK);
+
 	texture_flags &= ~BO_USE_RENDERSCRIPT;
 	texture_flags &= ~BO_USE_SW_WRITE_OFTEN;
 	texture_flags &= ~BO_USE_SW_READ_OFTEN;
@@ -121,9 +129,8 @@ int i915_private_add_combinations(struct driver *drv)
 	metadata.modifier = I915_FORMAT_MOD_X_TILED;
 
 	drv_add_combinations(drv, private_linear_source_formats,
-                             ARRAY_SIZE(private_linear_source_formats), &metadata,
-                             texture_flags | BO_USE_CAMERA_MASK);
-
+			     ARRAY_SIZE(private_linear_source_formats), &metadata,
+			     texture_flags | BO_USE_CAMERA_MASK);
 	return 0;
 }
 
