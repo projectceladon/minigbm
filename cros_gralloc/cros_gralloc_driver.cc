@@ -646,6 +646,11 @@ uint32_t cros_gralloc_driver::get_resolved_drm_format(uint32_t drm_format, uint6
 	return drv_resolve_format(drv, drm_format, usage);
 }
 
+uint32_t cros_gralloc_driver::get_resolved_common_drm_format(uint32_t drm_format)
+{
+	return drv_resolved_common_drm_format(drm_format);
+}
+
 cros_gralloc_buffer *cros_gralloc_driver::get_buffer(cros_gralloc_handle_t hnd)
 {
 	/* Assumes driver mutex is held. */
