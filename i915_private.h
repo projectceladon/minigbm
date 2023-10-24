@@ -39,6 +39,12 @@ struct driver;
 #define DRM_FORMAT_XRGB161616  fourcc_code('X', 'R', '4', '8') /* [63:0] x:R:G:B 16:16:16:16 little endian */
 #define DRM_FORMAT_XBGR161616  fourcc_code('X', 'B', '4', '8') /* [63:0] x:B:G:R 16:16:16:16 little endian */
 
+/* ATS using TILE_4 instead of TILE_Y */
+#define I915_FORMAT_MOD_4_TILED	fourcc_mod_code(INTEL, 9)
+#define I915_TILING_4		9
+
+bool i915_has_tile4(struct driver *drv);
+
 int i915_private_init(struct driver *drv, uint64_t *cursor_width, uint64_t *cursor_height);
 
 int i915_private_add_combinations(struct driver *drv);
