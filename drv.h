@@ -184,6 +184,8 @@ uint32_t drv_stride_from_format(uint32_t format, uint32_t width, size_t plane);
 
 uint32_t drv_resolve_format(struct driver *drv, uint32_t format, uint64_t use_flags);
 
+uint32_t drv_resolved_common_drm_format(uint32_t format);
+
 size_t drv_num_planes_from_format(uint32_t format);
 
 size_t drv_num_planes_from_modifier(struct driver *drv, uint32_t format, uint64_t modifier);
