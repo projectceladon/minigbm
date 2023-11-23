@@ -373,27 +373,7 @@ static int i915_align_dimensions(struct bo *bo, uint32_t tiling, uint32_t *strid
 		vertical_alignment = 32;
 		break;
 	}
-	if (i915->genx10 >= 125) {
-		/*
-		 * The alignment calculated above is based on the full size luma plane and to have
-		 * chroma
-		 * planes properly aligned with subsampled formats, we need to multiply luma
-		 * alignment by
-		 * subsampling factor.
-		 */
-		switch (bo->meta.format) {
-		case DRM_FORMAT_YVU420_ANDROID:
-		case DRM_FORMAT_YVU420:
-			horizontal_alignment *= 2;
 
-		/* Fall through */
-
-		case DRM_FORMAT_NV12:
-			vertical_alignment *= 2;
-			break;
-		}
-		i915_private_align_dimensions(bo->meta.format, &vertical_alignment);
-	}
 	*aligned_height = ALIGN(*aligned_height, vertical_alignment);
 
 #ifdef USE_GRALLOC1
