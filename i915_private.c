@@ -134,15 +134,6 @@ int i915_private_add_combinations(struct driver *drv)
 	return 0;
 }
 
-void i915_private_align_dimensions(uint32_t format, uint32_t *vertical_alignment)
-{
-	switch (format) {
-	case DRM_FORMAT_NV12_Y_TILED_INTEL:
-		*vertical_alignment = 64;
-		break;
-	}
-}
-
 uint32_t i915_private_bpp_from_format(uint32_t format, size_t plane)
 {
 	assert(plane < drv_num_planes_from_format(format));
