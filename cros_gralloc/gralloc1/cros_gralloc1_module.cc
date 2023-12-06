@@ -466,13 +466,13 @@ int32_t CrosGralloc1::lock(buffer_handle_t bufferHandle, gralloc1_producer_usage
 		buffer_handle_t buffer_handle = native_handle_clone(bufferHandle);
 		auto error = retain(buffer_handle);
 		if (error != GRALLOC1_ERROR_NONE) {
-			delete buffer_handle;
+			free(const_cast<native_handle_t*>(buffer_handle));
 			return error;
 		}
 		bufferHandle = buffer_handle;
 		if (driver->lock(bufferHandle, acquireFence, map_flags, addr))
 			return CROS_GRALLOC_ERROR_BAD_HANDLE;
-		delete buffer_handle;
+		free(const_cast<native_handle_t*>(buffer_handle));
 	}
 
 	*outData = addr[0];
@@ -567,14 +567,14 @@ int32_t CrosGralloc1::lockYCbCr(buffer_handle_t bufferHandle,
 		buffer_handle_t buffer_handle = native_handle_clone(bufferHandle);
 		auto error = retain(buffer_handle);
 		if (error != GRALLOC1_ERROR_NONE) {
-			delete buffer_handle;
+			free(const_cast<native_handle_t*>(buffer_handle));
 			return error;
 		}
 		bufferHandle = buffer_handle;
 		if (driver->lock(bufferHandle, acquireFence, map_flags, addr))
 			return CROS_GRALLOC_ERROR_BAD_HANDLE;
 		driver->release(buffer_handle);
-		delete buffer_handle;
+		free(const_cast<native_handle_t*>(buffer_handle));
 	}
 
 	switch (hnd->format) {
