@@ -934,7 +934,7 @@ static void *i915_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t 
 		} else {
                         if ((bo->meta.use_flags & BO_USE_SCANOUT) &&
                             !(bo->meta.use_flags &
-                              (BO_USE_RENDERSCRIPT | BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE))) {
+                              (BO_USE_RENDERSCRIPT | BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SW_READ_OFTEN))) {
                                 mmap_arg.flags = I915_MMAP_OFFSET_WC;
                         } else {
                                 mmap_arg.flags = I915_MMAP_OFFSET_WB;
@@ -946,7 +946,7 @@ static void *i915_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t 
 		if (ret != 0 && mmap_arg.flags == I915_MMAP_OFFSET_FIXED) {
 			if ((bo->meta.use_flags & BO_USE_SCANOUT) &&
 			    !(bo->meta.use_flags &
-			      (BO_USE_RENDERSCRIPT | BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE))) {
+			      (BO_USE_RENDERSCRIPT | BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SW_READ_OFTEN))) {
 				mmap_arg.flags = I915_MMAP_OFFSET_WC;
 			} else {
 				mmap_arg.flags = I915_MMAP_OFFSET_WB;
@@ -981,7 +981,7 @@ static void *i915_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t 
 		 * performance-sensitive. */
 		if ((bo->meta.use_flags & BO_USE_SCANOUT) &&
 		    !(bo->meta.use_flags &
-		      (BO_USE_RENDERSCRIPT | BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE)))
+		      (BO_USE_RENDERSCRIPT | BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SW_READ_OFTEN)))
 			gem_map.flags = I915_MMAP_WC;
 
 		gem_map.handle = bo->handles[0].u32;
@@ -1008,7 +1008,7 @@ static void *i915_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t 
 
 			if ((bo->meta.use_flags & BO_USE_SCANOUT) &&
 			    !(bo->meta.use_flags &
-			      (BO_USE_RENDERSCRIPT | BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE)))
+			      (BO_USE_RENDERSCRIPT | BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SW_READ_OFTEN)))
 				gem_map.flags = I915_MMAP_WC;
 			gem_map.handle = bo->handles[0].u32;
 			gem_map.offset = 0;
