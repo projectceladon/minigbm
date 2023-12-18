@@ -374,6 +374,9 @@ static int i915_align_dimensions(struct bo *bo, uint32_t tiling, uint32_t *strid
 		break;
 	}
 
+	if ((bo->meta.format == DRM_FORMAT_NV12) && (i915->genx10 >= 125))
+		vertical_alignment = 32;
+
 	*aligned_height = ALIGN(*aligned_height, vertical_alignment);
 
 #ifdef USE_GRALLOC1
