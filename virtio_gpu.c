@@ -95,6 +95,8 @@ static uint32_t translate_format(uint32_t drm_fourcc)
 	case DRM_FORMAT_YVU420:
 	case DRM_FORMAT_YVU420_ANDROID:
 		return VIRGL_FORMAT_YV12;
+	case DRM_FORMAT_R16:
+		return VIRGL_FORMAT_R16_UNORM;
 	default:
 		return 0;
 	}
