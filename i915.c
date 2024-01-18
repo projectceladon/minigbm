@@ -720,18 +720,12 @@ static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t heig
 	return 0;
 }
 
-static bool is_need_local(struct i915_device *i915_dev, uint32_t format, int64_t use_flags)
+static bool is_need_local(int64_t use_flags)
 {
 	static bool local = true;
 
-	/* TODO(OAM-113684): video layer set BO_USE_SW_WRITE_OFTEN and BO_USE_SW_READ_OFTEN,
-	 * while we still found using local memory can bring better performance,
-	 * maybe app set such flags to minigbm, but CPU doesn't read/write video buffer. */
-	if ((i915_dev->genx10 >= 125) && (format == DRM_FORMAT_NV12) &&
-	    (use_flags & (BO_USE_SW_READ_OFTEN | BO_USE_SW_WRITE_OFTEN))) {
-		local = true;
-	} else if (use_flags & BO_USE_SW_READ_RARELY || use_flags & BO_USE_SW_READ_OFTEN ||
-		   use_flags & BO_USE_SW_WRITE_RARELY || use_flags & BO_USE_SW_WRITE_OFTEN) {
+	if (use_flags & BO_USE_SW_READ_RARELY || use_flags & BO_USE_SW_READ_OFTEN ||
+	    use_flags & BO_USE_SW_WRITE_RARELY || use_flags & BO_USE_SW_WRITE_OFTEN) {
 		local = false;
 	} else {
 		local = true;
@@ -758,8 +752,7 @@ static int i915_bo_create_from_metadata(struct bo *bo)
 	struct drm_i915_gem_set_tiling gem_set_tiling;
 	struct i915_device *i915_dev = (struct i915_device *)bo->drv->priv;
 	int64_t use_flags = bo->meta.use_flags;
-	uint32_t format = bo->meta.format;
-	bool local = is_need_local(i915_dev, format, use_flags);
+	bool local = is_need_local(use_flags);
 	if (local && i915_dev->has_local_mem) {
 		if (!is_prelim_kernel) {
 			/* All new BOs we get from the kernel are zeroed, so we don't need to
