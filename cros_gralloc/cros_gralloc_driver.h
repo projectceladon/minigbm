@@ -53,6 +53,7 @@ class cros_gralloc_driver
 	void for_each_handle(const std::function<void(cros_gralloc_handle_t)> &function);
 
 	bool IsSupportedYUVFormat(uint32_t droid_format);
+	int32_t reload();
 
       private:
 	cros_gralloc_driver(cros_gralloc_driver const &);
@@ -60,6 +61,10 @@ class cros_gralloc_driver
 	cros_gralloc_buffer *get_buffer(cros_gralloc_handle_t hnd);
 
 	struct driver *drv_render_;
+	struct driver *drv_ivshmem_;
+	bool use_ivshmem = false;
+	int32_t drv_num = 0;
+	bool is_sriov_mode = false;
 	std::mutex mutex_;
 	std::unordered_map<uint32_t, cros_gralloc_buffer *> buffers_;
 	std::unordered_map<cros_gralloc_handle_t, std::pair<cros_gralloc_buffer *, int32_t>>
