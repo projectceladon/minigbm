@@ -181,6 +181,16 @@ bool i915_has_tile4(struct driver *drv)
 	return i915->genx10 >= 125;
 }
 
+bool i915_should_use_linear(struct i915_device *i915)
+{
+	switch (i915->device_id) {
+	case 0x46A6:
+		return true;
+	default:
+		return false;
+	}
+}
+
 static uint64_t unset_flags(uint64_t current_flags, uint64_t mask)
 {
 	uint64_t value = current_flags & ~mask;
@@ -282,6 +292,19 @@ static int i915_add_combinations(struct driver *drv)
 	render = unset_flags(render, linear_mask | camera_mask);
 	scanout_and_render = unset_flags(scanout_and_render, linear_mask |camera_mask);
 
+	/* TODO(OAM-115771):
+	* Some devices virtio has VIRTIO_GPU_F_MODIFIER feature,
+	* but some devices have not. If device virtio has not
+	* VIRTIO_GPU_F_MODIFIER, android display black screen with
+	* qemu + SRIOV. So far, we have not found out why device
+	* id of the two ADL device are both 0x46A6, one has
+	* VIRTIO_GPU_F_MODIFIER feature, the other one has not.
+	*
+	* For now, we use LINEAR as WA for the above devices with
+	* same device id.. */
+	if (is_kvm && i915_should_use_linear(i915)) {
+		scanout_and_render = unset_flags(scanout_and_render, BO_USE_SCANOUT);
+	}
 
 	/* On dGPU, only use linear */
 	if (i915->genx10 >= 125)
