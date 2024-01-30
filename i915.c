@@ -956,13 +956,7 @@ static void *i915_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t 
 		if (i915->has_local_mem) {
 			mmap_arg.flags = I915_MMAP_OFFSET_FIXED;
 		} else {
-                        if ((bo->meta.use_flags & BO_USE_SCANOUT) &&
-                            !(bo->meta.use_flags &
-                              (BO_USE_RENDERSCRIPT | BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE))) {
-                                mmap_arg.flags = I915_MMAP_OFFSET_WC;
-                        } else {
-                                mmap_arg.flags = I915_MMAP_OFFSET_WB;
-                        }
+			mmap_arg.flags = I915_MMAP_OFFSET_WC;
 		}
 
 		/* Get the fake offset back */
