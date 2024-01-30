@@ -282,6 +282,10 @@ static int i915_add_combinations(struct driver *drv)
 	render = unset_flags(render, linear_mask | camera_mask);
 	scanout_and_render = unset_flags(scanout_and_render, linear_mask |camera_mask);
 
+	/* On ADL-P vm mode on 5.10 kernel, BO_USE_SCANOUT is not well supported for tiled bo */
+	if (is_kvm && i915->is_adlp) {
+	    scanout_and_render = unset_flags(scanout_and_render, BO_USE_SCANOUT);
+	}
 
 	/* On dGPU, only use linear */
 	if (i915->genx10 >= 125)
@@ -882,7 +886,7 @@ static int i915_bo_create_from_metadata(struct bo *bo)
 	for (plane = 0; plane < bo->meta.num_planes; plane++)
 		bo->handles[plane].u32 = gem_handle;
 
-	if (i915_dev->genx10 != 125) {
+	if (i915_dev->has_fence_reg) {
 		memset(&gem_set_tiling, 0, sizeof(gem_set_tiling));
 		gem_set_tiling.handle = bo->handles[0].u32;
 		gem_set_tiling.tiling_mode = bo->meta.tiling;
@@ -917,7 +921,7 @@ static int i915_bo_import(struct bo *bo, struct drv_import_fd_data *data)
 	if (ret)
 		return ret;
 
-	if (i915_dev->genx10 != 125) {
+	if (i915_dev->has_fence_reg) {
 		/* TODO(gsingh): export modifiers and get rid of backdoor tiling. */
 		memset(&gem_get_tiling, 0, sizeof(gem_get_tiling));
 		gem_get_tiling.handle = bo->handles[0].u32;
