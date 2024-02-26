@@ -7,6 +7,7 @@
 #ifndef HELPERS_H
 #define HELPERS_H
 
+#include <math.h>
 #include <stdbool.h>
 
 #include "drv.h"
@@ -42,4 +43,8 @@ int drv_modify_linear_combinations(struct driver *drv);
 uint64_t drv_pick_modifier(const uint64_t *modifiers, uint32_t count,
 			   const uint64_t *modifier_order, uint32_t order_count);
 bool drv_has_modifier(const uint64_t *list, uint32_t count, uint64_t modifier);
+
+void one_ytile_to_linear(char *src, char *dst, u_int16_t x, u_int16_t y,
+						u_int16_t width, u_int16_t height, u_int16_t offset);
+void *ytiled_to_linear(struct bo_metadata meta, void * src);
 #endif
