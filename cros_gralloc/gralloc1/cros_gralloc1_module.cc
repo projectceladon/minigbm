@@ -471,7 +471,7 @@ int32_t CrosGralloc1::lock(buffer_handle_t bufferHandle, gralloc1_producer_usage
 		auto error = retain(buffer_handle);
 		if (error != GRALLOC1_ERROR_NONE) {
 			drv_log("Retain failed");
-			delete buffer_handle;
+			free(const_cast<native_handle_t*>(buffer_handle));
 			return error;
 		}
 		bufferHandle = buffer_handle;
@@ -479,7 +479,7 @@ int32_t CrosGralloc1::lock(buffer_handle_t bufferHandle, gralloc1_producer_usage
 			drv_log("lock failed");
 			return CROS_GRALLOC_ERROR_BAD_HANDLE;
 		}
-		delete buffer_handle;
+		free(const_cast<native_handle_t*>(buffer_handle));
 	}
 
 	*outData = addr[0];
@@ -575,7 +575,7 @@ int32_t CrosGralloc1::lockYCbCr(buffer_handle_t bufferHandle,
 		auto error = retain(buffer_handle);
 		if (error != GRALLOC1_ERROR_NONE) {
 			drv_log("Retain failed");
-			delete buffer_handle;
+			free(const_cast<native_handle_t*>(buffer_handle));
 			return error;
 		}
 		bufferHandle = buffer_handle;
@@ -584,7 +584,7 @@ int32_t CrosGralloc1::lockYCbCr(buffer_handle_t bufferHandle,
 			return CROS_GRALLOC_ERROR_BAD_HANDLE;
 		}
 		driver->release(buffer_handle);
-		delete buffer_handle;
+		free(const_cast<native_handle_t*>(buffer_handle));
 	}
 
 	switch (hnd->format) {
