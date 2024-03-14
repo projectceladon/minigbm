@@ -965,6 +965,19 @@ static void *i915_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t 
 		/* And map it */
 		addr = mmap(0, bo->meta.total_size, PROT_READ | PROT_WRITE, MAP_SHARED, bo->drv->fd,
 			    mmap_arg.offset);
+
+		// TODO: GEM_MMAP_OFFSET cannot convert ytiled to linear, we have to convert it manually.
+		// Other formats(e.g. I915_TILING_X) should also be converted.
+		if (bo->meta.tiling == I915_TILING_Y) {
+			void* tmp_addr = ytiled_to_linear(bo->meta, addr);
+
+			if (NULL != tmp_addr) {
+				// release original one and replace it with a linear address.
+				munmap(addr, bo->meta.total_size);
+				addr = tmp_addr;
+				vma->cpu = true;
+			}
+		}
 	} else if (bo->meta.tiling == I915_TILING_NONE) {
 		struct drm_i915_gem_mmap gem_map;
 		memset(&gem_map, 0, sizeof(gem_map));
