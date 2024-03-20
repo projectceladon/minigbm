@@ -7,6 +7,7 @@
 #ifdef DRV_I915
 
 #include <assert.h>
+#include <cpuid.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -91,8 +92,6 @@ struct i915_device {
 
 static void i915_info_from_device_id(struct i915_device *i915)
 {
-	const uint16_t gen3_ids[] = { 0x2582, 0x2592, 0x2772, 0x27A2, 0x27AE,
-				      0x29C2, 0x29B2, 0x29D2, 0xA001, 0xA011 };
 	const uint16_t gen4_ids[] = { 0x29A2, 0x2992, 0x2982, 0x2972, 0x2A02, 0x2A12, 0x2A42,
 				      0x2E02, 0x2E12, 0x2E22, 0x2E32, 0x2E42, 0x2E92 };
 	const uint16_t gen5_ids[] = { 0x0042, 0x0046 };
@@ -143,14 +142,9 @@ static void i915_info_from_device_id(struct i915_device *i915)
 	const uint16_t mtl_ids[] = { 0x7D40, 0x7D60, 0x7D45, 0x7D55, 0x7DD5 };
 
 	unsigned i;
-	i915->graphics_version = 4;
+	i915->graphics_version  = 12;
 	i915->is_xelpd = false;
 	i915->is_mtl = false;
-
-	for (i = 0; i < ARRAY_SIZE(gen3_ids); i++)
-		if (gen3_ids[i] == i915->device_id)
-			i915->graphics_version = 3;
-
 	/* Gen 4 */
 	for (i = 0; i < ARRAY_SIZE(gen4_ids); i++)
 		if (gen4_ids[i] == i915->device_id)
@@ -233,6 +227,17 @@ static uint64_t unset_flags(uint64_t current_flags, uint64_t mask)
 	return value;
 }
 
+/*
+ * Check if in virtual machine mode, by checking cpuid
+ */
+static inline bool is_in_vm()
+{
+	int ret;
+	uint32_t eax=0, ebx=0, ecx=0, edx=0;
+	ret = __get_cpuid(1, &eax, &ebx, &ecx, &edx);
+	return ret && (((ecx >> 31) & 1) == 1);
+}
+
 static int i915_add_combinations(struct driver *drv)
 {
 	struct i915_device *i915 = drv->priv;
@@ -311,6 +316,10 @@ static int i915_add_combinations(struct driver *drv)
            unset_flags(texture_flags, BO_USE_RENDERSCRIPT | BO_USE_SW_WRITE_OFTEN |
                                           BO_USE_SW_READ_OFTEN | BO_USE_LINEAR);
 
+	/* On ADL-P vm mode on 5.10 kernel, BO_USE_SCANOUT is not well supported for tiled bo */
+	if (is_in_vm() && i915->is_xelpd)
+	    scanout_and_render_not_linear = unset_flags(scanout_and_render, BO_USE_SCANOUT);
+
 	// In sriov mode, MMAP_GTT will fail for tiled buffer.
 	if ((drv->gpu_grp_type == TWO_GPU_IGPU_VIRTIO) || (drv->gpu_grp_type == THREE_GPU_IGPU_VIRTIO_DGPU))
 		scanout_and_render_not_linear =
@@ -387,7 +396,6 @@ static int i915_add_combinations(struct driver *drv)
 static int i915_align_dimensions(struct bo *bo, uint32_t format, uint32_t tiling, uint32_t *stride,
 				 uint32_t *aligned_height)
 {
-	struct i915_device *i915 = bo->drv->priv;
 	uint32_t horizontal_alignment;
 	uint32_t vertical_alignment;
 
@@ -436,29 +444,19 @@ static int i915_align_dimensions(struct bo *bo, uint32_t format, uint32_t tiling
 		break;
 
 	case I915_TILING_Y:
+		horizontal_alignment = 128;
+		vertical_alignment = 32;
+		break;
 	case I915_TILING_4:
-		if (i915->graphics_version == 3) {
-			horizontal_alignment = 512;
-			vertical_alignment = 8;
-		} else {
-			horizontal_alignment = 128;
-			vertical_alignment = 32;
-		}
+		horizontal_alignment = 128;
+		vertical_alignment = 32;
 		break;
 	}
 
 	*aligned_height = ALIGN(*aligned_height, vertical_alignment);
-	if (i915->graphics_version > 3) {
-		*stride = ALIGN(*stride, horizontal_alignment);
-	} else {
-		while (*stride > horizontal_alignment)
-			horizontal_alignment <<= 1;
 
-		*stride = horizontal_alignment;
-	}
-
-	if (i915->graphics_version <= 3 && *stride > 8192)
-		return -EINVAL;
+	if(DRM_FORMAT_R8 != bo->meta.format)
+	*stride = ALIGN(*stride, horizontal_alignment);
 
 	return 0;
 }
