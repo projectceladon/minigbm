@@ -223,6 +223,17 @@ static inline int vm_type()
 	return type;
 }
 
+/*
+ * Check if in virtual machine mode, by checking cpuid
+ */
+static inline bool is_in_vm()
+{
+	int ret;
+	uint32_t eax=0, ebx=0, ecx=0, edx=0;
+	ret = __get_cpuid(1, &eax, &ebx, &ecx, &edx);
+	return ret && (((ecx >> 31) & 1) == 1);
+}
+
 static int i915_add_combinations(struct driver *drv)
 {
 	struct i915_device *i915 = drv->priv;
@@ -282,6 +293,9 @@ static int i915_add_combinations(struct driver *drv)
 	render = unset_flags(render, linear_mask | camera_mask);
 	scanout_and_render = unset_flags(scanout_and_render, linear_mask |camera_mask);
 
+	/* On ADL-P vm mode on 5.10 kernel, BO_USE_SCANOUT is not well supported for tiled bo */
+	if (is_in_vm() && i915->is_adlp)
+	    scanout_and_render = unset_flags(scanout_and_render, BO_USE_SCANOUT);
 
 	/* On dGPU, only use linear */
 	if (i915->genx10 >= 125)
