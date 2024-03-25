@@ -798,12 +798,12 @@ static int i915_bo_create_from_metadata(struct bo *bo)
 			 */
 			ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_CREATE_EXT, &gem_create_ext);
 			if (ret) {
-				drv_log("drv: DRM_IOCTL_I915_GEM_CREATE_EXT failed (size=%llu)\n",
-					gem_create_ext.size);
+				drv_log("drv: DRM_IOCTL_I915_GEM_CREATE_EXT failed (size=%llu) from heap %d with usage 0x%llx\n",
+					gem_create_ext.size, heap, use_flags);
 				return -errno;
 			} else {
-				drv_info("drv: DRM_IOCTL_I915_GEM_CREATE_EXT OK (size=%llu)\n",
-					gem_create_ext.size);
+				drv_info("drv: DRM_IOCTL_I915_GEM_CREATE_EXT OK (size=%llu) from heap %d with usage 0x%llx\n",
+					gem_create_ext.size, heap, use_flags);
 			}
 			gem_handle = gem_create_ext.handle;
 
@@ -851,9 +851,11 @@ static int i915_bo_create_from_metadata(struct bo *bo)
 		gem_create.size = bo->meta.total_size;
 		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_CREATE, &gem_create);
 		if (ret) {
-			drv_log("DRM_IOCTL_I915_GEM_CREATE failed (size=%llu)\n", gem_create.size);
+			drv_log("DRM_IOCTL_I915_GEM_CREATE failed (size=%llu) with 0x%llx\n", gem_create.size, use_flags);
 			return -errno;
-		}
+		} else {
+                        drv_info("DRM_IOCTL_I915_GEM_CREATE OK (size=%llu) with 0x%llx\n", gem_create.size, use_flags);
+                }
 		gem_handle = gem_create.handle;
 	}
 
