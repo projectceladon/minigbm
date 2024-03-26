@@ -49,6 +49,8 @@ int i915_private_init(struct driver *drv, uint64_t *cursor_width, uint64_t *curs
 
 int i915_private_add_combinations(struct driver *drv);
 
+void i915_private_align_dimensions(uint32_t format, uint32_t *vertical_alignment);
+
 uint32_t i915_private_bpp_from_format(uint32_t format, size_t plane);
 
 void i915_private_vertical_subsampling_from_format(uint32_t *vertical_subsampling, uint32_t format,
