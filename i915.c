@@ -374,6 +374,13 @@ static int i915_align_dimensions(struct bo *bo, uint32_t tiling, uint32_t *strid
 		break;
 	}
 
+	if ((bo->meta.format == DRM_FORMAT_NV12) && (i915->genx10 >= 125) && (bo->meta.use_flags & (BO_USE_SW_READ_OFTEN | BO_USE_SW_WRITE_OFTEN))) {
+		vertical_alignment = 4;
+	}
+	else if ((bo->meta.format == DRM_FORMAT_NV12_Y_TILED_INTEL) && (i915->genx10 >= 125)) {
+		vertical_alignment = 32;
+	}
+
 	*aligned_height = ALIGN(*aligned_height, vertical_alignment);
 
 #ifdef USE_GRALLOC1
@@ -593,12 +600,15 @@ static int i915_bo_from_format(struct bo *bo, uint32_t width, uint32_t height, u
 	uint32_t offset;
 	size_t plane;
 	int ret, pagesize;
+	struct i915_device *i915 = (struct i915_device *)bo->drv->priv;
 
 	offset = 0;
 	pagesize = getpagesize();
 	for (plane = 0; plane < drv_num_planes_from_format(format); plane++) {
 		uint32_t stride = drv_stride_from_format(format, width, plane);
 		uint32_t plane_height = drv_height_from_format(format, height, plane);
+		if ((format == DRM_FORMAT_NV12) && (i915->genx10 >= 125))
+			bo->meta.tiling = I915_TILING_4;
 
 		if (bo->meta.tiling != I915_TILING_NONE)
 			assert(IS_ALIGNED(offset, pagesize));
@@ -621,6 +631,7 @@ static int i915_bo_from_format(struct bo *bo, uint32_t width, uint32_t height, u
 static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t height, uint32_t format,
 				    uint64_t use_flags, const uint64_t *modifiers, uint32_t count)
 {
+	struct i915_device *i915 = (struct i915_device *)bo->drv->priv;
 	static const uint64_t modifier_order[] = {
 		I915_FORMAT_MOD_Y_TILED,
 		I915_FORMAT_MOD_X_TILED,
@@ -656,6 +667,11 @@ static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t heig
 	case I915_FORMAT_MOD_4_TILED:
 		bo->meta.tiling = I915_TILING_4;
 		break;
+	}
+
+	if ((format == DRM_FORMAT_NV12) && (i915->genx10 >= 125)) {
+		bo->meta.tiling = I915_TILING_4;
+		modifier = I915_FORMAT_MOD_4_TILED;
 	}
 
 	bo->meta.format_modifiers[0] = modifier;
@@ -751,6 +767,8 @@ static int i915_bo_create_from_metadata(struct bo *bo)
 	struct i915_device *i915_dev = (struct i915_device *)bo->drv->priv;
 	int64_t use_flags = bo->meta.use_flags;
 	bool local = is_need_local(use_flags);
+	if ((i915_dev->genx10 >= 125) && (bo->meta.format == DRM_FORMAT_NV12) && (bo->meta.use_flags & (BO_USE_SW_READ_OFTEN | BO_USE_SW_WRITE_OFTEN)))
+		local = true;
 	if (local && i915_dev->has_local_mem) {
 		if (!is_prelim_kernel) {
 			/* All new BOs we get from the kernel are zeroed, so we don't need to
