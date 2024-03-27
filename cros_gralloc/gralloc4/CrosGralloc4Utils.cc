@@ -316,7 +316,7 @@ int convertToBufferUsage(uint64_t grallocUsage, uint64_t* outBufferUsage) {
     }
     if (grallocUsage & BufferUsage::COMPOSER_OVERLAY) {
         /* HWC wants to use display hardware, but can defer to OpenGL. */
-        bufferUsage |= BO_USE_SCANOUT | BO_USE_TEXTURE;
+        bufferUsage |= BO_USE_TEXTURE;
     }
     if (grallocUsage & BufferUsage::PROTECTED) {
         bufferUsage |= BO_USE_PROTECTED;
@@ -340,6 +340,10 @@ int convertToBufferUsage(uint64_t grallocUsage, uint64_t* outBufferUsage) {
     if (grallocUsage & BufferUsage::VIDEO_DECODER) {
         bufferUsage |= BO_USE_HW_VIDEO_DECODER;
     }
+    if ((grallocUsage & BufferUsage::COMPOSER_CLIENT_TARGET) && (grallocUsage & BufferUsage::GPU_DATA_BUFFER)) {
+        bufferUsage |= BO_USE_SCANOUT;
+    }
+
 #ifdef USE_GRALLOC1
     if ((grallocUsage & BufferUsage::GPU_MIPMAP_COMPLETE) ||
         (grallocUsage & BufferUsage::GPU_CUBE_MAP)) {
