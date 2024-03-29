@@ -256,6 +256,8 @@ static int i915_add_combinations(struct driver *drv)
 				     BO_USE_SW_WRITE_OFTEN | BO_USE_SW_READ_RARELY |
 				     BO_USE_SW_WRITE_RARELY;
 
+	uint64_t camera_mask = BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE;
+
 	struct format_metadata metadata_linear = { .tiling = I915_TILING_NONE,
 						   .priority = 1,
 						   .modifier = DRM_FORMAT_MOD_LINEAR };
@@ -953,8 +955,26 @@ static void *i915_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags)
 		gem_map.handle = bo->handles[0].u32;
 		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_MMAP_GTT, &gem_map);
 		if (ret) {
-			drv_loge("DRM_IOCTL_I915_GEM_MMAP_GTT failed\n");
-			return MAP_FAILED;
+			struct drm_i915_gem_mmap gem_map;
+			memset(&gem_map, 0, sizeof(gem_map));
+
+			if ((bo->meta.use_flags & BO_USE_SCANOUT) &&
+			    !(bo->meta.use_flags &
+			      (BO_USE_RENDERSCRIPT | BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE)))
+				gem_map.flags = I915_MMAP_WC;
+			gem_map.handle = bo->handles[0].u32;
+			gem_map.offset = 0;
+			gem_map.size = bo->meta.total_size;
+			ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_MMAP, &gem_map);
+
+			if (ret) {
+			        drv_loge("DRM_IOCTL_I915_GEM_MMAP failed\n");
+			        return MAP_FAILED;
+			}
+			addr = (void *)(uintptr_t)gem_map.addr_ptr;
+
+			vma->length = bo->meta.total_size;
+			return addr;
 		}
 
 		addr = mmap(0, bo->meta.total_size, drv_get_prot(map_flags), MAP_SHARED,
