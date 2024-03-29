@@ -15,6 +15,9 @@ extern "C" {
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
+#ifdef __ANDROID__
+#include <cutils/log.h>
+#endif
 
 #define DRV_MAX_PLANES 4
 
