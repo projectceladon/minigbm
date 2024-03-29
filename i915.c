@@ -256,6 +256,8 @@ static int i915_add_combinations(struct driver *drv)
 				     BO_USE_SW_WRITE_OFTEN | BO_USE_SW_READ_RARELY |
 				     BO_USE_SW_WRITE_RARELY;
 
+	uint64_t camera_mask = BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE;
+
 	struct format_metadata metadata_linear = { .tiling = I915_TILING_NONE,
 						   .priority = 1,
 						   .modifier = DRM_FORMAT_MOD_LINEAR };
@@ -310,8 +312,8 @@ static int i915_add_combinations(struct driver *drv)
                             &metadata_linear, texture_flags | BO_USE_CAMERA_MASK);
 
 
-	const uint64_t render_not_linear = unset_flags(render, linear_mask);
-	uint64_t scanout_and_render_not_linear = render_not_linear | BO_USE_SCANOUT;
+	const uint64_t render_not_linear = unset_flags(render, linear_mask | camera_mask);
+	uint64_t scanout_and_render_not_linear = unset_flags(render_not_linear | BO_USE_SCANOUT, camera_mask);
 	uint64_t texture_flags_video =
            unset_flags(texture_flags, BO_USE_RENDERSCRIPT | BO_USE_SW_WRITE_OFTEN |
                                           BO_USE_SW_READ_OFTEN | BO_USE_LINEAR);
@@ -319,11 +321,6 @@ static int i915_add_combinations(struct driver *drv)
 	/* On ADL-P vm mode on 5.10 kernel, BO_USE_SCANOUT is not well supported for tiled bo */
 	if (is_in_vm() && i915->is_xelpd)
 	    scanout_and_render_not_linear = unset_flags(scanout_and_render, BO_USE_SCANOUT);
-
-	// In sriov mode, MMAP_GTT will fail for tiled buffer.
-	if ((drv->gpu_grp_type == TWO_GPU_IGPU_VIRTIO) || (drv->gpu_grp_type == THREE_GPU_IGPU_VIRTIO_DGPU))
-		scanout_and_render_not_linear =
-			unset_flags(scanout_and_render, BO_USE_SW_READ_RARELY | BO_USE_SW_WRITE_RARELY);
 
 	struct format_metadata metadata_x_tiled = { .tiling = I915_TILING_X,
 						    .priority = 2,
@@ -958,8 +955,26 @@ static void *i915_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags)
 		gem_map.handle = bo->handles[0].u32;
 		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_MMAP_GTT, &gem_map);
 		if (ret) {
-			drv_loge("DRM_IOCTL_I915_GEM_MMAP_GTT failed\n");
-			return MAP_FAILED;
+			struct drm_i915_gem_mmap gem_map;
+			memset(&gem_map, 0, sizeof(gem_map));
+
+			if ((bo->meta.use_flags & BO_USE_SCANOUT) &&
+			    !(bo->meta.use_flags &
+			      (BO_USE_RENDERSCRIPT | BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE)))
+				gem_map.flags = I915_MMAP_WC;
+			gem_map.handle = bo->handles[0].u32;
+			gem_map.offset = 0;
+			gem_map.size = bo->meta.total_size;
+			ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_MMAP, &gem_map);
+
+			if (ret) {
+			        drv_loge("DRM_IOCTL_I915_GEM_MMAP failed\n");
+			        return MAP_FAILED;
+			}
+			addr = (void *)(uintptr_t)gem_map.addr_ptr;
+
+			vma->length = bo->meta.total_size;
+			return addr;
 		}
 
 		addr = mmap(0, bo->meta.total_size, drv_get_prot(map_flags), MAP_SHARED,
