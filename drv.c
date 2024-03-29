@@ -16,7 +16,6 @@
 #include <xf86drm.h>
 
 #ifdef __ANDROID__
-#include <cutils/log.h>
 #include <libgen.h>
 #endif
 

@@ -70,6 +70,7 @@ Error CrosGralloc4Allocator::allocate(const BufferDescriptorInfo& descriptor, ui
     }
 
     if (!outStride || !outHandle) {
+        ALOGE("Invalid params.\n");
         return Error::NO_RESOURCES;
     }
 
