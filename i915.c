@@ -228,14 +228,38 @@ static uint64_t unset_flags(uint64_t current_flags, uint64_t mask)
 }
 
 /*
- * Check if in virtual machine mode, by checking cpuid
+ * Check virtual machine type, by checking cpuid
  */
-static inline bool is_in_vm()
+enum {
+	HYPERTYPE_NONE 	    = 0,
+	HYPERTYPE_ANY       = 0x1,
+	HYPERTYPE_TYPE_ACRN = 0x2,
+	HYPERTYPE_TYPE_KVM  = 0x4
+};
+static inline int vm_type()
 {
-	int ret;
+	int type = HYPERTYPE_NONE;
+	union {
+		uint32_t sig32[3];
+		char text[13];
+	} sig = {};
+
 	uint32_t eax=0, ebx=0, ecx=0, edx=0;
-	ret = __get_cpuid(1, &eax, &ebx, &ecx, &edx);
-	return ret && (((ecx >> 31) & 1) == 1);
+	if(__get_cpuid(1, &eax, &ebx, &ecx, &edx)) {
+		if (((ecx >> 31) & 1) == 1) {
+			type |= HYPERTYPE_ANY;
+
+			__cpuid(0x40000000U, eax, ebx, ecx, edx);
+			sig.sig32[0] = ebx;
+			sig.sig32[1] = ecx;
+			sig.sig32[2] = edx;
+			if (!strncmp(sig.text, "ACRNACRNACRN", 12))
+				type |= HYPERTYPE_TYPE_ACRN;
+			else if (!strncmp(sig.text, "KVMKVMKVM", 9))
+				type |= HYPERTYPE_TYPE_KVM;
+		}
+	}
+	return type;
 }
 
 static int i915_add_combinations(struct driver *drv)
@@ -247,6 +271,7 @@ static int i915_add_combinations(struct driver *drv)
 	const uint64_t texture_only = BO_USE_TEXTURE_MASK;
 	uint64_t render_flags = BO_USE_RENDER_MASK;
 	uint64_t texture_flags = BO_USE_TEXTURE_MASK;
+	bool is_kvm = vm_type() & HYPERTYPE_TYPE_KVM;
 
 	// HW protected buffers also need to be scanned out.
 	const uint64_t hw_protected =
@@ -319,7 +344,7 @@ static int i915_add_combinations(struct driver *drv)
                                           BO_USE_SW_READ_OFTEN | BO_USE_LINEAR);
 
 	/* On ADL-P vm mode on 5.10 kernel, BO_USE_SCANOUT is not well supported for tiled bo */
-	if (is_in_vm() && i915->is_xelpd)
+	if (is_kvm && i915->is_xelpd)
 	    scanout_and_render_not_linear = unset_flags(scanout_and_render, BO_USE_SCANOUT);
 
 	struct format_metadata metadata_x_tiled = { .tiling = I915_TILING_X,
