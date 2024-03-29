@@ -341,6 +341,11 @@ static int i915_add_combinations(struct driver *drv)
 		struct format_metadata metadata_4_tiled = { .tiling = I915_TILING_4,
 							    .priority = 3,
 							    .modifier = I915_FORMAT_MOD_4_TILED };
+	
+	// dGPU do not support Tiling Y mode
+	if ((drv->gpu_grp_type == TWO_GPU_IGPU_DGPU) || (drv->gpu_grp_type == THREE_GPU_IGPU_VIRTIO_DGPU))
+		 scanout_and_render_not_linear = unset_flags(scanout_and_render, BO_USE_SCANOUT);
+
 /* Support tile4 NV12 and P010 for libva */
 #ifdef I915_SCANOUT_4_TILED
 		const uint64_t nv12_usage =
