@@ -15,6 +15,9 @@ extern "C" {
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
+#ifdef __ANDROID__
+#include <cutils/log.h>
+#endif
 
 #define DRV_MAX_PLANES 4
 
@@ -249,6 +252,11 @@ enum drv_log_level {
 #define _drv_log(level, format, ...)                                                               \
 	do {                                                                                       \
 		drv_log_prefix(level, "minigbm", __FILE__, __LINE__, format, ##__VA_ARGS__);       \
+	} while (0)
+
+#define drv_info(level, format, ...)                                                                       \
+	do {                                                                                       \
+		drv_log_prefix(level, "minigbm", __FILE__, __LINE__, format, ##__VA_ARGS__);              \
 	} while (0)
 
 #define drv_loge(format, ...) _drv_log(DRV_LOGE, format, ##__VA_ARGS__)
