@@ -320,11 +320,6 @@ static int i915_add_combinations(struct driver *drv)
 	if (is_in_vm() && i915->is_xelpd)
 	    scanout_and_render_not_linear = unset_flags(scanout_and_render, BO_USE_SCANOUT);
 
-	// In sriov mode, MMAP_GTT will fail for tiled buffer.
-	if ((drv->gpu_grp_type == TWO_GPU_IGPU_VIRTIO) || (drv->gpu_grp_type == THREE_GPU_IGPU_VIRTIO_DGPU))
-		scanout_and_render_not_linear =
-			unset_flags(scanout_and_render, BO_USE_SW_READ_RARELY | BO_USE_SW_WRITE_RARELY);
-
 	struct format_metadata metadata_x_tiled = { .tiling = I915_TILING_X,
 						    .priority = 2,
 						    .modifier = I915_FORMAT_MOD_X_TILED };
