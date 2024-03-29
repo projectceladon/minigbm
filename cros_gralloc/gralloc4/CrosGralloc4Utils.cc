@@ -78,7 +78,6 @@ int convertToCrosDescriptor(const BufferDescriptorInfo& descriptor,
         return -EINVAL;
     }
     if (convertToDrmFormat(descriptor.format, &outCrosDescriptor->drm_format)) {
-        ALOGE("Failed to convert descriptor by convertToDrmFormat");
         if (!IsSupportedYUVFormat(static_cast<uint32_t>(descriptor.format))) {
             std::string pixelFormatString = getPixelFormatString(descriptor.format);
             ALOGE("Failed to convert descriptor. Unsupported fomat %s\n", pixelFormatString.c_str());
