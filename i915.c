@@ -658,7 +658,6 @@ static bool i915_bo_query_prelim_meminfo(struct driver *drv, struct i915_device 
 		return false;
 	}
 	if (item.length <= 0) {
-		drv_loge("drv: Invalid memory region length\n");
 		return false;
 	}
 	struct prelim_drm_i915_query_memory_regions *meminfo = calloc(1, item.length);
@@ -749,7 +748,6 @@ static int i915_init(struct driver *drv)
 	i915->has_fence_reg = gem_param(drv->fd, I915_PARAM_NUM_FENCES_AVAIL) > 0;
 
 	if (!i915_bo_query_prelim_meminfo(drv, i915)) {
-		drv_loge("drv: Kernel does not support prelim\n");
 		i915_bo_query_meminfo(drv, i915);
 	} else {
 		drv_loge("drv: kernel supports prelim\n");
@@ -1379,22 +1377,25 @@ static int i915_bo_invalidate(struct bo *bo, struct mapping *mapping)
 {
 	int ret;
 	struct drm_i915_gem_set_domain set_domain = { 0 };
+	struct i915_device *i915_dev = (struct i915_device *)bo->drv->priv;
+	
+	if (i915_dev->graphics_version != 125) {
+		set_domain.handle = bo->handles[0].u32;
+		if (bo->meta.tiling == I915_TILING_NONE) {
+			set_domain.read_domains = I915_GEM_DOMAIN_CPU;
+			if (mapping->vma->map_flags & BO_MAP_WRITE)
+				set_domain.write_domain = I915_GEM_DOMAIN_CPU;
+		} else {
+			set_domain.read_domains = I915_GEM_DOMAIN_GTT;
+			if (mapping->vma->map_flags & BO_MAP_WRITE)
+				set_domain.write_domain = I915_GEM_DOMAIN_GTT;
+		}
 
-	set_domain.handle = bo->handles[0].u32;
-	if (bo->meta.tiling == I915_TILING_NONE) {
-		set_domain.read_domains = I915_GEM_DOMAIN_CPU;
-		if (mapping->vma->map_flags & BO_MAP_WRITE)
-			set_domain.write_domain = I915_GEM_DOMAIN_CPU;
-	} else {
-		set_domain.read_domains = I915_GEM_DOMAIN_GTT;
-		if (mapping->vma->map_flags & BO_MAP_WRITE)
-			set_domain.write_domain = I915_GEM_DOMAIN_GTT;
-	}
-
-	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_SET_DOMAIN, &set_domain);
-	if (ret) {
-		drv_loge("DRM_IOCTL_I915_GEM_SET_DOMAIN with %d\n", ret);
-		return ret;
+		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_SET_DOMAIN, &set_domain);
+		if (ret) {
+			drv_loge("DRM_IOCTL_I915_GEM_SET_DOMAIN with %d\n", ret);
+			return ret;
+		}
 	}
 
 	return 0;
