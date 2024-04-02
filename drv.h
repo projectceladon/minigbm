@@ -95,6 +95,10 @@ extern "C" {
 #define DRM_FORMAT_XRGB161616  fourcc_code('X', 'R', '4', '8') /* [63:0] x:R:G:B 16:16:16:16 little endian */
 #define DRM_FORMAT_XBGR161616  fourcc_code('X', 'B', '4', '8') /* [63:0] x:B:G:R 16:16:16:16 little endian */
 
+/* ATS using TILE_4 instead of TILE_Y */
+#define I915_FORMAT_MOD_4_TILED	fourcc_mod_code(INTEL, 9)
+#define I915_TILING_4		9
+
 #define DRM_FORMAT_NV12_Y_TILED_INTEL fourcc_code('9', '9', '9', '6')
 
 //TODO: remove this defination once drm_fourcc.h contains it.
@@ -129,6 +133,8 @@ struct drv_import_fd_data {
 	uint32_t format;
 	uint32_t tiling;
 	uint64_t use_flags;
+	uint32_t aligned_width;
+	uint32_t aligned_height;
 };
 
 struct vma {

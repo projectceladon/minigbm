@@ -18,8 +18,9 @@
 
 #include "drv_helpers.h"
 #include "drv_priv.h"
-#include "external/i915_drm.h"
+// #include "external/i915_drm.h"
 #include "util.h"
+#include "i915_prelim.h"
 
 #define I915_CACHELINE_SIZE 64
 #define I915_CACHELINE_MASK (I915_CACHELINE_SIZE - 1)
@@ -42,6 +43,11 @@ static const uint32_t linear_source_formats[] = { DRM_FORMAT_R16,    DRM_FORMAT_
                                                  DRM_FORMAT_P010 };
 
 static const uint32_t source_formats[] = { DRM_FORMAT_P010, DRM_FORMAT_NV12_Y_TILED_INTEL };
+
+struct iris_memregion {
+	struct drm_i915_gem_memory_class_instance region;
+	uint64_t size;
+};
 
 #if !defined(DRM_CAP_CURSOR_WIDTH)
 #define DRM_CAP_CURSOR_WIDTH 0x8
@@ -82,13 +88,44 @@ struct i915_device {
 	struct modifier_support_t modifier;
 	int device_id;
 	bool is_xelpd;
+	int32_t has_mmap_offset;
+	bool has_local_mem;
+	bool has_fence_reg;
+	struct iris_memregion vram, sys;
 	/*TODO : cleanup is_mtl to avoid adding variables for every new platforms */
 	bool is_mtl;
 	int32_t num_fences_avail;
-	bool has_mmap_offset;
 	uint64_t cursor_width;
 	uint64_t cursor_height;
 };
+
+/*
+ * src/gallium/drivers/iris/iris_bufmgr.c
+ */
+
+enum iris_heap {
+	IRIS_HEAP_SYSTEM_MEMORY,
+	IRIS_HEAP_DEVICE_LOCAL,
+	IRIS_HEAP_DEVICE_LOCAL_PREFERRED,
+	IRIS_HEAP_MAX,
+};
+
+const char *
+iris_heap_to_string[IRIS_HEAP_MAX] = {
+	[IRIS_HEAP_SYSTEM_MEMORY] = "system",
+	[IRIS_HEAP_DEVICE_LOCAL] = "local",
+	[IRIS_HEAP_DEVICE_LOCAL_PREFERRED] = "local-preferred",
+};
+
+static enum iris_heap
+flags_to_heap(struct i915_device *i915, unsigned flags)
+{
+	if (i915->vram.size > 0) {
+		return IRIS_HEAP_DEVICE_LOCAL_PREFERRED;
+	} else {
+		return IRIS_HEAP_SYSTEM_MEMORY;
+	}
+}
 
 static void i915_info_from_device_id(struct i915_device *i915)
 {
@@ -137,12 +174,32 @@ static void i915_info_from_device_id(struct i915_device *i915)
 				      0x462A, 0x4626, 0x4628, 0x46B0, 0x46B1, 0x46B2, 0x46B3,
 				      0x46C0, 0x46C1, 0x46C2, 0x46C3, 0x46D0, 0x46D1, 0x46D2 };
 
+	const uint16_t dg2_ids[] = { // DG2 Val-Only Super-SKU: 4F80 - 4F87
+			0x4F80, 0x4F81, 0x4F82, 0x4F83, 0x4F84, 0x4F85, 0x4F86, 0x4F87,
+
+			// DG2 Desktop Reserved:  56A0 to 56AF
+			0x56A0, 0x56A1, 0x56A2, 0x56A3, 0x56A4, 0x56A5, 0x56A6, 0x56A7,
+			0x56A8, 0x56A9, 0x56AA, 0x56AB, 0x56AC, 0x56AD, 0x56AE, 0x56AF,
+
+			// DG2 Notebook Reserved:  5690 to 569F
+			0x5690, 0x5691, 0x5692, 0x5693, 0x5694, 0x5695, 0x5696, 0x5697,
+			0x5698, 0x5699, 0x569A, 0x569B, 0x569C, 0x569D, 0x569E, 0x569F,
+
+			// Workstation Reserved:  56B0 to 56BF
+			0x56B0, 0x56B1, 0x56B2, 0x56B3, 0x56B4, 0x56B5, 0x56B6, 0x56B7,
+			0x56B8, 0x56B9, 0x56BA, 0x56BB, 0x56BC, 0x56BD, 0x56BE, 0x56BF,
+
+			// Server Reserved:  56C0 to 56CF
+			0x56C0, 0x56C1, 0x56C2, 0x56C3, 0x56C4, 0x56C5, 0x56C6, 0x56C7,
+			0x56C8, 0x56C9, 0x56CA, 0x56CB, 0x56CC, 0x56CD, 0x56CE, 0x56CF
+	};
+
 	const uint16_t rplp_ids[] = { 0xA720, 0xA721, 0xA7A0, 0xA7A1, 0xA7A8, 0xA7A9 };
 
 	const uint16_t mtl_ids[] = { 0x7D40, 0x7D60, 0x7D45, 0x7D55, 0x7DD5 };
 
 	unsigned i;
-	i915->graphics_version  = 12;
+	i915->graphics_version  = 120;
 	i915->is_xelpd = false;
 	i915->is_mtl = false;
 	/* Gen 4 */
@@ -173,7 +230,7 @@ static void i915_info_from_device_id(struct i915_device *i915)
 	/* Gen 9 */
 	for (i = 0; i < ARRAY_SIZE(gen9_ids); i++)
 		if (gen9_ids[i] == i915->device_id)
-			i915->graphics_version = 9;
+			i915->graphics_version = 90;
 
 	/* Gen 11 */
 	for (i = 0; i < ARRAY_SIZE(gen11_ids); i++)
@@ -183,12 +240,18 @@ static void i915_info_from_device_id(struct i915_device *i915)
 	/* Gen 12 */
 	for (i = 0; i < ARRAY_SIZE(gen12_ids); i++)
 		if (gen12_ids[i] == i915->device_id)
-			i915->graphics_version = 12;
+			i915->graphics_version = 120;
+
+	for (i = 0; i < ARRAY_SIZE(dg2_ids); i++)
+		if (dg2_ids[i] == i915->device_id) {
+			i915->graphics_version = 125;
+			return;
+		}
 
 	for (i = 0; i < ARRAY_SIZE(adlp_ids); i++)
 		if (adlp_ids[i] == i915->device_id) {
 			i915->is_xelpd = true;
-			i915->graphics_version = 12;
+			i915->graphics_version = 120;
 		}
 
 	for (i = 0; i < ARRAY_SIZE(rplp_ids); i++)
@@ -202,6 +265,12 @@ static void i915_info_from_device_id(struct i915_device *i915)
 			i915->graphics_version = 12;
 			i915->is_mtl = true;
 		}
+}
+
+bool i915_has_tile4(struct driver *drv)
+{
+	struct i915_device *i915 = drv->priv;
+	return i915->graphics_version >= 125;
 }
 
 static void i915_get_modifier_order(struct i915_device *i915)
@@ -348,6 +417,10 @@ static int i915_add_combinations(struct driver *drv)
 	if (is_kvm && i915->is_xelpd)
 	    scanout_and_render_not_linear = unset_flags(scanout_and_render, BO_USE_SCANOUT);
 
+	/* On dGPU, only use linear */
+	if (i915->graphics_version >= 125)
+		scanout_and_render_not_linear = unset_flags(scanout_and_render, BO_USE_SCANOUT);
+
 	struct format_metadata metadata_x_tiled = { .tiling = I915_TILING_X,
 						    .priority = 2,
 						    .modifier = I915_FORMAT_MOD_X_TILED };
@@ -363,12 +436,7 @@ static int i915_add_combinations(struct driver *drv)
 	if (i915->is_mtl) {
 		struct format_metadata metadata_4_tiled = { .tiling = I915_TILING_4,
 							    .priority = 3,
-							    .modifier = I915_FORMAT_MOD_4_TILED };
-	
-	// dGPU do not support Tiling Y mode
-	if ((drv->gpu_grp_type == TWO_GPU_IGPU_DGPU) || (drv->gpu_grp_type == THREE_GPU_IGPU_VIRTIO_DGPU))
-		 scanout_and_render_not_linear = unset_flags(scanout_and_render, BO_USE_SCANOUT);
-
+							    .modifier = I915_FORMAT_MOD_4_TILED };	
 /* Support tile4 NV12 and P010 for libva */
 #ifdef I915_SCANOUT_4_TILED
 		const uint64_t nv12_usage =
@@ -393,6 +461,10 @@ static int i915_add_combinations(struct driver *drv)
 		struct format_metadata metadata_y_tiled = { .tiling = I915_TILING_Y,
 							    .priority = 3,
 							    .modifier = I915_FORMAT_MOD_Y_TILED };
+		if ((drv->gpu_grp_type == TWO_GPU_IGPU_DGPU) ||
+		    (drv->gpu_grp_type == THREE_GPU_IGPU_VIRTIO_DGPU)) {
+			scanout_and_render_not_linear = unset_flags(scanout_and_render, BO_USE_SCANOUT);
+		}
 /* Support y-tiled NV12 and P010 for libva */
 #ifdef I915_SCANOUT_Y_TILED
 		const uint64_t nv12_usage =
@@ -426,6 +498,11 @@ static int i915_align_dimensions(struct bo *bo, uint32_t format, uint32_t tiling
 {
 	uint32_t horizontal_alignment;
 	uint32_t vertical_alignment;
+	struct i915_device *i915 = bo->drv->priv;
+	if (i915->graphics_version >= 125) {
+		horizontal_alignment = 4;
+		vertical_alignment = 4;
+	}
 
 	switch (tiling) {
 	default:
@@ -501,6 +578,80 @@ static void i915_clflush(void *start, size_t size)
 	}
 }
 
+static inline int gen_ioctl(int fd, unsigned long request, void *arg)
+{
+	int ret;
+
+	do {
+		ret = ioctl(fd, request, arg);
+	} while (ret == -1 && (errno == EINTR || errno == EAGAIN));
+	return ret;
+}
+
+static int gem_param(int fd, int name)
+{
+	int v = -1; /* No param uses (yet) the sign bit, reserve it for errors */
+
+	struct drm_i915_getparam gp = {.param = name, .value = &v };
+	if (gen_ioctl(fd, DRM_IOCTL_I915_GETPARAM, &gp))
+		return -1;
+
+	return v;
+}
+
+static void i915_bo_update_meminfo(struct i915_device *i915_dev,
+				   const struct drm_i915_query_memory_regions *meminfo)
+{
+	i915_dev->has_local_mem = false;
+	for (uint32_t i = 0; i < meminfo->num_regions; i++) {
+		const struct drm_i915_memory_region_info *mem = &meminfo->regions[i];
+		switch (mem->region.memory_class) {
+		case I915_MEMORY_CLASS_SYSTEM:
+			i915_dev->sys.region = mem->region;
+			i915_dev->sys.size = mem->probed_size;
+			break;
+		case I915_MEMORY_CLASS_DEVICE:
+			i915_dev->vram.region = mem->region;
+			i915_dev->vram.size = mem->probed_size;
+			i915_dev->has_local_mem = i915_dev->vram.size > 0;
+			break;
+		default:
+			break;
+		}
+	}
+}
+
+static bool i915_bo_query_meminfo(struct driver *drv, struct i915_device *i915_dev)
+{
+	struct drm_i915_query_item item = {
+		.query_id = DRM_I915_QUERY_MEMORY_REGIONS,
+	};
+
+	struct drm_i915_query query = {
+		.num_items = 1, .items_ptr = (uintptr_t)&item,
+	};
+	if (drmIoctl(drv->fd, DRM_IOCTL_I915_QUERY, &query)) {
+		drv_loge("drv: Failed to DRM_IOCTL_I915_QUERY\n");
+		return false;
+	}
+	struct drm_i915_query_memory_regions *meminfo = calloc(1, item.length);
+	if (!meminfo) {
+		drv_loge("drv: %s Exit due to memory allocation failure\n", __func__);
+		return false;
+	}
+	item.data_ptr = (uintptr_t)meminfo;
+	if (drmIoctl(drv->fd, DRM_IOCTL_I915_QUERY, &query) || item.length <= 0) {
+		free(meminfo);
+		drv_loge("%s:%d DRM_IOCTL_I915_QUERY error\n", __FUNCTION__, __LINE__);
+		return false;
+	}
+	i915_bo_update_meminfo(i915_dev, meminfo);
+
+	free(meminfo);
+
+	return true;
+}
+
 static int i915_init(struct driver *drv)
 {
 	int ret, val;
@@ -533,6 +684,11 @@ static int i915_init(struct driver *drv)
 		free(i915);
 		return -EINVAL;
 	}
+
+	i915->has_mmap_offset = gem_param(drv->fd, I915_PARAM_MMAP_GTT_VERSION) >= 4;
+	i915->has_fence_reg = gem_param(drv->fd, I915_PARAM_NUM_FENCES_AVAIL) > 0;
+
+	i915_bo_query_meminfo(drv, i915);
 
 	memset(&get_param, 0, sizeof(get_param));
 	get_param.param = I915_PARAM_NUM_FENCES_AVAIL;
@@ -821,6 +977,30 @@ static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t heig
 	return 0;
 }
 
+static bool is_need_local(int64_t use_flags)
+{
+	static bool local = true;
+
+	if (use_flags & BO_USE_SW_READ_RARELY || use_flags & BO_USE_SW_READ_OFTEN ||
+	    use_flags & BO_USE_SW_WRITE_RARELY || use_flags & BO_USE_SW_WRITE_OFTEN) {
+		local = false;
+	} else {
+		local = true;
+	}
+	return local;
+}
+
+static inline void
+intel_gem_add_ext(__u64 *ptr, uint32_t ext_name,
+		struct i915_user_extension *ext) {
+	__u64 *iter = ptr;
+	while (*iter != 0) {
+		iter = (__u64 *) &((struct i915_user_extension *)(uintptr_t)*iter)->next_extension;
+	}
+	ext->name = ext_name;
+	*iter = (uintptr_t) ext;
+}
+
 static int i915_bo_create_from_metadata(struct bo *bo)
 {
 	int ret;
@@ -828,35 +1008,70 @@ static int i915_bo_create_from_metadata(struct bo *bo)
 	uint32_t gem_handle;
 	struct drm_i915_gem_set_tiling gem_set_tiling = { 0 };
 	struct i915_device *i915 = bo->drv->priv;
-
-	if (i915->has_hw_protection && (bo->meta.use_flags & BO_USE_PROTECTED)) {
-		struct drm_i915_gem_create_ext_protected_content protected_content = {
-			.base = { .name = I915_GEM_CREATE_EXT_PROTECTED_CONTENT },
-			.flags = 0,
+	int64_t use_flags = bo->meta.use_flags;
+	bool local = is_need_local(use_flags);
+	
+	if (local && i915->has_local_mem) {
+		/* All new BOs we get from the kernel are zeroed, so we don't need to
+		 * worry about that here.
+		 */
+		struct drm_i915_gem_create_ext gem_create_ext = {
+			.size = ALIGN(bo->meta.total_size, 0x10000),
 		};
 
-		struct drm_i915_gem_create_ext create_ext = {
-			.size = bo->meta.total_size,
-			.extensions = (uintptr_t)&protected_content,
-		};
+		struct drm_i915_gem_memory_class_instance regions[2];
 
-		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_CREATE_EXT, &create_ext);
-		if (ret) {
-			drv_loge("DRM_IOCTL_I915_GEM_CREATE_EXT failed (size=%llu) (ret=%d) \n",
-				 create_ext.size, ret);
-			return -errno;
+		struct drm_i915_gem_create_ext_memory_regions ext_regions = {
+			.base = { .name = I915_GEM_CREATE_EXT_MEMORY_REGIONS },
+			.num_regions = 0,
+			.regions = (uintptr_t)regions,
+		};
+		enum iris_heap heap = flags_to_heap(i915, use_flags);
+		switch (heap) {
+			case IRIS_HEAP_DEVICE_LOCAL_PREFERRED:
+				/* For vram allocations, still use system memory as a fallback. */
+				regions[ext_regions.num_regions++] = i915->vram.region;
+				regions[ext_regions.num_regions++] = i915->sys.region;
+				break;
+			case IRIS_HEAP_DEVICE_LOCAL:
+				regions[ext_regions.num_regions++] = i915->vram.region;
+				break;
+			case IRIS_HEAP_SYSTEM_MEMORY:
+				regions[ext_regions.num_regions++] = i915->sys.region;
+				break;
+			case IRIS_HEAP_MAX:
+				break;
+		}
+		intel_gem_add_ext(&gem_create_ext.extensions,
+				I915_GEM_CREATE_EXT_MEMORY_REGIONS,
+				&ext_regions.base);
+		if (heap == IRIS_HEAP_DEVICE_LOCAL_PREFERRED) {
+			gem_create_ext.flags |= I915_GEM_CREATE_EXT_FLAG_NEEDS_CPU_ACCESS;
 		}
 
-		gem_handle = create_ext.handle;
+		/* It should be safe to use GEM_CREATE_EXT without checking, since we are
+		 * in the side of the branch where discrete memory is available. So we
+		 * can assume GEM_CREATE_EXT is supported already.
+		 */
+		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_CREATE_EXT, &gem_create_ext);
+		if (ret) {
+			drv_loge("drv: DRM_IOCTL_I915_GEM_CREATE_EXT failed (size=%llu)\n",
+				gem_create_ext.size);
+			return -errno;
+		} else {
+			drv_loge("drv: DRM_IOCTL_I915_GEM_CREATE_EXT OK (size=%llu)\n",
+				gem_create_ext.size);
+		}
+		gem_handle = gem_create_ext.handle;
 	} else {
-		struct drm_i915_gem_create gem_create = { 0 };
+		struct drm_i915_gem_create gem_create;
+		memset(&gem_create, 0, sizeof(gem_create));
 		gem_create.size = bo->meta.total_size;
 		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_CREATE, &gem_create);
 		if (ret) {
 			drv_loge("DRM_IOCTL_I915_GEM_CREATE failed (size=%llu)\n", gem_create.size);
 			return -errno;
 		}
-
 		gem_handle = gem_create.handle;
 	}
 
@@ -917,6 +1132,8 @@ static int i915_bo_import(struct bo *bo, struct drv_import_fd_data *data)
 			return ret;
 		}
 		bo->meta.tiling = gem_get_tiling.tiling_mode;
+	} else {
+		bo->meta.tiling = data->tiling;
 	}
 	return 0;
 }
@@ -932,50 +1149,73 @@ static void *i915_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags)
 	    (bo->meta.format_modifier == I915_FORMAT_MOD_4_TILED))
 		return MAP_FAILED;
 
-	if (bo->meta.tiling == I915_TILING_NONE) {
-		if (i915->has_mmap_offset) {
-			struct drm_i915_gem_mmap_offset gem_map = { 0 };
-			gem_map.handle = bo->handles[0].u32;
-			gem_map.flags = I915_MMAP_OFFSET_WB;
+	if (i915->has_mmap_offset) {
+		struct drm_i915_gem_mmap_offset mmap_arg = {
+			.handle = bo->handles[0].u32,
+		};
 
-			/* Get the fake offset back */
-			ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_MMAP_OFFSET, &gem_map);
-			if (ret == 0)
-				addr = mmap(0, bo->meta.total_size, drv_get_prot(map_flags),
-					    MAP_SHARED, bo->drv->fd, gem_map.offset);
+		if (i915->has_local_mem) {
+			mmap_arg.flags = I915_MMAP_OFFSET_FIXED;
 		} else {
-			struct drm_i915_gem_mmap gem_map = { 0 };
-			/* TODO(b/118799155): We don't seem to have a good way to
-			 * detect the use cases for which WC mapping is really needed.
-			 * The current heuristic seems overly coarse and may be slowing
-			 * down some other use cases unnecessarily.
-			 *
-			 * For now, care must be taken not to use WC mappings for
-			 * Renderscript and camera use cases, as they're
-			 * performance-sensitive. */
+			mmap_arg.flags = I915_MMAP_OFFSET_WC;
+		}
+
+		/* Get the fake offset back */
+		int ret = gen_ioctl(bo->drv->fd, DRM_IOCTL_I915_GEM_MMAP_OFFSET, &mmap_arg);
+		if (ret != 0 && mmap_arg.flags == I915_MMAP_OFFSET_FIXED) {
 			if ((bo->meta.use_flags & BO_USE_SCANOUT) &&
 			    !(bo->meta.use_flags &
-			      (BO_USE_RENDERSCRIPT | BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE)))
-				gem_map.flags = I915_MMAP_WC;
+			      (BO_USE_RENDERSCRIPT | BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE))) {
+				mmap_arg.flags = I915_MMAP_OFFSET_WC;
+			} else {
+				mmap_arg.flags = I915_MMAP_OFFSET_WB;
+			}
 
-			gem_map.handle = bo->handles[0].u32;
-			gem_map.offset = 0;
-			gem_map.size = bo->meta.total_size;
-
-			ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_MMAP, &gem_map);
-			/* DRM_IOCTL_I915_GEM_MMAP mmaps the underlying shm
-			 * file and returns a user space address directly, ie,
-			 * doesn't go through mmap. If we try that on a
-			 * dma-buf that doesn't have a shm file, i915.ko
-			 * returns ENXIO.  Fall through to
-			 * DRM_IOCTL_I915_GEM_MMAP_GTT in that case, which
-			 * will mmap on the drm fd instead. */
-			if (ret == 0)
-				addr = (void *)(uintptr_t)gem_map.addr_ptr;
+			ret = gen_ioctl(bo->drv->fd, DRM_IOCTL_I915_GEM_MMAP_OFFSET, &mmap_arg);
 		}
-	}
 
-	if (addr == MAP_FAILED) {
+		if (ret != 0) {
+			drv_loge("drv: DRM_IOCTL_I915_GEM_MMAP_OFFSET failed ret=%d, errno=0x%x\n",
+				ret, errno);
+			return MAP_FAILED;
+		}
+
+		drv_loge("%s : %d : handle = %x, size = %zd, mmpa_arg.offset = %llx", __func__,
+			__LINE__, mmap_arg.handle, bo->meta.total_size, mmap_arg.offset);
+
+		/* And map it */
+		addr = mmap(0, bo->meta.total_size, PROT_READ | PROT_WRITE, MAP_SHARED, bo->drv->fd,
+			    mmap_arg.offset);
+	} else if (bo->meta.tiling == I915_TILING_NONE) {
+		struct drm_i915_gem_mmap gem_map = { 0 };
+		/* TODO(b/118799155): We don't seem to have a good way to
+			* detect the use cases for which WC mapping is really needed.
+			* The current heuristic seems overly coarse and may be slowing
+			* down some other use cases unnecessarily.
+			*
+			* For now, care must be taken not to use WC mappings for
+			* Renderscript and camera use cases, as they're
+			* performance-sensitive. */
+		if ((bo->meta.use_flags & BO_USE_SCANOUT) &&
+			!(bo->meta.use_flags &
+				(BO_USE_RENDERSCRIPT | BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE)))
+			gem_map.flags = I915_MMAP_WC;
+
+		gem_map.handle = bo->handles[0].u32;
+		gem_map.offset = 0;
+		gem_map.size = bo->meta.total_size;
+
+		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_MMAP, &gem_map);
+		/* DRM_IOCTL_I915_GEM_MMAP mmaps the underlying shm
+			* file and returns a user space address directly, ie,
+			* doesn't go through mmap. If we try that on a
+			* dma-buf that doesn't have a shm file, i915.ko
+			* returns ENXIO.  Fall through to
+			* DRM_IOCTL_I915_GEM_MMAP_GTT in that case, which
+			* will mmap on the drm fd instead. */
+		if (ret == 0)
+			addr = (void *)(uintptr_t)gem_map.addr_ptr;
+	}else {
 		struct drm_i915_gem_mmap_gtt gem_map = { 0 };
 
 		gem_map.handle = bo->handles[0].u32;
