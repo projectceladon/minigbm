@@ -163,7 +163,7 @@ cros_gralloc_driver::cros_gralloc_driver()
 		node_fd[availabe_node] = fd;
 		int len = snprintf(NULL, 0, "%s", version->name);
 		node_name[availabe_node] = (char *)malloc(len + 1);
-		strcpy(node_name[availabe_node], version->name);
+		strncpy(node_name[availabe_node], version->name, name_length);
 		availabe_node++;
 
 		drmFreeVersion(version);
