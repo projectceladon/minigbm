@@ -55,10 +55,6 @@ class cros_gralloc_driver
 			 const std::function<void(cros_gralloc_buffer *)> &function);
 	void with_each_buffer(const std::function<void(cros_gralloc_buffer *)> &function);
 	uint32_t get_resolved_common_drm_format(uint32_t drm_format);
-	bool is_kmsro_enabled()
-	{
-		return drv_kms_ != drv_render_;
-	};
 
       private:
 	cros_gralloc_driver();
@@ -87,7 +83,6 @@ class cros_gralloc_driver
 		int32_t refcount = 1;
 	};
 
-	struct driver *drv_kms_ = nullptr;
 	struct driver *drv_render_ = nullptr;
 	std::mutex mutex_;
 	std::unordered_map<uint32_t, std::unique_ptr<cros_gralloc_buffer>> buffers_;
