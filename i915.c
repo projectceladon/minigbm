@@ -15,6 +15,7 @@
 #include <sys/mman.h>
 #include <unistd.h>
 #include <xf86drm.h>
+#include <cutils/properties.h>
 
 #include "drv_helpers.h"
 #include "drv_priv.h"
@@ -25,6 +26,7 @@
 #define I915_CACHELINE_SIZE 64
 #define I915_CACHELINE_MASK (I915_CACHELINE_SIZE - 1)
 
+static bool is_prelim_kernel = false;
 static const uint32_t scanout_render_formats[] = { DRM_FORMAT_ABGR2101010, DRM_FORMAT_ABGR8888,
 						   DRM_FORMAT_ARGB2101010, DRM_FORMAT_ARGB8888,
 						   DRM_FORMAT_RGB565,	   DRM_FORMAT_XBGR2101010,
@@ -92,6 +94,7 @@ struct i915_device {
 	bool has_local_mem;
 	bool has_fence_reg;
 	struct iris_memregion vram, sys;
+	bool force_mem_local;
 	/*TODO : cleanup is_mtl to avoid adding variables for every new platforms */
 	bool is_mtl;
 	int32_t num_fences_avail;
@@ -620,6 +623,67 @@ static void i915_bo_update_meminfo(struct i915_device *i915_dev,
 	}
 }
 
+static void prelim_i915_bo_update_meminfo(struct i915_device *i915_dev,
+				   const struct prelim_drm_i915_query_memory_regions *meminfo)
+{
+	i915_dev->has_local_mem = false;
+	for (uint32_t i = 0; i < meminfo->num_regions; i++) {
+		const struct prelim_drm_i915_memory_region_info *mem = &meminfo->regions[i];
+		switch (mem->region.memory_class) {
+		case I915_MEMORY_CLASS_SYSTEM:
+			i915_dev->sys.region = mem->region;
+			i915_dev->sys.size = mem->probed_size;
+			break;
+		case I915_MEMORY_CLASS_DEVICE:
+			i915_dev->vram.region = mem->region;
+			i915_dev->vram.size = mem->probed_size;
+			i915_dev->has_local_mem = i915_dev->vram.size > 0;
+			break;
+		default:
+			break;
+		}
+	}
+}
+
+static bool i915_bo_query_prelim_meminfo(struct driver *drv, struct i915_device *i915_dev)
+{
+	struct drm_i915_query_item item = {
+		.query_id = PRELIM_DRM_I915_QUERY_MEMORY_REGIONS,
+	};
+
+	struct drm_i915_query query = {
+		.num_items = 1, .items_ptr = (uintptr_t)&item,
+	};
+	int ret = 0;
+	ret = drmIoctl(drv->fd, DRM_IOCTL_I915_QUERY, &query);
+	if (ret < 0) {
+		drv_loge("drv: Failed to query PRELIM_DRM_I915_QUERY_MEMORY_REGIONS\n");
+		return false;
+	}
+	if (item.length <= 0) {
+		drv_loge("drv: Invalid memory region length\n");
+		return false;
+	}
+	struct prelim_drm_i915_query_memory_regions *meminfo = calloc(1, item.length);
+	if (!meminfo) {
+		 drv_loge("drv: %s Exit due to memory allocation failure\n", __func__);
+		return false;
+	}
+	item.data_ptr = (uintptr_t)meminfo;
+	ret = drmIoctl(drv->fd, DRM_IOCTL_I915_QUERY, &query);
+	if (ret < 0 || item.length <= 0) {
+		free(meminfo);
+		drv_loge("%s:%d DRM_IOCTL_I915_QUERY error\n", __FUNCTION__, __LINE__);
+		return false;
+	}
+	prelim_i915_bo_update_meminfo(i915_dev, meminfo);
+
+	free(meminfo);
+
+	is_prelim_kernel = true;
+	return true;
+}
+
 static bool i915_bo_query_meminfo(struct driver *drv, struct i915_device *i915_dev)
 {
 	struct drm_i915_query_item item = {
@@ -687,7 +751,20 @@ static int i915_init(struct driver *drv)
 	i915->has_mmap_offset = gem_param(drv->fd, I915_PARAM_MMAP_GTT_VERSION) >= 4;
 	i915->has_fence_reg = gem_param(drv->fd, I915_PARAM_NUM_FENCES_AVAIL) > 0;
 
-	i915_bo_query_meminfo(drv, i915);
+	if (!i915_bo_query_prelim_meminfo(drv, i915)) {
+		drv_loge("drv: Kernel does not support prelim\n");
+		i915_bo_query_meminfo(drv, i915);
+	} else {
+		drv_loge("drv: kernel supports prelim\n");
+	}
+#define FORCE_MEM_PROP "sys.icr.gralloc.force_mem"
+	char prop[PROPERTY_VALUE_MAX];
+	i915->force_mem_local = (i915->vram.size > 0) &&
+				property_get(FORCE_MEM_PROP, prop, "local") > 0 &&
+				!strcmp(prop, "local");
+	if (i915->force_mem_local) {
+		drv_loge("Force to use local memory");
+	}
 
 	memset(&get_param, 0, sizeof(get_param));
 	get_param.param = I915_PARAM_NUM_FENCES_AVAIL;
@@ -1011,57 +1088,97 @@ static int i915_bo_create_from_metadata(struct bo *bo)
 	bool local = is_need_local(use_flags);
 	
 	if (local && i915->has_local_mem) {
-		/* All new BOs we get from the kernel are zeroed, so we don't need to
-		 * worry about that here.
-		 */
-		struct drm_i915_gem_create_ext gem_create_ext = {
-			.size = ALIGN(bo->meta.total_size, 0x10000),
-		};
+		if (!is_prelim_kernel) {
+			/* All new BOs we get from the kernel are zeroed, so we don't need to
+			 * worry about that here.
+			 */
+			struct drm_i915_gem_create_ext gem_create_ext = {
+				.size = ALIGN(bo->meta.total_size, 0x10000),
+			};
 
-		struct drm_i915_gem_memory_class_instance regions[2];
+			struct drm_i915_gem_memory_class_instance regions[2];
 
-		struct drm_i915_gem_create_ext_memory_regions ext_regions = {
-			.base = { .name = I915_GEM_CREATE_EXT_MEMORY_REGIONS },
-			.num_regions = 0,
-			.regions = (uintptr_t)regions,
-		};
-		enum iris_heap heap = flags_to_heap(i915, use_flags);
-		switch (heap) {
-			case IRIS_HEAP_DEVICE_LOCAL_PREFERRED:
-				/* For vram allocations, still use system memory as a fallback. */
-				regions[ext_regions.num_regions++] = i915->vram.region;
-				regions[ext_regions.num_regions++] = i915->sys.region;
-				break;
-			case IRIS_HEAP_DEVICE_LOCAL:
-				regions[ext_regions.num_regions++] = i915->vram.region;
-				break;
-			case IRIS_HEAP_SYSTEM_MEMORY:
-				regions[ext_regions.num_regions++] = i915->sys.region;
-				break;
-			case IRIS_HEAP_MAX:
-				break;
-		}
-		intel_gem_add_ext(&gem_create_ext.extensions,
-				I915_GEM_CREATE_EXT_MEMORY_REGIONS,
-				&ext_regions.base);
-		if (heap == IRIS_HEAP_DEVICE_LOCAL_PREFERRED) {
-			gem_create_ext.flags |= I915_GEM_CREATE_EXT_FLAG_NEEDS_CPU_ACCESS;
-		}
+			struct drm_i915_gem_create_ext_memory_regions ext_regions = {
+				.base = { .name = I915_GEM_CREATE_EXT_MEMORY_REGIONS },
+				.num_regions = 0,
+				.regions = (uintptr_t)regions,
+			};
+			enum iris_heap heap = flags_to_heap(i915, use_flags);
+			switch (heap) {
+				case IRIS_HEAP_DEVICE_LOCAL_PREFERRED:
+					/* For vram allocations, still use system memory as a fallback. */
+					regions[ext_regions.num_regions++] = i915->vram.region;
+					regions[ext_regions.num_regions++] = i915->sys.region;
+					break;
+				case IRIS_HEAP_DEVICE_LOCAL:
+					regions[ext_regions.num_regions++] = i915->vram.region;
+					break;
+				case IRIS_HEAP_SYSTEM_MEMORY:
+					regions[ext_regions.num_regions++] = i915->sys.region;
+					break;
+				case IRIS_HEAP_MAX:
+					break;
+			}
+			intel_gem_add_ext(&gem_create_ext.extensions,
+					I915_GEM_CREATE_EXT_MEMORY_REGIONS,
+					&ext_regions.base);
 
-		/* It should be safe to use GEM_CREATE_EXT without checking, since we are
-		 * in the side of the branch where discrete memory is available. So we
-		 * can assume GEM_CREATE_EXT is supported already.
-		 */
-		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_CREATE_EXT, &gem_create_ext);
-		if (ret) {
-			drv_loge("drv: DRM_IOCTL_I915_GEM_CREATE_EXT failed (size=%llu)\n",
-				gem_create_ext.size);
-			return -errno;
+			if (heap == IRIS_HEAP_DEVICE_LOCAL_PREFERRED) {
+				gem_create_ext.flags |= I915_GEM_CREATE_EXT_FLAG_NEEDS_CPU_ACCESS;
+			}
+			/* It should be safe to use GEM_CREATE_EXT without checking, since we are
+			 * in the side of the branch where discrete memory is available. So we
+			 * can assume GEM_CREATE_EXT is supported already.
+			 */
+			ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_CREATE_EXT, &gem_create_ext);
+			if (ret) {
+				drv_loge("drv: DRM_IOCTL_I915_GEM_CREATE_EXT failed (size=%llu)\n",
+					gem_create_ext.size);
+				return -errno;
+			} else {
+				drv_loge("drv: DRM_IOCTL_I915_GEM_CREATE_EXT OK (size=%llu)\n",
+					gem_create_ext.size);
+			}
+			gem_handle = gem_create_ext.handle;
+
 		} else {
-			drv_loge("drv: DRM_IOCTL_I915_GEM_CREATE_EXT OK (size=%llu)\n",
-				gem_create_ext.size);
+			struct prelim_drm_i915_gem_memory_class_instance regions[2];
+			uint32_t nregions = 0;
+			if (i915->force_mem_local) {
+				/* For vram allocations, still use system memory as a fallback. */
+				regions[nregions++] = i915->vram.region;
+				regions[nregions++] = i915->sys.region;
+			} else {
+				regions[nregions++] = i915->sys.region;
+			}
+
+			struct prelim_drm_i915_gem_object_param region_param = {
+				.size = nregions,
+				.data = (uintptr_t)regions,
+				.param = PRELIM_I915_OBJECT_PARAM | PRELIM_I915_PARAM_MEMORY_REGIONS,
+			};
+
+			struct prelim_drm_i915_gem_create_ext_setparam setparam_region = {
+				.base = { .name = PRELIM_I915_GEM_CREATE_EXT_SETPARAM },
+				.param = region_param,
+			};
+
+			struct prelim_drm_i915_gem_create_ext gem_create_ext = {
+				.size = ALIGN(bo->meta.total_size, 0x10000),
+				.extensions = (uintptr_t)&setparam_region,
+			};
+			/* It should be safe to use GEM_CREATE_EXT without checking, since we are
+			 * in the side of the branch where discrete memory is available. So we
+			 * can assume GEM_CREATE_EXT is supported already.
+			 */
+			ret = drmIoctl(bo->drv->fd, PRELIM_DRM_IOCTL_I915_GEM_CREATE_EXT, &gem_create_ext);
+			if (ret) {
+				drv_loge("drv: PRELIM_DRM_IOCTL_I915_GEM_CREATE_EXT failed (size=%llu)\n",
+					gem_create_ext.size);
+				return -errno;
+			}
+			gem_handle = gem_create_ext.handle;
 		}
-		gem_handle = gem_create_ext.handle;
 	} else {
 		struct drm_i915_gem_create gem_create;
 		memset(&gem_create, 0, sizeof(gem_create));
