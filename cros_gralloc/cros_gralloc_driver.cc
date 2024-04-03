@@ -210,9 +210,7 @@ cros_gralloc_driver::cros_gralloc_driver()
 		}
 
 		if (drv_render_) {
-			if (drv_init(drv_render_, gpu_grp_type)) {
-				drv_loge("Failed to init render driver\n");
-			}
+			drv_init(drv_render_, gpu_grp_type);
 		}
 	}
 
