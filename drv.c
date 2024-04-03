@@ -105,6 +105,7 @@ static const struct backend *drv_get_backend(int fd)
 struct driver *drv_create(int fd)
 {
 	struct driver *drv;
+	int ret;
 
 	drv = (struct driver *)calloc(1, sizeof(*drv));
 
@@ -139,6 +140,14 @@ struct driver *drv_create(int fd)
 	if (!drv->combos)
 		goto free_mappings;
 
+	if (drv->backend->init) {
+		ret = drv->backend->init(drv);
+		if (ret) {
+			drv_array_destroy(drv->combos);
+			goto free_mappings;
+		}
+	}
+
 	return drv;
 
 free_mappings:
@@ -154,18 +163,13 @@ free_driver:
 	return NULL;
 }
 
-int drv_init(struct driver * drv, uint32_t grp_type)
+void drv_init(struct driver * drv, uint32_t grp_type)
 {
 	int ret = 0;
 	assert(drv);
 	assert(drv->backend);
 
 	drv->gpu_grp_type = grp_type;
-
-	if (drv->backend->init) {
-		ret = drv->backend->init(drv);
-	}
-	return ret;
 }
 
 void drv_destroy(struct driver *drv)
