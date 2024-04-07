@@ -494,8 +494,8 @@ static int i915_add_combinations(struct driver *drv)
 static int i915_align_dimensions(struct bo *bo, uint32_t format, uint32_t tiling, uint32_t *stride,
 				 uint32_t *aligned_height)
 {
-	uint32_t horizontal_alignment;
-	uint32_t vertical_alignment;
+	uint32_t horizontal_alignment = 64;
+	uint32_t vertical_alignment = 4;
 	struct i915_device *i915 = bo->drv->priv;
 	if (i915->graphics_version >= 125) {
 		horizontal_alignment = 4;
