@@ -104,7 +104,7 @@ int32_t cros_gralloc_driver::init()
 		}
 
 		node_fd[availabe_node] = fd;
-		strcpy(node_name[availabe_node], version->name);
+		strncpy(node_name[availabe_node], version->name, name_length);
 		availabe_node++;
 
 		drmFreeVersion(version);
