@@ -202,7 +202,7 @@ static void i915_info_from_device_id(struct i915_device *i915)
 	const uint16_t mtl_ids[] = { 0x7D40, 0x7D60, 0x7D45, 0x7D55, 0x7DD5 };
 
 	unsigned i;
-	i915->graphics_version  = 120;
+	i915->graphics_version = 120;
 	i915->is_xelpd = false;
 	i915->is_mtl = false;
 	/* Gen 4 */
@@ -938,8 +938,8 @@ static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t heig
 		break;
 	case I915_FORMAT_MOD_Y_TILED:
 	case I915_FORMAT_MOD_Y_TILED_CCS:
-       case I915_FORMAT_MOD_Yf_TILED:
-       case I915_FORMAT_MOD_Yf_TILED_CCS:
+	case I915_FORMAT_MOD_Yf_TILED:
+	case I915_FORMAT_MOD_Yf_TILED_CCS:
 
 	/* For now support only I915_TILING_Y as this works with all
 	 * IPs(render/media/display)
@@ -1191,7 +1191,7 @@ static int i915_bo_create_from_metadata(struct bo *bo)
 	/* Set/Get tiling ioctl not supported  based on fence availability
 	   Refer : "https://patchwork.freedesktop.org/patch/325343/"
 	 */
-	if (i915->graphics_version != 125) {
+	if ((i915->graphics_version != 125) && (i915->is_mtl != true)) {
 		gem_set_tiling.handle = bo->handles[0].u32;
 		gem_set_tiling.tiling_mode = bo->meta.tiling;
 		gem_set_tiling.stride = bo->meta.strides[0];
@@ -1231,7 +1231,7 @@ static int i915_bo_import(struct bo *bo, struct drv_import_fd_data *data)
 	/* Set/Get tiling ioctl not supported  based on fence availability
 	   Refer : "https://patchwork.freedesktop.org/patch/325343/"
 	 */
-	if (i915->graphics_version != 125) {
+	if ((i915->graphics_version != 125) && (i915->is_mtl != true)) {
 		/* TODO(gsingh): export modifiers and get rid of backdoor tiling. */
 		gem_get_tiling.handle = bo->handles[0].u32;
 
