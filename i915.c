@@ -345,7 +345,6 @@ static int i915_align_dimensions(struct bo *bo, uint32_t tiling, uint32_t *strid
 	}
 
 	switch (tiling) {
-	default:
 	case I915_TILING_NONE:
 		/*
 		 * The Intel GPU doesn't need any alignment in linear mode,
@@ -372,7 +371,12 @@ static int i915_align_dimensions(struct bo *bo, uint32_t tiling, uint32_t *strid
 		horizontal_alignment = 128;
 		vertical_alignment = 32;
 		break;
+	
+	default:
+		break;
 	}
+
+
 
 	*aligned_height = ALIGN(*aligned_height, vertical_alignment);
 
@@ -476,7 +480,6 @@ static bool i915_bo_query_prelim_meminfo(struct driver *drv, struct i915_device 
 		return false;
 	}
 	if (item.length <= 0) {
-		drv_log("drv: Invalid memory region length\n");
 		return false;
 	}
 	struct prelim_drm_i915_query_memory_regions *meminfo = calloc(1, item.length);
@@ -567,7 +570,6 @@ static int i915_init(struct driver *drv)
 	i915->has_fence_reg = gem_param(drv->fd, I915_PARAM_NUM_FENCES_AVAIL) > 0;
 
 	if (!i915_bo_query_prelim_meminfo(drv, i915)) {
-		drv_info("drv: Kernel does not support prelim\n");
 		i915_bo_query_meminfo(drv, i915);
 	} else {
 		drv_info("drv: kernel supports prelim\n");
