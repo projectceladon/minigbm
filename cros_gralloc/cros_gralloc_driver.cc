@@ -444,11 +444,8 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 	hnd->producer_usage = descriptor->producer_usage;
 	hnd->consumer_usage = descriptor->consumer_usage;
 #endif
-	format = cros_gralloc_invert_format(hnd->format);
-	if (format == 0) {
-		format = descriptor->droid_format;
-	}
-	hnd->droid_format = format;
+
+	hnd->droid_format = descriptor->droid_format;
 	hnd->usage = descriptor->droid_usage;
 	hnd->total_size = descriptor->reserved_region_size + drv_bo_get_total_size(bo);
 
