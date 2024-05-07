@@ -77,6 +77,8 @@ extern "C" {
 #define DRM_FORMAT_P010 fourcc_code('P', '0', '1', '0')
 #endif
 
+#define DRM_FORMAT_YCBCR_P010 fourcc_code('P', '0', '0', '9')
+
 /*
  * 2 plane YCbCr MSB aligned
  * index 0 = Y plane, [15:0] Y:x [12:4] little endian
