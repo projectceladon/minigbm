@@ -106,23 +106,26 @@ uint64_t cros_gralloc1_convert_map_usage(uint64_t producer_flags, uint64_t consu
 
 #ifdef USE_GRALLOC1
 bool IsSupportedYUVFormat(uint32_t droid_format) {
-   switch (droid_format) {
-       case HAL_PIXEL_FORMAT_YCbCr_420_888:
-       case HAL_PIXEL_FORMAT_YV12:
-       case HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED:
-       case HAL_PIXEL_FORMAT_NV12:
-       case HAL_PIXEL_FORMAT_NV12_Y_TILED_INTEL:
-       case HAL_PIXEL_FORMAT_YCbCr_422_I:
-       case HAL_PIXEL_FORMAT_YCbCr_422_888:
-       case HAL_PIXEL_FORMAT_YCbCr_444_888:
-       case HAL_PIXEL_FORMAT_YCrCb_420_SP:
-       case HAL_PIXEL_FORMAT_Y16:
-       case HAL_PIXEL_FORMAT_P010_INTEL:
-               return true;
-       default:
-               return false;
-       }
-       return false;
+	switch (droid_format) {
+	case HAL_PIXEL_FORMAT_YCbCr_420_888:
+	case HAL_PIXEL_FORMAT_YV12:
+	case HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED:
+	case HAL_PIXEL_FORMAT_NV12:
+	case HAL_PIXEL_FORMAT_NV12_Y_TILED_INTEL:
+	case HAL_PIXEL_FORMAT_YCbCr_422_I:
+	case HAL_PIXEL_FORMAT_YCbCr_422_888:
+	case HAL_PIXEL_FORMAT_YCbCr_444_888:
+	case HAL_PIXEL_FORMAT_YCrCb_420_SP:
+	case HAL_PIXEL_FORMAT_Y16:
+	case HAL_PIXEL_FORMAT_P010_INTEL:
+#if ANDROID_API_LEVEL >= 30
+	case HAL_PIXEL_FORMAT_YCBCR_P010:
+#endif
+		return true;
+	default:
+		return false;
+	}
+	return false;
 }
 #endif
 
@@ -604,6 +607,7 @@ int32_t CrosGralloc1::lockYCbCr(buffer_handle_t bufferHandle,
 		ycbcr->chroma_step = 1;
 		break;
 	case DRM_FORMAT_P010:
+	case DRM_FORMAT_P010_INTEL:
 		ycbcr->y = addr[0];
 		ycbcr->cb = addr[1];
 		ycbcr->cr = addr[1] + 2;
