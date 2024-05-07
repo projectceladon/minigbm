@@ -91,6 +91,7 @@ static uint32_t translate_format(uint32_t drm_fourcc)
 	case DRM_FORMAT_NV21:
 		return VIRGL_FORMAT_NV21;
 	case DRM_FORMAT_P010:
+	case DRM_FORMAT_YCBCR_P010:
 		return VIRGL_FORMAT_P010;
 	case DRM_FORMAT_YVU420:
 	case DRM_FORMAT_YVU420_ANDROID:
@@ -639,6 +640,9 @@ static int virgl_init(struct driver *drv)
 	 * Camera preview and is expected to be conditionally stripped by virgl_add_combination
 	 * when not natively supported and instead handled by HWComposer. */
 	virgl_add_combination(drv, DRM_FORMAT_P010, &LINEAR_METADATA,
+			      BO_USE_SCANOUT | BO_USE_TEXTURE | BO_USE_SW_MASK |
+				  BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE);
+	virgl_add_combination(drv, DRM_FORMAT_YCBCR_P010, &LINEAR_METADATA,
 			      BO_USE_SCANOUT | BO_USE_TEXTURE | BO_USE_SW_MASK |
 				  BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE);
 	/* Android VTS sensors hal tests require BO_USE_SENSOR_DIRECT_DATA. */

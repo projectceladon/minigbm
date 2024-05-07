@@ -296,6 +296,28 @@ const std::unordered_map<uint32_t, std::vector<PlaneLayout>>& GetPlaneLayoutsMap
                               .verticalSubsampling = 2,
                       }}},
 
+                    {DRM_FORMAT_YCBCR_P010,
+                     {{
+                              .components = {{.type = android::gralloc4::PlaneLayoutComponentType_Y,
+                                              .offsetInBits = 6,
+                                              .sizeInBits = 10}},
+                              .sampleIncrementInBits = 16,
+                              .horizontalSubsampling = 1,
+                              .verticalSubsampling = 1,
+                      },
+                      {
+                              .components =
+                                      {{.type = android::gralloc4::PlaneLayoutComponentType_CB,
+                                        .offsetInBits = 6,
+                                        .sizeInBits = 10},
+                                       {.type = android::gralloc4::PlaneLayoutComponentType_CR,
+                                        .offsetInBits = 22,
+                                        .sizeInBits = 10}},
+                              .sampleIncrementInBits = 32,
+                              .horizontalSubsampling = 2,
+                              .verticalSubsampling = 2,
+                      }}},
+
                     {DRM_FORMAT_R8,
                      {{
                              .components = {{.type = android::gralloc4::PlaneLayoutComponentType_R,
@@ -441,24 +463,25 @@ int getPlaneLayouts(uint32_t drmFormat, std::vector<PlaneLayout>* outPlaneLayout
     return 0;
 }
 
-#ifdef USE_GRALLOC1
 bool IsSupportedYUVFormat(uint32_t droid_format) {
-   switch (droid_format) {
-       case HAL_PIXEL_FORMAT_YCbCr_420_888:
-       case HAL_PIXEL_FORMAT_YV12:
-       case HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED:
-       case HAL_PIXEL_FORMAT_NV12:
-       case HAL_PIXEL_FORMAT_NV12_Y_TILED_INTEL:
-       case HAL_PIXEL_FORMAT_YCbCr_422_I:
-       case HAL_PIXEL_FORMAT_YCbCr_422_888:
-       case HAL_PIXEL_FORMAT_YCbCr_444_888:
-       case HAL_PIXEL_FORMAT_YCrCb_420_SP:
-       case HAL_PIXEL_FORMAT_Y16:
-       case HAL_PIXEL_FORMAT_P010_INTEL:
-               return true;
-       default:
-               return false;
-       }
-       return false;
-}
+    switch (droid_format) {
+    case HAL_PIXEL_FORMAT_YCbCr_420_888:
+    case HAL_PIXEL_FORMAT_YV12:
+    case HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED:
+    case HAL_PIXEL_FORMAT_NV12:
+    case HAL_PIXEL_FORMAT_NV12_Y_TILED_INTEL:
+    case HAL_PIXEL_FORMAT_YCbCr_422_I:
+    case HAL_PIXEL_FORMAT_YCbCr_422_888:
+    case HAL_PIXEL_FORMAT_YCbCr_444_888:
+    case HAL_PIXEL_FORMAT_YCrCb_420_SP:
+    case HAL_PIXEL_FORMAT_Y16:
+    case HAL_PIXEL_FORMAT_P010_INTEL:
+#if ANDROID_API_LEVEL >= 30
+    case HAL_PIXEL_FORMAT_YCBCR_P010:
 #endif
+        return true;
+    default:
+        return false;
+    }
+    return false;
+}

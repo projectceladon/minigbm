@@ -37,14 +37,14 @@ static const uint32_t render_formats[] = { DRM_FORMAT_ABGR16161616F };
 
 static const uint32_t texture_only_formats[] = { DRM_FORMAT_R8, DRM_FORMAT_NV12, DRM_FORMAT_P010,
 						 DRM_FORMAT_YVU420, DRM_FORMAT_YVU420_ANDROID,
-						 DRM_FORMAT_YUYV };
+						 DRM_FORMAT_YUYV, DRM_FORMAT_YCBCR_P010 };
 
 static const uint32_t linear_source_formats[] = { DRM_FORMAT_R16,    DRM_FORMAT_NV16,
                                                  DRM_FORMAT_YUV420, DRM_FORMAT_YUV422,
                                                  DRM_FORMAT_YUV444, DRM_FORMAT_NV21,
-                                                 DRM_FORMAT_P010 };
+                                                 DRM_FORMAT_P010, DRM_FORMAT_YCBCR_P010 };
 
-static const uint32_t source_formats[] = { DRM_FORMAT_P010, DRM_FORMAT_NV12_Y_TILED_INTEL };
+static const uint32_t source_formats[] = { DRM_FORMAT_P010, DRM_FORMAT_NV12_Y_TILED_INTEL, DRM_FORMAT_YCBCR_P010 };
 
 struct iris_memregion {
 	struct drm_i915_gem_memory_class_instance region;
@@ -447,6 +447,7 @@ static int i915_add_combinations(struct driver *drv)
 #endif
 		drv_add_combination(drv, DRM_FORMAT_NV12, &metadata_4_tiled, nv12_usage);
 		drv_add_combination(drv, DRM_FORMAT_P010, &metadata_4_tiled, p010_usage);
+		drv_add_combination(drv, DRM_FORMAT_YCBCR_P010, &metadata_4_tiled, p010_usage);
 		drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats),
 				     &metadata_4_tiled, render_not_linear);
 		drv_add_combinations(drv, scanout_render_formats,
@@ -476,6 +477,7 @@ static int i915_add_combinations(struct driver *drv)
 #endif
 		drv_add_combination(drv, DRM_FORMAT_NV12, &metadata_y_tiled, nv12_usage);
 		drv_add_combination(drv, DRM_FORMAT_P010, &metadata_y_tiled, p010_usage);
+		drv_add_combination(drv, DRM_FORMAT_YCBCR_P010, &metadata_y_tiled, p010_usage);
 		drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats),
 				     &metadata_y_tiled, render_not_linear);
 		/* Y-tiled scanout isn't available on old platforms so we add
@@ -815,6 +817,7 @@ static bool i915_format_needs_LCU_alignment(uint32_t format, size_t plane,
 	switch (format) {
 	case DRM_FORMAT_NV12:
 	case DRM_FORMAT_P010:
+	case DRM_FORMAT_YCBCR_P010:
 	case DRM_FORMAT_P016:
 		return (i915->graphics_version == 11 || i915->graphics_version == 12) && plane == 1;
 	}
@@ -895,7 +898,7 @@ static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t heig
 	 * i915 only supports linear/x-tiled above 4096 wide on Gen9/Gen10 GPU.
 	 * VAAPI decode in NV12 Y tiled format so skip modifier change for NV12/P010 huge bo.
 	 */
-	if (huge_bo && format != DRM_FORMAT_NV12 && format != DRM_FORMAT_P010 &&
+	if (huge_bo && format != DRM_FORMAT_NV12 && format != DRM_FORMAT_P010 && format != DRM_FORMAT_YCBCR_P010 &&
 	    modifier != I915_FORMAT_MOD_X_TILED && modifier != DRM_FORMAT_MOD_LINEAR) {
 		uint32_t i;
 		for (i = 0; modifiers && i < count; i++) {

@@ -604,6 +604,7 @@ int32_t CrosGralloc1::lockYCbCr(buffer_handle_t bufferHandle,
 		ycbcr->chroma_step = 1;
 		break;
 	case DRM_FORMAT_P010:
+	case DRM_FORMAT_YCBCR_P010:
 		ycbcr->y = addr[0];
 		ycbcr->cb = addr[1];
 		ycbcr->cr = addr[1] + 2;
