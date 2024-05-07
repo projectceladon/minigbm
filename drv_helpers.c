@@ -108,6 +108,7 @@ static const struct planar_layout *layout_from_format(uint32_t format)
 		return &biplanar_yuv_420_layout;
 
 	case DRM_FORMAT_P010:
+	case DRM_FORMAT_P010_INTEL:
 		return &biplanar_yuv_p010_layout;
 
 	case DRM_FORMAT_ABGR1555:
@@ -189,6 +190,7 @@ size_t drv_num_planes_from_format(uint32_t format)
                case DRM_FORMAT_NV12_Y_TILED_INTEL:
                case DRM_FORMAT_NV16:
                case DRM_FORMAT_P010:
+	       case DRM_FORMAT_P010_INTEL:
                        return 2;
                case DRM_FORMAT_YUV420:
                case DRM_FORMAT_YUV422:
@@ -377,6 +379,7 @@ int drv_dumb_bo_create_ex(struct bo *bo, uint32_t width, uint32_t height, uint32
 	case DRM_FORMAT_NV12:
 	case DRM_FORMAT_NV21:
 	case DRM_FORMAT_P010:
+	case DRM_FORMAT_P010_INTEL:
 		/* Adjust the height to include room for chroma planes */
 		aligned_height = 3 * DIV_ROUND_UP(height, 2);
 		break;
