@@ -434,7 +434,7 @@ static int i915_add_combinations(struct driver *drv)
 	if (i915_has_tile4(i915)) {
 		struct format_metadata metadata_4_tiled = { .tiling = I915_TILING_4,
 							    .priority = 3,
-							    .modifier = I915_FORMAT_MOD_4_TILED };	
+							    .modifier = I915_FORMAT_MOD_4_TILED };
 /* Support tile4 NV12 and P010 for libva */
 #ifdef I915_SCANOUT_4_TILED
 		const uint64_t nv12_usage =
@@ -751,7 +751,7 @@ static int i915_init(struct driver *drv)
 	if (!i915_bo_query_prelim_meminfo(drv, i915)) {
 		i915_bo_query_meminfo(drv, i915);
 	} else {
-		drv_loge("drv: kernel supports prelim\n");
+		drv_logi("drv: kernel supports prelim\n");
 	}
 #define FORCE_MEM_PROP "sys.icr.gralloc.force_mem"
 	char prop[PROPERTY_VALUE_MAX];
@@ -759,7 +759,7 @@ static int i915_init(struct driver *drv)
 				property_get(FORCE_MEM_PROP, prop, "local") > 0 &&
 				!strcmp(prop, "local");
 	if (i915->force_mem_local) {
-		drv_loge("Force to use local memory");
+		drv_logi("Force to use local memory");
 	}
 
 	memset(&get_param, 0, sizeof(get_param));
@@ -789,9 +789,9 @@ static int i915_init(struct driver *drv)
 
 	uint64_t width = 0, height = 0;
 	if (drmGetCap(drv->fd, DRM_CAP_CURSOR_WIDTH, &width)) {
-		drv_loge("cannot get cursor width. \n");
+		drv_logi("cannot get cursor width. \n");
 	} else if (drmGetCap(drv->fd, DRM_CAP_CURSOR_HEIGHT, &height)) {
-		drv_loge("cannot get cursor height. \n");
+		drv_logi("cannot get cursor height. \n");
 	}
 
 	if (!width)
@@ -1082,7 +1082,7 @@ static int i915_bo_create_from_metadata(struct bo *bo)
 	struct i915_device *i915 = bo->drv->priv;
 	int64_t use_flags = bo->meta.use_flags;
 	bool local = is_need_local(use_flags);
-	
+
 	if (local && i915->has_local_mem) {
 		if (!is_prelim_kernel) {
 			/* All new BOs we get from the kernel are zeroed, so we don't need to
@@ -1255,6 +1255,7 @@ static void *i915_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags)
 	int ret;
 	void *addr = MAP_FAILED;
 	struct i915_device *i915 = bo->drv->priv;
+	vma->cpu = false;
 
 	if ((bo->meta.format_modifier == I915_FORMAT_MOD_Y_TILED_CCS) ||
 	    (bo->meta.format_modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS) ||
@@ -1298,12 +1299,26 @@ static void *i915_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags)
 			return MAP_FAILED;
 		}
 
-		drv_loge("%s : %d : handle = %x, size = %zd, mmpa_arg.offset = %llx", __func__,
+		drv_logi("%s : %d : handle = %x, size = %zd, mmpa_arg.offset = %llx", __func__,
 			__LINE__, mmap_arg.handle, bo->meta.total_size, mmap_arg.offset);
 
 		/* And map it */
 		addr = mmap(0, bo->meta.total_size, PROT_READ | PROT_WRITE, MAP_SHARED, bo->drv->fd,
 			    mmap_arg.offset);
+
+		// TODO: GEM_MMAP_OFFSET cannot convert ytiled to linear, we have to convert it manually.
+		// Other formats(e.g. I915_TILING_X) should also be converted.
+		if ((bo->meta.use_flags & (BO_USE_SW_READ_OFTEN | BO_USE_SW_WRITE_OFTEN)) &&
+		    (bo->meta.tiling == I915_TILING_Y)) {
+			void* tmp_addr = ytiled_to_linear(bo->meta, addr);
+
+			if (NULL != tmp_addr) {
+				// release original one and replace it with a linear address.
+				munmap(addr, bo->meta.total_size);
+				addr = tmp_addr;
+				vma->cpu = true;
+			}
+		}
 	} else if (bo->meta.tiling == I915_TILING_NONE) {
 		struct drm_i915_gem_mmap gem_map = { 0 };
 		/* TODO(b/118799155): We don't seem to have a good way to
@@ -1379,7 +1394,7 @@ static int i915_bo_invalidate(struct bo *bo, struct mapping *mapping)
 	int ret;
 	struct drm_i915_gem_set_domain set_domain = { 0 };
 	struct i915_device *i915_dev = (struct i915_device *)bo->drv->priv;
-	
+
 	if (i915_dev->graphics_version != 125) {
 		set_domain.handle = bo->handles[0].u32;
 		if (bo->meta.tiling == I915_TILING_NONE) {

@@ -175,7 +175,7 @@ cros_gralloc_driver::cros_gralloc_driver()
 		if (!drv_render_) {
 			drv_loge("Failed to create driver for the 1st device\n");
 			close(node_fd[0]);
-		} 
+		}
 		switch (availabe_node) {
 		// only have one render node, is GVT-d/BM/VirtIO
 		case 1:
@@ -761,7 +761,7 @@ uint32_t cros_gralloc_driver::get_resolved_drm_format(uint32_t drm_format, uint6
 	uint32_t resolved_format;
 	uint64_t resolved_use_flags;
 	struct driver *drv = drv_render_;
-	
+
 	drv_resolve_format_and_use_flags(drv, drm_format, use_flags, &resolved_format,
 					 &resolved_use_flags);
 

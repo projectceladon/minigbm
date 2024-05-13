@@ -522,6 +522,10 @@ void *drv_dumb_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags)
 
 int drv_bo_munmap(struct bo *bo, struct vma *vma)
 {
+	if (vma->cpu) {
+		free(vma->addr);
+		vma->addr = NULL;
+	}
 	return munmap(vma->addr, vma->length);
 }
 
@@ -612,6 +616,45 @@ bool drv_has_modifier(const uint64_t *list, uint32_t count, uint64_t modifier)
 			return true;
 
 	return false;
+}
+
+const u_int16_t ytile_width = 16;
+const u_int16_t ytile_heigth = 32;
+void one_ytile_to_linear(char *src, char *dst, u_int16_t x, u_int16_t y, u_int16_t width, u_int16_t height, uint32_t offset)
+{
+	// x and y follow linear
+	u_int32_t count = x + y * width/ytile_width;
+
+	for (int j = 0; j < ytile_width * ytile_heigth; j += ytile_width) {
+		memcpy(dst + offset + width * ytile_heigth * y + width * j / ytile_width + x * ytile_width,
+			src + offset + j + ytile_width * ytile_heigth * count, ytile_width);
+	}
+}
+
+void * ytiled_to_linear(struct bo_metadata meta, void * src)
+{
+	void* dst = malloc(meta.total_size);
+	if (NULL == dst) return NULL;
+
+	memset(dst, 0, meta.total_size);
+
+	u_int16_t height = meta.sizes[0] / meta.strides[0];
+	// Y
+	u_int16_t y_hcount =  height / ytile_heigth + (height % ytile_heigth != 0);
+	for (u_int16_t x = 0; x < meta.strides[0]/ytile_width; x++) {
+		for (u_int16_t y = 0; y < y_hcount; y++) {
+			one_ytile_to_linear(src, dst, x, y, meta.strides[0], height, 0);
+		}
+	}
+	// UV
+	u_int16_t uv_hcount =  (height/ytile_heigth/2) + (height % (ytile_heigth*2) != 0);
+	for (u_int16_t x = 0; x < meta.strides[0]/ytile_width; x++) {
+		for (u_int16_t y = 0; y < uv_hcount; y++) {
+			one_ytile_to_linear(src, dst, x, y, meta.strides[0], height/2, meta.sizes[0]);
+		}
+	}
+
+	return dst;
 }
 
 void drv_resolve_format_and_use_flags_helper(struct driver *drv, uint32_t format,

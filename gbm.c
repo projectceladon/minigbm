@@ -63,7 +63,7 @@ PUBLIC struct gbm_device *gbm_create_device(int fd)
 	}
 
 	drv_init(gbm->drv, 0);
-	
+
 	return gbm;
 }
 
