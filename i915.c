@@ -751,7 +751,7 @@ static int i915_init(struct driver *drv)
 	if (!i915_bo_query_prelim_meminfo(drv, i915)) {
 		i915_bo_query_meminfo(drv, i915);
 	} else {
-		drv_loge("drv: kernel supports prelim\n");
+		drv_logi("drv: kernel supports prelim\n");
 	}
 #define FORCE_MEM_PROP "sys.icr.gralloc.force_mem"
 	char prop[PROPERTY_VALUE_MAX];
@@ -759,7 +759,7 @@ static int i915_init(struct driver *drv)
 				property_get(FORCE_MEM_PROP, prop, "local") > 0 &&
 				!strcmp(prop, "local");
 	if (i915->force_mem_local) {
-		drv_loge("Force to use local memory");
+		drv_logi("Force to use local memory");
 	}
 
 	memset(&get_param, 0, sizeof(get_param));
@@ -789,9 +789,9 @@ static int i915_init(struct driver *drv)
 
 	uint64_t width = 0, height = 0;
 	if (drmGetCap(drv->fd, DRM_CAP_CURSOR_WIDTH, &width)) {
-		drv_loge("cannot get cursor width. \n");
+		drv_logi("cannot get cursor width. \n");
 	} else if (drmGetCap(drv->fd, DRM_CAP_CURSOR_HEIGHT, &height)) {
-		drv_loge("cannot get cursor height. \n");
+		drv_logi("cannot get cursor height. \n");
 	}
 
 	if (!width)
@@ -1298,7 +1298,7 @@ static void *i915_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags)
 			return MAP_FAILED;
 		}
 
-		drv_loge("%s : %d : handle = %x, size = %zd, mmpa_arg.offset = %llx", __func__,
+		drv_logi("%s : %d : handle = %x, size = %zd, mmpa_arg.offset = %llx", __func__,
 			__LINE__, mmap_arg.handle, bo->meta.total_size, mmap_arg.offset);
 
 		/* And map it */
