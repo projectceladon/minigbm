@@ -698,11 +698,9 @@ uint32_t drv_resolved_common_drm_format(uint32_t format)
 		case DRM_FORMAT_FLEX_YCbCr_420_888:
 		case DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED:
 			ret = DRM_FORMAT_NV12;
-			drv_log("drv_resolved_common_drm_format: DRM_FORMAT_NV12");
 			break;
 		case DRM_FORMAT_YVU420_ANDROID:
 			ret = DRM_FORMAT_YVU420;
-			drv_log("drv_resolved_common_drm_format: DRM_FORMAT_YVU420");
 			break;
 		default:
 			break;
