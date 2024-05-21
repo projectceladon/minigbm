@@ -1257,8 +1257,7 @@ static void *i915_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags)
 	struct i915_device *i915 = bo->drv->priv;
 
 	if ((bo->meta.format_modifier == I915_FORMAT_MOD_Y_TILED_CCS) ||
-	    (bo->meta.format_modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS) ||
-	    (bo->meta.format_modifier == I915_FORMAT_MOD_4_TILED))
+	    (bo->meta.format_modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS))
 		return MAP_FAILED;
 
 	if (i915->has_mmap_offset) {
