@@ -35,33 +35,6 @@ const char *drmFormat2Str(int drm_format)
 	return buf;
 }
 
-bool is_flex_format(uint32_t format)
-{
-	switch (format) {
-	case DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED:
-	case DRM_FORMAT_FLEX_YCbCr_420_888:
-		return true;
-	default:
-		return false;
-	}
-	return false;
-}
-
-bool flex_format_match(uint32_t descriptor_format, uint32_t handle_format, uint64_t usage)
-{
-	bool flag = usage & (GRALLOC_USAGE_HW_CAMERA_READ | GRALLOC_USAGE_HW_CAMERA_WRITE);
-
-	/* HACK: See b/28671744 */
-	if (HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED == descriptor_format &&
-		((HAL_PIXEL_FORMAT_NV12 == handle_format && flag) ||
-		(HAL_PIXEL_FORMAT_RGBX_8888 == handle_format && !flag)))
-		return true;
-	else if (HAL_PIXEL_FORMAT_YCBCR_420_888 == descriptor_format && HAL_PIXEL_FORMAT_NV12 == handle_format)
-		return true;
-	else
-		return false;
-}
-
 uint32_t cros_gralloc_convert_format(int format)
 {
 	/*
@@ -282,58 +255,6 @@ std::string get_drm_format_string(uint32_t drm_format)
 	char *sequence = (char *)&drm_format;
 	std::string s(sequence, 4);
 	return "DRM_FOURCC_" + s;
-}
-
-int32_t cros_gralloc_invert_format(int format)
-{
-       /* Convert the DRM FourCC into the most specific HAL pixel format. */
-	switch (format) {
-	case DRM_FORMAT_ARGB8888:
-		return HAL_PIXEL_FORMAT_BGRA_8888;
-	case DRM_FORMAT_RGB565:
-		return HAL_PIXEL_FORMAT_RGB_565;
-	case DRM_FORMAT_RGB888:
-		return HAL_PIXEL_FORMAT_RGB_888;
-	case DRM_FORMAT_ABGR8888:
-		return HAL_PIXEL_FORMAT_RGBA_8888;
-	case DRM_FORMAT_XBGR8888:
-		return HAL_PIXEL_FORMAT_RGBX_8888;
-	case DRM_FORMAT_FLEX_YCbCr_420_888:
-		return HAL_PIXEL_FORMAT_YCbCr_420_888;
-	case DRM_FORMAT_YVU420_ANDROID:
-		return HAL_PIXEL_FORMAT_YV12;
-	case DRM_FORMAT_R8:
-		return HAL_PIXEL_FORMAT_BLOB;
-	case DRM_FORMAT_NV12:
-		return HAL_PIXEL_FORMAT_NV12;
-	case DRM_FORMAT_NV12_Y_TILED_INTEL:
-		return HAL_PIXEL_FORMAT_NV12_Y_TILED_INTEL;
-	case DRM_FORMAT_YUYV:
-		return HAL_PIXEL_FORMAT_YCbCr_422_I;
-	case DRM_FORMAT_R16:
-		return HAL_PIXEL_FORMAT_Y16;
-	case DRM_FORMAT_P010_INTEL:
-		return HAL_PIXEL_FORMAT_P010_INTEL;
-	case DRM_FORMAT_YUV444:
-		return HAL_PIXEL_FORMAT_YCbCr_444_888;
-	case DRM_FORMAT_NV21:
-		return HAL_PIXEL_FORMAT_YCrCb_420_SP;
-	case DRM_FORMAT_NV16:
-		return HAL_PIXEL_FORMAT_YCbCr_422_SP;
-	case DRM_FORMAT_YUV422:
-		return HAL_PIXEL_FORMAT_YCbCr_422_888;
-	case DRM_FORMAT_ABGR16161616F:
-		return HAL_PIXEL_FORMAT_RGBA_FP16;
-	case DRM_FORMAT_ABGR2101010:
-		return HAL_PIXEL_FORMAT_RGBA_1010102;
-#if ANDROID_API_LEVEL >= 30
-	case DRM_FORMAT_P010:
-		return HAL_PIXEL_FORMAT_YCBCR_P010;
-#endif
-	default:
-		ALOGE("Unhandled DRM format %4.4s", drmFormat2Str(format));
-	}
-	return 0;
 }
 
 bool IsSupportedYUVFormat(uint32_t droid_format)

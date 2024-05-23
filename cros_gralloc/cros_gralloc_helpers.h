@@ -54,8 +54,6 @@ cros_gralloc_handle_t cros_gralloc_convert_handle(buffer_handle_t handle);
 
 int32_t cros_gralloc_sync_wait(int32_t fence, bool close_fence);
 
-bool flex_format_match(uint32_t descriptor_format, uint32_t handle_format, uint64_t usage = 0);
-
 #ifdef USE_GRALLOC1
 int32_t cros_gralloc_sync_wait(int32_t acquire_fence);
 #endif
@@ -63,10 +61,6 @@ int32_t cros_gralloc_sync_wait(int32_t acquire_fence);
 std::string get_drm_format_string(uint32_t drm_format);
 
 const char *drmFormat2Str(int format);
-
-bool is_flex_format(uint32_t format);
-
-int32_t cros_gralloc_invert_format(int format);
 
 bool IsSupportedYUVFormat(uint32_t droid_format);
 #endif
