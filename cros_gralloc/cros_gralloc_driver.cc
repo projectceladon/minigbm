@@ -334,7 +334,6 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 	uint64_t resolved_use_flags;
 	struct bo *bo;
 	struct cros_gralloc_handle *hnd;
-	int32_t format;
 	std::unique_ptr<cros_gralloc_buffer> buffer;
 
 	struct driver *drv;
@@ -444,14 +443,7 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 	hnd->producer_usage = descriptor->producer_usage;
 	hnd->consumer_usage = descriptor->consumer_usage;
 #endif
-	format = cros_gralloc_invert_format(hnd->format);
-	if (format == 0) {
-		format = descriptor->droid_format;
-	}
-	if ((hnd->format == DRM_FORMAT_NV12) && (descriptor->drm_format == DRM_FORMAT_FLEX_YCbCr_420_888)) {
-		format = HAL_PIXEL_FORMAT_YCbCr_420_888;
-	}
-	hnd->droid_format = format;
+	hnd->droid_format = descriptor->droid_format;
 	hnd->usage = descriptor->droid_usage;
 	hnd->total_size = descriptor->reserved_region_size + drv_bo_get_total_size(bo);
 

@@ -319,9 +319,7 @@ int32_t CrosGralloc1::validateBufferSize(buffer_handle_t buffer,
 		return CROS_GRALLOC_ERROR_BAD_HANDLE;
 	}
 
-	if (!flex_format_match((uint32_t)descriptorInfo->format, (uint32_t)hnd->droid_format,
-		descriptorInfo->producerUsage | descriptorInfo->consumerUsage) &&
-	    cros_gralloc_convert_format(descriptorInfo->format) != hnd->format) {
+	if (descriptorInfo->format != hnd->droid_format) {
 		return CROS_GRALLOC_ERROR_BAD_VALUE;
 	}
 
