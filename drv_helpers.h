@@ -10,9 +10,7 @@
 #include <stdbool.h>
 
 #include "drv.h"
-#include "drv_priv.h"
 #include "drv_array_helpers.h"
-#include <math.h>
 
 #ifndef PAGE_SIZE
 #define PAGE_SIZE 0x1000
@@ -51,8 +49,4 @@ bool drv_has_modifier(const uint64_t *list, uint32_t count, uint64_t modifier);
 void drv_resolve_format_and_use_flags_helper(struct driver *drv, uint32_t format,
 					     uint64_t use_flags, uint32_t *out_format,
 					     uint64_t *out_use_flags);
-
-void one_ytile_to_linear(char *src, char *dst, u_int16_t x, u_int16_t y,
-						u_int16_t width, u_int16_t height, uint32_t offset);
-void *ytiled_to_linear(struct bo_metadata meta, void * src);
 #endif
