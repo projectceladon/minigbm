@@ -410,14 +410,10 @@ static int i915_add_combinations(struct driver *drv)
 
 
 	const uint64_t render_not_linear = unset_flags(render, linear_mask | camera_mask);
-	uint64_t scanout_and_render_not_linear = unset_flags(render_not_linear | BO_USE_SCANOUT, camera_mask);
+	uint64_t scanout_and_render_not_linear = render_not_linear | BO_USE_SCANOUT;
 	uint64_t texture_flags_video =
            unset_flags(texture_flags, BO_USE_RENDERSCRIPT | BO_USE_SW_WRITE_OFTEN |
                                           BO_USE_SW_READ_OFTEN | BO_USE_LINEAR);
-
-	/* On dGPU, only use linear */
-	if (i915->graphics_version >= 125)
-		scanout_and_render_not_linear = unset_flags(scanout_and_render, BO_USE_SCANOUT);
 
 	struct format_metadata metadata_x_tiled = { .tiling = I915_TILING_X,
 						    .priority = 2,
@@ -452,7 +448,7 @@ static int i915_add_combinations(struct driver *drv)
 				     &metadata_4_tiled, render_not_linear);
 		drv_add_combinations(drv, scanout_render_formats,
 				     ARRAY_SIZE(scanout_render_formats), &metadata_4_tiled,
-				     render_not_linear);
+				     scanout_and_render_not_linear);
                 drv_add_combinations(drv, source_formats, ARRAY_SIZE(source_formats), &metadata_4_tiled,
                                      texture_flags | BO_USE_NON_GPU_HW);
 
@@ -485,7 +481,7 @@ static int i915_add_combinations(struct driver *drv)
 		 */
 		drv_add_combinations(drv, scanout_render_formats,
 				     ARRAY_SIZE(scanout_render_formats), &metadata_y_tiled,
-				     render_not_linear);
+				     scanout_and_render_not_linear);
 		drv_add_combinations(drv, source_formats, ARRAY_SIZE(source_formats), &metadata_y_tiled,
 				     texture_flags | BO_USE_NON_GPU_HW);
 
