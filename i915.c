@@ -7,7 +7,6 @@
 #ifdef DRV_I915
 
 #include <assert.h>
-#include <cpuid.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -19,7 +18,6 @@
 
 #include "drv_helpers.h"
 #include "drv_priv.h"
-// #include "external/i915_drm.h"
 #include "util.h"
 #include "i915_prelim.h"
 
@@ -298,42 +296,6 @@ static uint64_t unset_flags(uint64_t current_flags, uint64_t mask)
 	return value;
 }
 
-/*
- * Check virtual machine type, by checking cpuid
- */
-enum {
-	HYPERTYPE_NONE 	    = 0,
-	HYPERTYPE_ANY       = 0x1,
-	HYPERTYPE_TYPE_ACRN = 0x2,
-	HYPERTYPE_TYPE_KVM  = 0x4
-};
-static inline int vm_type()
-{
-	int type = HYPERTYPE_NONE;
-	union {
-		uint32_t sig32[3];
-		char text[13];
-	} sig = {};
-
-	uint32_t eax=0, ebx=0, ecx=0, edx=0;
-	if(__get_cpuid(1, &eax, &ebx, &ecx, &edx)) {
-		if (((ecx >> 31) & 1) == 1) {
-			type |= HYPERTYPE_ANY;
-
-			__cpuid(0x40000000U, eax, ebx, ecx, edx);
-			sig.sig32[0] = ebx;
-			sig.sig32[1] = ecx;
-			sig.sig32[2] = edx;
-			if (!strncmp(sig.text, "ACRNACRNACRN", 12))
-				type |= HYPERTYPE_TYPE_ACRN;
-			else if ((!strncmp(sig.text, "KVMKVMKVM", 9)) ||
-				 (!strncmp(sig.text, "EVMMEVMMEVMM", 12)))
-				type |= HYPERTYPE_TYPE_KVM;
-		}
-	}
-	return type;
-}
-
 static int i915_add_combinations(struct driver *drv)
 {
 	struct i915_device *i915 = drv->priv;
@@ -343,7 +305,6 @@ static int i915_add_combinations(struct driver *drv)
 	const uint64_t texture_only = BO_USE_TEXTURE_MASK;
 	uint64_t render_flags = BO_USE_RENDER_MASK;
 	uint64_t texture_flags = BO_USE_TEXTURE_MASK;
-	bool is_kvm = vm_type() & HYPERTYPE_TYPE_KVM;
 
 	// HW protected buffers also need to be scanned out.
 	const uint64_t hw_protected =
