@@ -140,14 +140,6 @@ struct driver *drv_create(int fd)
 	if (!drv->combos)
 		goto free_mappings;
 
-	if (drv->backend->init) {
-		ret = drv->backend->init(drv);
-		if (ret) {
-			drv_array_destroy(drv->combos);
-			goto free_mappings;
-		}
-	}
-
 	return drv;
 
 free_mappings:
@@ -163,13 +155,21 @@ free_driver:
 	return NULL;
 }
 
-void drv_init(struct driver * drv, uint32_t grp_type)
+int drv_init(struct driver * drv, uint32_t grp_type)
 {
 	int ret = 0;
 	assert(drv);
 	assert(drv->backend);
 
 	drv->gpu_grp_type = grp_type;
+	if (drv->backend->init) {
+		ret = drv->backend->init(drv);
+		if (ret) {
+			drv_array_destroy(drv->combos);
+			drv_array_destroy(drv->mappings);
+		}
+	}
+	return ret;
 }
 
 void drv_destroy(struct driver *drv)
