@@ -167,7 +167,7 @@ void drv_preload(bool load);
 
 struct driver *drv_create(int fd);
 
-void  drv_init(struct driver * drv, uint32_t grp_type);
+int drv_init(struct driver * drv, uint32_t grp_type);
 
 void drv_destroy(struct driver *drv);
 

@@ -204,7 +204,13 @@ cros_gralloc_driver::cros_gralloc_driver()
 		}
 
 		if (drv_render_) {
-			drv_init(drv_render_, gpu_grp_type);
+			if (drv_init(drv_render_, gpu_grp_type)) {
+				drv_loge("Failed to init driver\n");
+				fd = drv_get_fd(drv_render_);
+				drv_destroy(drv_render_);
+				close(fd);
+				drv_render_ = nullptr;
+			}
 		}
 	}
 
