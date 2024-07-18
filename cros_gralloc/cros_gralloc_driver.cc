@@ -122,6 +122,16 @@ cros_gralloc_driver::cros_gralloc_driver()
 	mt8183_camera_quirk_ = !strncmp(buf, "kukui", strlen("kukui"));
 
 	// destroy drivers if exist before re-initializing them
+	if (drv_kms_) {
+		int fd = drv_get_fd(drv_kms_);
+		drv_destroy(drv_kms_);
+		if (!is_kmsro_enabled()) {
+			drv_render_ = nullptr;
+		}
+		drv_kms_ = nullptr;
+		close(fd);
+	}
+
 	if (drv_render_) {
 		int fd = drv_get_fd(drv_render_);
 		drv_destroy(drv_render_);
@@ -183,10 +193,17 @@ cros_gralloc_driver::cros_gralloc_driver()
 			break;
 		// is SR-IOV or iGPU + dGPU
 		case 2:
-			close(node_fd[1]);
 			if (virtio_node_idx != -1) {
+				drv_kms_ = drv_create(node_fd[virtio_node_idx]);
+				if (!drv_kms_) {
+					drv_loge("Failed to create driver for virtio device\n");
+					close(node_fd[virtio_node_idx]);
+					break;
+				}
 				gpu_grp_type = TWO_GPU_IGPU_VIRTIO;
 			} else {
+				close(node_fd[1]);
+				drv_kms_ = drv_render_;
 				gpu_grp_type = TWO_GPU_IGPU_DGPU;
 			}
 			break;
@@ -196,7 +213,12 @@ cros_gralloc_driver::cros_gralloc_driver()
 				close(node_fd[1]);
 			}
 			if (virtio_node_idx != -1) {
-				close(node_fd[virtio_node_idx]);
+				drv_kms_ = drv_create(node_fd[virtio_node_idx]);
+				if (!drv_kms_) {
+					drv_loge("Failed to create driver for virtio device\n");
+					close(node_fd[virtio_node_idx]);
+					break;
+				}
 			}
 			gpu_grp_type = THREE_GPU_IGPU_VIRTIO_DGPU;
 			// TO-DO: the 3rd node is i915 or others.
@@ -204,7 +226,16 @@ cros_gralloc_driver::cros_gralloc_driver()
 		}
 
 		if (drv_render_) {
-			drv_init(drv_render_, gpu_grp_type);
+			if (drv_init(drv_render_, gpu_grp_type)) {
+				drv_loge("Failed to init driver\n");
+				fd = drv_get_fd(drv_render_);
+				drv_destroy(drv_render_);
+				close(fd);
+				drv_render_ = nullptr;
+			}
+		}
+		if (drv_kms_ && (drv_kms_ != drv_render_)) {
+			drv_init(drv_kms_, gpu_grp_type);
 		}
 	}
 
@@ -218,6 +249,16 @@ cros_gralloc_driver::~cros_gralloc_driver()
 	buffers_.clear();
 	handles_.clear();
 
+	if (drv_kms_) {
+		int fd = drv_get_fd(drv_kms_);
+		drv_destroy(drv_kms_);
+		if (!is_kmsro_enabled()) {
+			drv_render_ = nullptr;
+		}
+		drv_kms_ = nullptr;
+		close(fd);
+	}
+
 	if (drv_render_) {
 		int fd = drv_get_fd(drv_render_);
 		drv_destroy(drv_render_);
@@ -229,7 +270,7 @@ cros_gralloc_driver::~cros_gralloc_driver()
 
 bool cros_gralloc_driver::is_initialized()
 {
-	return (drv_render_ != nullptr);
+	return (drv_render_ != nullptr && drv_kms_ != nullptr);
 }
 
 bool cros_gralloc_driver::get_resolved_format_and_use_flags(
@@ -240,7 +281,7 @@ bool cros_gralloc_driver::get_resolved_format_and_use_flags(
 	uint64_t resolved_use_flags;
 	struct combination *combo;
 
-	struct driver *drv = drv_render_;
+	struct driver *drv = (descriptor->use_flags & BO_USE_SCANOUT) ? drv_kms_ : drv_render_;
 	if (mt8183_camera_quirk_ && (descriptor->use_flags & BO_USE_CAMERA_READ) &&
 	    !(descriptor->use_flags & BO_USE_SCANOUT) &&
 	    descriptor->drm_format == DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED) {
@@ -254,8 +295,21 @@ bool cros_gralloc_driver::get_resolved_format_and_use_flags(
 
 	combo = drv_get_combination(drv, resolved_format, resolved_use_flags);
 	if (!combo && (descriptor->use_flags & BO_USE_SCANOUT)) {
-		resolved_use_flags &= ~BO_USE_SCANOUT;
-		combo = drv_get_combination(drv, resolved_format, descriptor->use_flags);
+		if (is_kmsro_enabled()) {
+			/* if kmsro is enabled, it is scanout buffer and not used for video,
+			 * don't need remove scanout flag */
+			if (!IsSupportedYUVFormat(descriptor->droid_format)) {
+				combo = drv_get_combination(drv, resolved_format,
+							    (descriptor->use_flags) & (~BO_USE_SCANOUT));
+			} else {
+				drv = drv_render_;
+				resolved_use_flags &= ~BO_USE_SCANOUT;
+				combo = drv_get_combination(drv, resolved_format, descriptor->use_flags);
+			}
+		} else {
+			resolved_use_flags &= ~BO_USE_SCANOUT;
+			combo = drv_get_combination(drv, resolved_format, descriptor->use_flags);
+		}
 	}
 	if (!combo && (descriptor->droid_usage & GRALLOC_USAGE_HW_VIDEO_ENCODER) &&
 	    descriptor->droid_format != HAL_PIXEL_FORMAT_YCbCr_420_888) {
@@ -283,7 +337,7 @@ bool cros_gralloc_driver::is_supported(const struct cros_gralloc_buffer_descript
 {
 	uint32_t resolved_format;
 	uint64_t resolved_use_flags;
-	struct driver *drv = drv_render_;
+	struct driver *drv = (descriptor->use_flags & BO_USE_SCANOUT) ? drv_kms_ : drv_render_;
 	uint32_t max_texture_size = drv_get_max_texture_2d_size(drv);
 	if (!get_resolved_format_and_use_flags(descriptor, &resolved_format, &resolved_use_flags))
 		return false;
@@ -329,10 +383,15 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 	struct bo *bo;
 	struct cros_gralloc_handle *hnd;
 	std::unique_ptr<cros_gralloc_buffer> buffer;
+	bool from_kms = false;
 
 	struct driver *drv;
-
-	drv = drv_render_;
+	if ((descriptor->use_flags & BO_USE_SCANOUT)) {
+		from_kms = true;
+		drv = drv_kms_;
+	} else {
+		drv = drv_render_;
+	}
 
 	if (!get_resolved_format_and_use_flags(descriptor, &resolved_format, &resolved_use_flags)) {
 		ALOGE("Failed to resolve format and use_flags.");
@@ -396,7 +455,7 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 		hnd->fds[i] = -1;
 
 	hnd->num_planes = num_planes;
-	hnd->from_kms = false; // not used, just set a default value. keep this member to be backward compatible.
+	hnd->from_kms = from_kms;
 	for (size_t plane = 0; plane < num_planes; plane++) {
 		ret = drv_bo_get_plane_fd(bo, plane);
 		if (ret < 0)
@@ -482,7 +541,7 @@ int32_t cros_gralloc_driver::retain(buffer_handle_t handle)
 		return -EINVAL;
 	}
 
-	drv = drv_render_;
+	drv = (hnd->from_kms) ? drv_kms_ : drv_render_;
 
 	auto hnd_it = handles_.find(hnd);
 	if (hnd_it != handles_.end()) {
@@ -746,7 +805,7 @@ uint32_t cros_gralloc_driver::get_resolved_drm_format(uint32_t drm_format, uint6
 {
 	uint32_t resolved_format;
 	uint64_t resolved_use_flags;
-	struct driver *drv = drv_render_;
+	struct driver *drv = (use_flags & BO_USE_SCANOUT) ? drv_kms_ : drv_render_;
 
 	drv_resolve_format_and_use_flags(drv, drm_format, use_flags, &resolved_format,
 					 &resolved_use_flags);
