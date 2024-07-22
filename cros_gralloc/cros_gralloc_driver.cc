@@ -115,6 +115,8 @@ cros_gralloc_driver::cros_gralloc_driver()
 	char *node_name[render_num] = {};
 	int availabe_node = 0;
 	int virtio_node_idx = -1;
+	int i915_node_idx = -1;
+	int renderer_idx = 0;
 	uint32_t gpu_grp_type = 0;
 
 	char buf[PROP_VALUE_MAX];
@@ -160,6 +162,10 @@ cros_gralloc_driver::cros_gralloc_driver()
 			virtio_node_idx = availabe_node;
 		}
 
+		if (!strcmp(version->name, "i915")) {
+			i915_node_idx = availabe_node;
+		}
+
 		node_fd[availabe_node] = fd;
 		int len = snprintf(NULL, 0, "%s", version->name);
 		node_name[availabe_node] = (char *)malloc(len + 1);
@@ -169,13 +175,29 @@ cros_gralloc_driver::cros_gralloc_driver()
 		drmFreeVersion(version);
 	}
 
-	// open the first render node
 	if (availabe_node > 0) {
-		drv_render_ = drv_create(node_fd[0]);
-		if (!drv_render_) {
-			drv_loge("Failed to create driver for the 1st device\n");
-			close(node_fd[0]);
+		if (i915_node_idx != -1) {
+			// Prefer i915 for performance consideration.
+			//
+			// TODO: We might have multiple i915 devices in the system and in
+			// this case we are effectively using the one with largest card id
+			// which is normally the dGPU VF or dGPU passed through device.
+			renderer_idx = i915_node_idx;
+		} else if (virtio_node_idx != -1) {
+			// Fallback to virtio-GPU
+			renderer_idx = virtio_node_idx;
+		} else {
+			drv_loge("Weird scenario! Neither of i915 nor virtio-GPU device is"
+				" found. Use the first deivice.\n");
+			renderer_idx = 0;
 		}
+		drv_render_ = drv_create(node_fd[renderer_idx]);
+		if (!drv_render_) {
+			drv_loge("Failed to create driver for the device with card id %d\n",
+				renderer_idx);
+			close(node_fd[renderer_idx]);
+		}
+
 		switch (availabe_node) {
 		// only have one render node, is GVT-d/BM/VirtIO
 		case 1:
@@ -183,26 +205,14 @@ cros_gralloc_driver::cros_gralloc_driver()
 			break;
 		// is SR-IOV or iGPU + dGPU
 		case 2:
-			close(node_fd[1]);
-			if (virtio_node_idx != -1) {
-				gpu_grp_type = TWO_GPU_IGPU_VIRTIO;
-			} else {
-				gpu_grp_type = TWO_GPU_IGPU_DGPU;
-			}
+			gpu_grp_type = (virtio_node_idx != -1)? TWO_GPU_IGPU_VIRTIO: TWO_GPU_IGPU_DGPU;
 			break;
 		// is SR-IOV + dGPU
 		case 3:
-			if (!strcmp(node_name[1], "i915")) {
-				close(node_fd[1]);
-			}
-			if (virtio_node_idx != -1) {
-				close(node_fd[virtio_node_idx]);
-			}
 			gpu_grp_type = THREE_GPU_IGPU_VIRTIO_DGPU;
 			// TO-DO: the 3rd node is i915 or others.
 			break;
 		}
-
 		if (drv_render_) {
 			if (drv_init(drv_render_, gpu_grp_type)) {
 				drv_loge("Failed to init driver\n");
@@ -216,6 +226,9 @@ cros_gralloc_driver::cros_gralloc_driver()
 
 	for (int i = 0; i < availabe_node; i++) {
 		free(node_name[i]);
+		if (i != renderer_idx) {
+			close(node_fd[i]);
+		}
 	}
 }
 
