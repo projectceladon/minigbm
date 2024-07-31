@@ -462,7 +462,7 @@ static int i915_add_combinations(struct driver *drv)
 				     &metadata_4_tiled, render_not_linear);
 		drv_add_combinations(drv, scanout_render_formats,
 				     ARRAY_SIZE(scanout_render_formats), &metadata_4_tiled,
-				     scanout_and_render_not_linear);
+				     render_not_linear);
                 drv_add_combinations(drv, source_formats, ARRAY_SIZE(source_formats), &metadata_4_tiled,
                                      texture_flags | BO_USE_NON_GPU_HW);
 
