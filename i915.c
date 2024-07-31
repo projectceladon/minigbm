@@ -51,6 +51,20 @@ struct iris_memregion {
 	uint64_t size;
 };
 
+static const char *tiling_to_string(int tiling) {
+	switch (tiling) {
+	case I915_TILING_NONE:
+		return "linear";
+	case I915_TILING_X:
+		return "tiling-x";
+	case I915_TILING_Y:
+		return "tiling-y";
+	case I915_TILING_4:
+		return "tiling-4";
+	}
+	return "unknown";
+}
+
 #if !defined(DRM_CAP_CURSOR_WIDTH)
 #define DRM_CAP_CURSOR_WIDTH 0x8
 #endif
@@ -952,6 +966,11 @@ static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t heig
 	}
 
 	bo->meta.format_modifier = modifier;
+
+	if (use_flags & BO_USE_SCANOUT) {
+		drv_logd("Use tiling mode %s for scan-out buffer, modifier=0x%lx\n",
+			 tiling_to_string(bo->meta.tiling), modifier);
+	}
 
 	if (format == DRM_FORMAT_YVU420_ANDROID) {
 		/*
