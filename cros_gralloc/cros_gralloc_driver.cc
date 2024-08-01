@@ -179,6 +179,12 @@ cros_gralloc_driver::cros_gralloc_driver()
 		switch (availabe_node) {
 		// only have one render node, is GVT-d/BM/VirtIO
 		case 1:
+			if (!drv_render_) {
+				fd = drv_get_fd(drv_render_);
+				drv_destroy(drv_render_);
+				close(fd);
+				drv_render_ = nullptr;
+			}
 			gpu_grp_type = (virtio_node_idx != -1)? ONE_GPU_VIRTIO: ONE_GPU_INTEL;
 			break;
 		// is SR-IOV or iGPU + dGPU

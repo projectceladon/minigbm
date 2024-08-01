@@ -502,7 +502,6 @@ static int i915_align_dimensions(struct bo *bo, uint32_t format, uint32_t tiling
 
 	switch (tiling) {
 	default:
-		break;
 	case I915_TILING_NONE:
 		/*
 		 * The Intel GPU doesn't need any alignment in linear mode,
