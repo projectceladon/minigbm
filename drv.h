@@ -106,6 +106,7 @@ struct vma {
 	uint32_t map_flags;
 	int32_t refcount;
 	uint32_t map_strides[DRV_MAX_PLANES];
+	bool cpu; /* true if the space is allocated by cpu (e.g. malloc) */
 	void *priv;
 };
 
