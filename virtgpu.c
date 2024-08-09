@@ -28,10 +28,13 @@ struct virtgpu_param params[] = {
 	PARAM(VIRTGPU_PARAM_CROSS_DEVICE),	   PARAM(VIRTGPU_PARAM_CONTEXT_INIT),
 	PARAM(VIRTGPU_PARAM_SUPPORTED_CAPSET_IDs), PARAM(VIRTGPU_PARAM_CREATE_GUEST_HANDLE),
 	PARAM(VIRTGPU_PARAM_RESOURCE_SYNC),	   PARAM(VIRTGPU_PARAM_GUEST_VRAM),
+	PARAM(VIRTGPU_PARAM_QUERY_DEV),
 };
 
 extern const struct backend virtgpu_virgl;
 extern const struct backend virtgpu_cross_domain;
+
+int dev_feature = 0;
 
 static int virtgpu_init(struct driver *drv)
 {
@@ -49,6 +52,14 @@ static int virtgpu_init(struct driver *drv)
 		int ret = drmIoctl(drv->fd, DRM_IOCTL_VIRTGPU_GETPARAM, &get_param);
 		if (ret)
 			drv_logi("virtgpu backend not enabling %s\n", params[i].name);
+		if (ret == 0) {
+			if (strcmp(params[i].name, "VIRTGPU_PARAM_QUERY_DEV") == 0) {
+				dev_feature += params[i].value;
+			}
+			if (strcmp(params[i].name, "VIRTGPU_PARAM_RESOURCE_BLOB") == 0) {
+				dev_feature += params[i].value;
+			}
+		}
 	}
 
 	for (uint32_t i = 0; i < ARRAY_SIZE(virtgpu_backends); i++) {

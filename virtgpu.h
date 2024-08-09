@@ -23,3 +23,5 @@ enum virtgpu_param_id {
 	param_guest_vram,
 	param_max,
 };
+
+extern int dev_feature;

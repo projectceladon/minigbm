@@ -833,3 +833,15 @@ uint32_t drv_get_max_texture_2d_size(struct driver *drv)
 
 	return UINT32_MAX;
 }
+
+bool drv_query_dev_feature(struct driver * drv)
+{
+        bool ret = false;
+        assert(drv);
+        assert(drv->backend);
+
+        if (drv->backend->query_dev_feature) {
+                ret = drv->backend->query_dev_feature();
+        }
+        return ret;
+}

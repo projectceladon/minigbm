@@ -1157,6 +1157,10 @@ static uint32_t virgl_get_max_texture_2d_size(struct driver *drv)
 		return VIRGL_2D_MAX_TEXTURE_2D_SIZE;
 }
 
+static bool virgl_query_dev_feature() {
+       return (dev_feature == 2);
+}
+
 const struct backend virtgpu_virgl = { .name = "virtgpu_virgl",
 				       .init = virgl_init,
 				       .close = virgl_close,
@@ -1171,4 +1175,5 @@ const struct backend virtgpu_virgl = { .name = "virtgpu_virgl",
 				       .resolve_format_and_use_flags =
 					   virgl_resolve_format_and_use_flags,
 				       .resource_info = virgl_resource_info,
-				       .get_max_texture_2d_size = virgl_get_max_texture_2d_size };
+				       .get_max_texture_2d_size = virgl_get_max_texture_2d_size,
+				       .query_dev_feature = virgl_query_dev_feature };

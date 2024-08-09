@@ -85,6 +85,7 @@ struct drm_virtgpu_execbuffer {
 #define VIRTGPU_PARAM_CREATE_GUEST_HANDLE 8 /* Host OS handle can be created from guest memory. */
 #define VIRTGPU_PARAM_RESOURCE_SYNC 9 /* Synchronization resources */
 #define VIRTGPU_PARAM_GUEST_VRAM 10 /* All guest allocations happen via virtgpu dedicated heap. */
+#define VIRTGPU_PARAM_QUERY_DEV 11 /* Query the virtio device name. */
 
 struct drm_virtgpu_getparam {
 	__u64 param;

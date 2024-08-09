@@ -249,6 +249,20 @@ cros_gralloc_driver::cros_gralloc_driver()
 				close(fd);
 				drv_kms_ = nullptr;
 			}
+			if (drv_kms_) {
+				bool virtiogpu_with_blob = drv_query_dev_feature(drv_kms_);
+				if (virtiogpu_with_blob) {
+					drv_logi("virtio gpu device with blob\n");
+					if (drv_kms_) {
+						int fd = drv_get_fd(drv_kms_);
+						drv_destroy(drv_kms_);
+						drv_kms_ = drv_render_;
+						close(fd);
+					}
+				} else {
+					drv_logi("virtio ivshmem device or no blob\n");
+				}
+			}
 		}
 	}
 
