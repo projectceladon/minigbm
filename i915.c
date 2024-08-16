@@ -26,6 +26,8 @@
 #define I915_CACHELINE_SIZE 64
 #define I915_CACHELINE_MASK (I915_CACHELINE_SIZE - 1)
 
+#define GEN_VERSION_X10(dev)	((dev)->graphics_version * 10 + (dev)->sub_version)
+
 static bool is_prelim_kernel = false;
 static const uint32_t scanout_render_formats[] = { DRM_FORMAT_ABGR2101010, DRM_FORMAT_ABGR8888,
 						   DRM_FORMAT_ARGB2101010, DRM_FORMAT_ARGB8888,
@@ -99,21 +101,19 @@ struct modifier_support_t {
 
 struct i915_device {
 	uint32_t graphics_version;
-	int32_t has_llc;
-	int32_t has_hw_protection;
+	uint32_t sub_version;
 	struct modifier_support_t modifier;
 	int device_id;
-	bool is_xelpd;
-	int32_t has_mmap_offset;
-	bool has_local_mem;
-	bool has_fence_reg;
 	struct iris_memregion vram, sys;
-	bool force_mem_local;
-	/*TODO : cleanup is_mtl to avoid adding variables for every new platforms */
-	bool is_mtl;
-	int32_t num_fences_avail;
 	uint64_t cursor_width;
 	uint64_t cursor_height;
+
+	uint32_t has_llc 			: 1;
+	uint32_t has_hw_protection	: 1;
+	uint32_t is_xelpd			: 1;
+	uint32_t has_mmap_offset	: 1;
+	uint32_t has_local_mem		: 1;
+	uint32_t force_mem_local	: 1;
 };
 
 /*
@@ -216,77 +216,76 @@ static void i915_info_from_device_id(struct i915_device *i915)
 	const uint16_t mtl_ids[] = { 0x7D40, 0x7D60, 0x7D45, 0x7D55, 0x7DD5 };
 
 	unsigned i;
-	i915->graphics_version = 120;
+	i915->graphics_version = 12;
 	i915->is_xelpd = false;
-	i915->is_mtl = false;
 	/* Gen 4 */
 	for (i = 0; i < ARRAY_SIZE(gen4_ids); i++)
 		if (gen4_ids[i] == i915->device_id)
-			i915->graphics_version = 40;
+			i915->graphics_version = 4;
 
 	/* Gen 5 */
 	for (i = 0; i < ARRAY_SIZE(gen5_ids); i++)
 		if (gen5_ids[i] == i915->device_id)
-			i915->graphics_version = 50;
+			i915->graphics_version = 5;
 
 	/* Gen 6 */
 	for (i = 0; i < ARRAY_SIZE(gen6_ids); i++)
 		if (gen6_ids[i] == i915->device_id)
-			i915->graphics_version = 60;
+			i915->graphics_version = 6;
 
 	/* Gen 7 */
 	for (i = 0; i < ARRAY_SIZE(gen7_ids); i++)
 		if (gen7_ids[i] == i915->device_id)
-			i915->graphics_version = 70;
+			i915->graphics_version = 7;
 
 	/* Gen 8 */
 	for (i = 0; i < ARRAY_SIZE(gen8_ids); i++)
 		if (gen8_ids[i] == i915->device_id)
-			i915->graphics_version = 80;
+			i915->graphics_version = 8;
 
 	/* Gen 9 */
 	for (i = 0; i < ARRAY_SIZE(gen9_ids); i++)
 		if (gen9_ids[i] == i915->device_id)
-			i915->graphics_version = 90;
+			i915->graphics_version = 9;
 
 	/* Gen 11 */
 	for (i = 0; i < ARRAY_SIZE(gen11_ids); i++)
 		if (gen11_ids[i] == i915->device_id)
-			i915->graphics_version = 110;
+			i915->graphics_version = 11;
 
 	/* Gen 12 */
 	for (i = 0; i < ARRAY_SIZE(gen12_ids); i++)
 		if (gen12_ids[i] == i915->device_id)
-			i915->graphics_version = 120;
+			i915->graphics_version = 12;
 
 	for (i = 0; i < ARRAY_SIZE(dg2_ids); i++)
 		if (dg2_ids[i] == i915->device_id) {
-			i915->graphics_version = 125;
+			i915->graphics_version = 12;
+			i915->sub_version = 5;
 			return;
 		}
 
 	for (i = 0; i < ARRAY_SIZE(adlp_ids); i++)
 		if (adlp_ids[i] == i915->device_id) {
 			i915->is_xelpd = true;
-			i915->graphics_version = 120;
+			i915->graphics_version = 12;
 		}
 
 	for (i = 0; i < ARRAY_SIZE(rplp_ids); i++)
 		if (rplp_ids[i] == i915->device_id) {
 			i915->is_xelpd = true;
-			i915->graphics_version = 120;
+			i915->graphics_version = 12;
 		}
 
 	for (i = 0; i < ARRAY_SIZE(mtl_ids); i++)
 		if (mtl_ids[i] == i915->device_id) {
-			i915->graphics_version = 120;
-			i915->is_mtl = true;
+			i915->graphics_version = 14;
 		}
 }
 
 bool i915_has_tile4(struct i915_device *i915)
 {
-	return i915->graphics_version >= 125 || i915->is_mtl;
+	return GEN_VERSION_X10(i915) >= 125;
 }
 
 static void i915_get_modifier_order(struct i915_device *i915)
@@ -512,7 +511,7 @@ static int i915_align_dimensions(struct bo *bo, uint32_t format, uint32_t tiling
 	uint32_t horizontal_alignment = 64;
 	uint32_t vertical_alignment = 4;
 	struct i915_device *i915 = bo->drv->priv;
-	if (i915->graphics_version >= 125) {
+	if (GEN_VERSION_X10(i915) >= 125) {
 		horizontal_alignment = 4;
 		vertical_alignment = 4;
 	}
@@ -592,22 +591,12 @@ static void i915_clflush(void *start, size_t size)
 	}
 }
 
-static inline int gen_ioctl(int fd, unsigned long request, void *arg)
-{
-	int ret;
-
-	do {
-		ret = ioctl(fd, request, arg);
-	} while (ret == -1 && (errno == EINTR || errno == EAGAIN));
-	return ret;
-}
-
 static int gem_param(int fd, int name)
 {
 	int v = -1; /* No param uses (yet) the sign bit, reserve it for errors */
 
 	struct drm_i915_getparam gp = {.param = name, .value = &v };
-	if (gen_ioctl(fd, DRM_IOCTL_I915_GETPARAM, &gp))
+	if (drmIoctl(fd, DRM_IOCTL_I915_GETPARAM, &gp))
 		return -1;
 
 	return v;
@@ -730,43 +719,45 @@ static int i915_init(struct driver *drv)
 {
 	int ret, val;
 	struct i915_device *i915;
-	drm_i915_getparam_t get_param = { 0 };
 
 	i915 = calloc(1, sizeof(*i915));
 	if (!i915)
 		return -ENOMEM;
 
-	get_param.param = I915_PARAM_CHIPSET_ID;
-	get_param.value = &(i915->device_id);
-	ret = drmIoctl(drv->fd, DRM_IOCTL_I915_GETPARAM, &get_param);
-	if (ret) {
+	ret = gem_param(drv->fd, I915_PARAM_CHIPSET_ID);
+	if (ret == -1) {
 		drv_loge("Failed to get I915_PARAM_CHIPSET_ID\n");
 		free(i915);
 		return -EINVAL;
 	}
+	i915->device_id = ret;
+
 	/* must call before i915->graphics_version is used anywhere else */
 	i915_info_from_device_id(i915);
-
 	i915_get_modifier_order(i915);
 
-	memset(&get_param, 0, sizeof(get_param));
-	get_param.param = I915_PARAM_HAS_LLC;
-	get_param.value = &i915->has_llc;
-	ret = drmIoctl(drv->fd, DRM_IOCTL_I915_GETPARAM, &get_param);
-	if (ret) {
+	ret = gem_param(drv->fd, I915_PARAM_HAS_LLC);
+	if (ret == -1) {
 		drv_loge("Failed to get I915_PARAM_HAS_LLC\n");
 		free(i915);
 		return -EINVAL;
 	}
+	i915->has_llc = ret > 0;
 
-	i915->has_mmap_offset = gem_param(drv->fd, I915_PARAM_MMAP_GTT_VERSION) >= 4;
-	i915->has_fence_reg = gem_param(drv->fd, I915_PARAM_NUM_FENCES_AVAIL) > 0;
+	ret = gem_param(drv->fd, I915_PARAM_MMAP_GTT_VERSION);
+	if (ret == -1) {
+		drv_loge("Failed to get I915_PARAM_MMAP_GTT_VERSION\n");
+		free(i915);
+		return -EINVAL;
+	}
+	i915->has_mmap_offset = ret >= 4;
 
 	if (!i915_bo_query_prelim_meminfo(drv, i915)) {
 		i915_bo_query_meminfo(drv, i915);
 	} else {
 		drv_logi("drv: kernel supports prelim\n");
 	}
+
 #define FORCE_MEM_PROP "sys.icr.gralloc.force_mem"
 	char prop[PROPERTY_VALUE_MAX];
 	i915->force_mem_local = (i915->vram.size > 0) &&
@@ -776,30 +767,8 @@ static int i915_init(struct driver *drv)
 		drv_logi("Force to use local memory");
 	}
 
-	memset(&get_param, 0, sizeof(get_param));
-	get_param.param = I915_PARAM_NUM_FENCES_AVAIL;
-	get_param.value = &i915->num_fences_avail;
-	ret = drmIoctl(drv->fd, DRM_IOCTL_I915_GETPARAM, &get_param);
-	if (ret) {
-		drv_loge("Failed to get I915_PARAM_NUM_FENCES_AVAIL\n");
-		free(i915);
-		return -EINVAL;
-	}
-
-	memset(&get_param, 0, sizeof(get_param));
-	get_param.param = I915_PARAM_MMAP_GTT_VERSION;
-	get_param.value = &val;
-
-	ret = drmIoctl(drv->fd, DRM_IOCTL_I915_GETPARAM, &get_param);
-	if (ret) {
-		drv_loge("Failed to get I915_PARAM_MMAP_GTT_VERSION\n");
-		free(i915);
-		return -EINVAL;
-	}
-	i915->has_mmap_offset = (val >= 4);
-
 	if (i915->graphics_version >= 12)
-		i915->has_hw_protection = 1;
+		i915->has_hw_protection = true;
 
 	uint64_t width = 0, height = 0;
 	if (drmGetCap(drv->fd, DRM_CAP_CURSOR_WIDTH, &width)) {
@@ -1212,7 +1181,7 @@ static int i915_bo_create_from_metadata(struct bo *bo)
 	/* Set/Get tiling ioctl not supported  based on fence availability
 	   Refer : "https://patchwork.freedesktop.org/patch/325343/"
 	 */
-	if ((i915->graphics_version != 125) && (i915->is_mtl != true)) {
+	if ((GEN_VERSION_X10(i915) != 125) && (i915->graphics_version != 14)) {
 		gem_set_tiling.handle = bo->handles[0].u32;
 		gem_set_tiling.tiling_mode = bo->meta.tiling;
 		gem_set_tiling.stride = bo->meta.strides[0];
@@ -1252,7 +1221,7 @@ static int i915_bo_import(struct bo *bo, struct drv_import_fd_data *data)
 	/* Set/Get tiling ioctl not supported  based on fence availability
 	   Refer : "https://patchwork.freedesktop.org/patch/325343/"
 	 */
-	if ((i915->graphics_version != 125) && (i915->is_mtl != true)) {
+	if ((GEN_VERSION_X10(i915) != 125) && (i915->graphics_version != 14)) {
 		/* TODO(gsingh): export modifiers and get rid of backdoor tiling. */
 		gem_get_tiling.handle = bo->handles[0].u32;
 
@@ -1297,7 +1266,7 @@ static void *i915_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags)
 		}
 
 		/* Get the fake offset back */
-		int ret = gen_ioctl(bo->drv->fd, DRM_IOCTL_I915_GEM_MMAP_OFFSET, &mmap_arg);
+		int ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_MMAP_OFFSET, &mmap_arg);
 		if (ret != 0 && mmap_arg.flags == I915_MMAP_OFFSET_FIXED) {
 			if ((bo->meta.use_flags & BO_USE_SCANOUT) &&
 			    !(bo->meta.use_flags &
@@ -1307,7 +1276,7 @@ static void *i915_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags)
 				mmap_arg.flags = I915_MMAP_OFFSET_WB;
 			}
 
-			ret = gen_ioctl(bo->drv->fd, DRM_IOCTL_I915_GEM_MMAP_OFFSET, &mmap_arg);
+			ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_MMAP_OFFSET, &mmap_arg);
 		}
 
 		if (ret != 0) {
@@ -1398,7 +1367,7 @@ static int i915_bo_invalidate(struct bo *bo, struct mapping *mapping)
 	struct drm_i915_gem_set_domain set_domain = { 0 };
 	struct i915_device *i915_dev = (struct i915_device *)bo->drv->priv;
 
-	if (i915_dev->graphics_version != 125) {
+	if (GEN_VERSION_X10(i915_dev) != 125) {
 		set_domain.handle = bo->handles[0].u32;
 		if (bo->meta.tiling == I915_TILING_NONE) {
 			set_domain.read_domains = I915_GEM_DOMAIN_CPU;
