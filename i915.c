@@ -1173,14 +1173,14 @@ static int i915_bo_create_from_metadata(struct bo *bo)
 			gem_handle = gem_create_ext.handle;
 		}
 	} else {
-		struct drm_i915_gem_create gem_create;
-		memset(&gem_create, 0, sizeof(gem_create));
+		struct drm_i915_gem_create gem_create = { 0 };
 		gem_create.size = bo->meta.total_size;
 		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_CREATE, &gem_create);
 		if (ret) {
 			drv_loge("DRM_IOCTL_I915_GEM_CREATE failed (size=%llu)\n", gem_create.size);
 			return -errno;
 		}
+
 		gem_handle = gem_create.handle;
 	}
 
@@ -1258,7 +1258,7 @@ static void *i915_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags)
 	    (bo->meta.format_modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS))
 		return MAP_FAILED;
 
-	if (i915->has_mmap_offset) {
+	if (i915->has_mmap_offset && bo->meta.tiling != I915_TILING_NONE) {
 		struct drm_i915_gem_mmap_offset mmap_arg = {
 			.handle = bo->handles[0].u32,
 		};
@@ -1317,33 +1317,46 @@ static void *i915_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags)
 		}
 	} else if (bo->meta.tiling == I915_TILING_NONE) {
 		struct drm_i915_gem_mmap gem_map = { 0 };
-		/* TODO(b/118799155): We don't seem to have a good way to
-			* detect the use cases for which WC mapping is really needed.
-			* The current heuristic seems overly coarse and may be slowing
-			* down some other use cases unnecessarily.
-			*
-			* For now, care must be taken not to use WC mappings for
-			* Renderscript and camera use cases, as they're
-			* performance-sensitive. */
-		if ((bo->meta.use_flags & BO_USE_SCANOUT) &&
-			!(bo->meta.use_flags &
-				(BO_USE_RENDERSCRIPT | BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SW_READ_OFTEN)))
-			gem_map.flags = I915_MMAP_WC;
+		if (i915->has_mmap_offset) {
+			struct drm_i915_gem_mmap_offset gem_map = { 0 };
+			gem_map.handle = bo->handles[0].u32;
+			gem_map.flags = I915_MMAP_OFFSET_WB;
 
-		gem_map.handle = bo->handles[0].u32;
-		gem_map.offset = 0;
-		gem_map.size = bo->meta.total_size;
+                        /* Get the fake offset back */
+			ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_MMAP_OFFSET, &gem_map);
+			if (ret == 0)
+				addr = mmap(0, bo->meta.total_size, drv_get_prot(map_flags),
+						MAP_SHARED, bo->drv->fd, gem_map.offset);
+		} else {
+			/* TODO(b/118799155): We don't seem to have a good way to
+			 *  detect the use cases for which WC mapping is really needed.
+			 *  The current heuristic seems overly coarse and may be slowing
+			 *  down some other use cases unnecessarily.
+			 *
+			 *  For now, care must be taken not to use WC mappings for
+			 *  Renderscript and camera use cases, as they're
+			 *  performance-sensitive. */
+			if ((bo->meta.use_flags & BO_USE_SCANOUT) &&
+					!(bo->meta.use_flags &
+						(BO_USE_RENDERSCRIPT | BO_USE_CAMERA_READ |
+						 BO_USE_CAMERA_WRITE | BO_USE_SW_READ_OFTEN)))
+				gem_map.flags = I915_MMAP_WC;
 
-		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_MMAP, &gem_map);
-		/* DRM_IOCTL_I915_GEM_MMAP mmaps the underlying shm
-			* file and returns a user space address directly, ie,
-			* doesn't go through mmap. If we try that on a
-			* dma-buf that doesn't have a shm file, i915.ko
-			* returns ENXIO.  Fall through to
-			* DRM_IOCTL_I915_GEM_MMAP_GTT in that case, which
-			* will mmap on the drm fd instead. */
-		if (ret == 0)
-			addr = (void *)(uintptr_t)gem_map.addr_ptr;
+			gem_map.handle = bo->handles[0].u32;
+			gem_map.offset = 0;
+			gem_map.size = bo->meta.total_size;
+
+			ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_MMAP, &gem_map);
+			/* DRM_IOCTL_I915_GEM_MMAP mmaps the underlying shm
+			 * file and returns a user space address directly, ie,
+			 * doesn't go through mmap. If we try that on a
+			 * dma-buf that doesn't have a shm file, i915.ko
+			 * returns ENXIO.
+			 * Fall through to DRM_IOCTL_I915_GEM_MMAP_GTT in that case, which
+			 *  will mmap on the drm fd instead. */
+			if (ret == 0)
+				addr = (void *)(uintptr_t)gem_map.addr_ptr;
+		}
 	}else {
 		struct drm_i915_gem_mmap_gtt gem_map = { 0 };
 
