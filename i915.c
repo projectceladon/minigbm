@@ -338,7 +338,7 @@ static int i915_add_combinations(struct driver *drv)
 {
 	struct i915_device *i915 = drv->priv;
 
-	const uint64_t scanout_and_render = BO_USE_RENDER_MASK | BO_USE_SCANOUT;
+	const uint64_t scanout_and_render = BO_USE_RENDER_MASK | BO_USE_SCANOUT | BO_USE_PRIVATE_1;
 	const uint64_t render = BO_USE_RENDER_MASK;
 	const uint64_t texture_only = BO_USE_TEXTURE_MASK;
 	uint64_t render_flags = BO_USE_RENDER_MASK;
