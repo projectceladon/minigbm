@@ -442,6 +442,12 @@ static int i915_add_combinations(struct driver *drv)
 
 
 	if (i915_has_tile4(i915)) {
+		// in dual gpu case, only alloc x-tiling for dgpu for render
+		if (((drv->gpu_grp_type == TWO_GPU_IGPU_DGPU) ||
+		    (drv->gpu_grp_type == THREE_GPU_IGPU_VIRTIO_DGPU))
+			&& (i915->graphics_version >= 125))
+			return 0;
+
 		struct format_metadata metadata_4_tiled = { .tiling = I915_TILING_4,
 							    .priority = 3,
 							    .modifier = I915_FORMAT_MOD_4_TILED };

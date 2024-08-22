@@ -60,6 +60,7 @@ class cros_gralloc_driver
 	cros_gralloc_driver();
 	~cros_gralloc_driver();
 	bool is_initialized();
+	bool is_video_format(const struct cros_gralloc_buffer_descriptor *descriptor);
 	cros_gralloc_buffer *get_buffer(cros_gralloc_handle_t hnd);
 	bool
 	get_resolved_format_and_use_flags(const struct cros_gralloc_buffer_descriptor *descriptor,
@@ -83,7 +84,10 @@ class cros_gralloc_driver
 		int32_t refcount = 1;
 	};
 
+	// in dual gpu scenario, use iGPU for video, use dGPU for render;
+	// otherwise they may be the same node.
 	struct driver *drv_render_ = nullptr;
+	struct driver *drv_video_ = nullptr;
 	std::mutex mutex_;
 	std::unordered_map<uint32_t, std::unique_ptr<cros_gralloc_buffer>> buffers_;
 	std::unordered_map<cros_gralloc_handle_t, cros_gralloc_imported_handle_info> handles_;
