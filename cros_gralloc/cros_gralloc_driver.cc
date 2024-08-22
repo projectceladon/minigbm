@@ -90,6 +90,25 @@ cros_gralloc_driver *cros_gralloc_driver::get_instance()
 	return &s_instance;
 }
 
+#define DRV_INIT(drv, type, idx)        \
+    if (drv) {                                   \
+        if (drv_init(drv, type)) {               \
+            drv_loge("Failed to init driver %d\n", idx); \
+            int fd = drv_get_fd(drv);            \
+            drv_destroy(drv);                    \
+            close(fd);                           \
+            drv = nullptr;                       \
+        }                                        \
+    }
+
+#define DRV_DESTROY(drv)    \
+    if (drv) {                       \
+        int fd = drv_get_fd(drv);    \
+        drv_destroy(drv);            \
+        drv = nullptr;               \
+        close(fd);                   \
+    }
+
 cros_gralloc_driver::cros_gralloc_driver()
 {
 	/*
@@ -115,8 +134,8 @@ cros_gralloc_driver::cros_gralloc_driver()
 	char *node_name[render_num] = {};
 	int availabe_node = 0;
 	int virtio_node_idx = -1;
-	int i915_node_idx = -1;
-	int renderer_idx = 0;
+	int renderer_idx = -1;
+	int video_idx = -1;
 	uint32_t gpu_grp_type = 0;
 
 	char buf[PROP_VALUE_MAX];
@@ -124,12 +143,9 @@ cros_gralloc_driver::cros_gralloc_driver()
 	mt8183_camera_quirk_ = !strncmp(buf, "kukui", strlen("kukui"));
 
 	// destroy drivers if exist before re-initializing them
-	if (drv_render_) {
-		int fd = drv_get_fd(drv_render_);
-		drv_destroy(drv_render_);
-		drv_render_ = nullptr;
-		close(fd);
-	}
+	if (drv_video_ != drv_render_)
+		DRV_DESTROY(drv_video_)
+	DRV_DESTROY(drv_render_)
 
 	for (uint32_t i = min_render_node; i < max_render_node; i++) {
 		if (asprintf(&node, render_nodes_fmt, DRM_DIR_NAME, i) < 0)
@@ -163,7 +179,15 @@ cros_gralloc_driver::cros_gralloc_driver()
 		}
 
 		if (!strcmp(version->name, "i915")) {
-			i915_node_idx = availabe_node;
+			// Prefer i915 for performance consideration.
+			//
+			// TODO: We might have multiple i915 devices in the system and in
+			// this case we are effectively using the one with largest card id
+			// which is normally the dGPU VF or dGPU passed through device.
+			renderer_idx = availabe_node;
+			// Use first available i915 node for video bo alloc
+			if (video_idx == -1)
+				video_idx = availabe_node;
 		}
 
 		node_fd[availabe_node] = fd;
@@ -176,28 +200,6 @@ cros_gralloc_driver::cros_gralloc_driver()
 	}
 
 	if (availabe_node > 0) {
-		if (i915_node_idx != -1) {
-			// Prefer i915 for performance consideration.
-			//
-			// TODO: We might have multiple i915 devices in the system and in
-			// this case we are effectively using the one with largest card id
-			// which is normally the dGPU VF or dGPU passed through device.
-			renderer_idx = i915_node_idx;
-		} else if (virtio_node_idx != -1) {
-			// Fallback to virtio-GPU
-			renderer_idx = virtio_node_idx;
-		} else {
-			drv_loge("Weird scenario! Neither of i915 nor virtio-GPU device is"
-				" found. Use the first deivice.\n");
-			renderer_idx = 0;
-		}
-		drv_render_ = drv_create(node_fd[renderer_idx]);
-		if (!drv_render_) {
-			drv_loge("Failed to create driver for the device with card id %d\n",
-				renderer_idx);
-			close(node_fd[renderer_idx]);
-		}
-
 		switch (availabe_node) {
 		// only have one render node, is GVT-d/BM/VirtIO
 		case 1:
@@ -213,20 +215,48 @@ cros_gralloc_driver::cros_gralloc_driver()
 			// TO-DO: the 3rd node is i915 or others.
 			break;
 		}
-		if (drv_render_) {
-			if (drv_init(drv_render_, gpu_grp_type)) {
-				drv_loge("Failed to init driver\n");
-				fd = drv_get_fd(drv_render_);
-				drv_destroy(drv_render_);
-				close(fd);
-				drv_render_ = nullptr;
+
+		// if no i915 node found
+		if (renderer_idx == -1) {
+			if (virtio_node_idx != -1) {
+				// Fallback to virtio-GPU
+				video_idx = renderer_idx = virtio_node_idx;
+			} else {
+				drv_loge("Weird scenario! Neither of i915 nor virtio-GPU device is"
+					" found. Use the first deivice.\n");
+				video_idx = renderer_idx = 0;
 			}
 		}
+
+		// Create drv
+		if (!(drv_render_ = drv_create(node_fd[renderer_idx]))) {
+			drv_loge("Failed to create driver for the render device with card id %d\n",
+				renderer_idx);
+			close(node_fd[renderer_idx]);
+		}
+		if (video_idx != renderer_idx) {
+			drv_video_ = drv_create(node_fd[video_idx]);
+			if (!drv_video_) {
+				drv_loge("Failed to create driver for the video device with card id %d\n",
+					video_idx);
+				close(node_fd[video_idx]);
+			}
+		} else {
+			drv_video_ = drv_render_;
+			if (!drv_video_)
+				drv_loge("Failed to create driver for the video device with card id %d\n",
+					video_idx);
+		}
+
+		// Init drv
+		DRV_INIT(drv_render_, gpu_grp_type, renderer_idx)
+		if (video_idx != renderer_idx)
+			DRV_INIT(drv_video_, gpu_grp_type, video_idx)
 	}
 
 	for (int i = 0; i < availabe_node; i++) {
 		free(node_name[i]);
-		if (i != renderer_idx) {
+		if ((i != renderer_idx) && (i != video_idx)) {
 			close(node_fd[i]);
 		}
 	}
@@ -237,18 +267,27 @@ cros_gralloc_driver::~cros_gralloc_driver()
 	buffers_.clear();
 	handles_.clear();
 
-	if (drv_render_) {
-		int fd = drv_get_fd(drv_render_);
-		drv_destroy(drv_render_);
-		drv_render_ = nullptr;
-		close(fd);
-	}
-
+	if (drv_video_ != drv_render_)
+		DRV_DESTROY(drv_video_)
+	DRV_DESTROY(drv_render_)
 }
 
 bool cros_gralloc_driver::is_initialized()
 {
 	return (drv_render_ != nullptr);
+}
+
+bool cros_gralloc_driver::is_video_format(const struct cros_gralloc_buffer_descriptor *descriptor)
+{
+	if (!IsSupportedYUVFormat(descriptor->droid_format))
+		return false;
+
+	// if supported yuv format, almost is_video==TRUE, except check flex implementation.
+	// In this case only camera usage is video format, according to 'drv_resolve_format_and_use_flags_helper()'.
+	if (descriptor->drm_format == DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED)
+		return (descriptor->use_flags & (BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE));
+
+	return true;
 }
 
 bool cros_gralloc_driver::get_resolved_format_and_use_flags(
@@ -259,7 +298,7 @@ bool cros_gralloc_driver::get_resolved_format_and_use_flags(
 	uint64_t resolved_use_flags;
 	struct combination *combo;
 
-	struct driver *drv = drv_render_;
+	struct driver *drv = is_video_format(descriptor) ? drv_video_ : drv_render_;
 	if (mt8183_camera_quirk_ && (descriptor->use_flags & BO_USE_CAMERA_READ) &&
 	    !(descriptor->use_flags & BO_USE_SCANOUT) &&
 	    descriptor->drm_format == DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED) {
@@ -302,7 +341,7 @@ bool cros_gralloc_driver::is_supported(const struct cros_gralloc_buffer_descript
 {
 	uint32_t resolved_format;
 	uint64_t resolved_use_flags;
-	struct driver *drv = drv_render_;
+	struct driver *drv = is_video_format(descriptor) ? drv_video_ : drv_render_;
 	uint32_t max_texture_size = drv_get_max_texture_2d_size(drv);
 	if (!get_resolved_format_and_use_flags(descriptor, &resolved_format, &resolved_use_flags))
 		return false;
@@ -351,7 +390,7 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 
 	struct driver *drv;
 
-	drv = drv_render_;
+	drv = is_video_format(descriptor) ? drv_video_ : drv_render_;
 
 	if (!get_resolved_format_and_use_flags(descriptor, &resolved_format, &resolved_use_flags)) {
 		ALOGE("Failed to resolve format and use_flags.");
@@ -501,7 +540,12 @@ int32_t cros_gralloc_driver::retain(buffer_handle_t handle)
 		return -EINVAL;
 	}
 
-	drv = drv_render_;
+	struct cros_gralloc_buffer_descriptor descriptor = {
+		.droid_format = hnd->droid_format,
+		.drm_format = hnd->format,
+		.use_flags = hnd->use_flags,
+	};
+	drv = is_video_format(&descriptor) ? drv_video_ : drv_render_;
 
 	auto hnd_it = handles_.find(hnd);
 	if (hnd_it != handles_.end()) {
