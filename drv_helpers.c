@@ -522,11 +522,14 @@ void *drv_dumb_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags)
 
 int drv_bo_munmap(struct bo *bo, struct vma *vma)
 {
+	int ret = -1;
 	if (vma->cpu) {
 		free(vma->addr);
 		vma->addr = NULL;
 	}
-	return munmap(vma->addr, vma->length);
+	if (vma->addr != NULL)
+		ret = munmap(vma->addr, vma->length); 
+	return ret;
 }
 
 int drv_get_prot(uint32_t map_flags)

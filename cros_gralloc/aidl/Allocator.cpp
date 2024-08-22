@@ -116,7 +116,7 @@ ndk::ScopedAStatus Allocator::allocate(const BufferDescriptorInfoV4& descriptor,
         return ToBinderStatus(AllocationError::NO_RESOURCES);
     }
 
-    struct cros_gralloc_buffer_descriptor crosDescriptor;
+    struct cros_gralloc_buffer_descriptor crosDescriptor = {};
     if (convertToCrosDescriptor(descriptor, &crosDescriptor)) {
         return ToBinderStatus(AllocationError::UNSUPPORTED);
     }
@@ -147,9 +147,11 @@ ndk::ScopedAStatus Allocator::allocate(const BufferDescriptorInfoV4& descriptor,
         releaseBufferAndHandle(handle);
         return status;
     }
-
-    *outStride = static_cast<int32_t>(crosHandle->pixel_stride);
-    *outHandle = handle;
+    
+    if (crosHandle != nullptr) {
+        *outStride = static_cast<int32_t>(crosHandle->pixel_stride);
+        *outHandle = handle;
+    }
 
     return ndk::ScopedAStatus::ok();
 }

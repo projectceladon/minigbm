@@ -18,6 +18,7 @@
 
 #define CAPSET_CROSS_DOMAIN 5
 #define CAPSET_CROSS_FAKE 30
+#define MAX_PLANES 4
 
 static const uint32_t scanout_render_formats[] = { DRM_FORMAT_ABGR8888, DRM_FORMAT_ARGB8888,
 						   DRM_FORMAT_RGB565, DRM_FORMAT_XBGR8888,
@@ -62,8 +63,6 @@ static void cross_domain_release_private(struct driver *drv)
 		drv_array_destroy(priv->metadata_cache);
 
 	pthread_mutex_destroy(&priv->metadata_cache_lock);
-
-	free(priv);
 }
 
 static void add_combinations(struct driver *drv)
@@ -350,6 +349,7 @@ static int cross_domain_init(struct driver *drv)
 
 free_private:
 	cross_domain_release_private(drv);
+	free(priv);
 	return ret;
 }
 
@@ -402,6 +402,10 @@ static int cross_domain_bo_create(struct bo *bo, uint32_t width, uint32_t height
 	if (ret < 0) {
 		drv_loge("DRM_VIRTGPU_RESOURCE_CREATE_BLOB failed with %s\n", strerror(errno));
 		return -errno;
+	}
+
+	if (bo->meta.num_planes <= 0 || bo->meta.num_planes > MAX_PLANES) {
+		return -1;
 	}
 
 	for (uint32_t plane = 0; plane < bo->meta.num_planes; plane++)
