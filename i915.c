@@ -449,8 +449,8 @@ static int i915_add_combinations(struct driver *drv)
 		drv_add_combinations(drv, scanout_render_formats,
 				     ARRAY_SIZE(scanout_render_formats), &metadata_4_tiled,
 				     scanout_and_render_not_linear);
-                drv_add_combinations(drv, source_formats, ARRAY_SIZE(source_formats), &metadata_4_tiled,
-                                     texture_flags | BO_USE_NON_GPU_HW);
+		drv_add_combinations(drv, source_formats, ARRAY_SIZE(source_formats), &metadata_4_tiled,
+                                     texture_flags | BO_USE_NON_GPU_HW | hw_protected);
 
 	} else {
 		struct format_metadata metadata_y_tiled = { .tiling = I915_TILING_Y,
@@ -483,7 +483,7 @@ static int i915_add_combinations(struct driver *drv)
 				     ARRAY_SIZE(scanout_render_formats), &metadata_y_tiled,
 				     scanout_and_render_not_linear);
 		drv_add_combinations(drv, source_formats, ARRAY_SIZE(source_formats), &metadata_y_tiled,
-				     texture_flags | BO_USE_NON_GPU_HW);
+				     texture_flags | BO_USE_NON_GPU_HW | hw_protected);
 
 	}
 	return 0;
@@ -1172,6 +1172,24 @@ static int i915_bo_create_from_metadata(struct bo *bo)
 			}
 			gem_handle = gem_create_ext.handle;
 		}
+	} else if (i915->has_hw_protection && (bo->meta.use_flags & BO_USE_PROTECTED)) {
+		struct drm_i915_gem_create_ext_protected_content protected_content = {
+			.base = { .name = I915_GEM_CREATE_EXT_PROTECTED_CONTENT },
+			.flags = 0,
+		};
+		struct drm_i915_gem_create_ext gem_create_ext = {
+			.size = bo->meta.total_size,
+			.extensions = (uintptr_t)&protected_content,
+		};
+
+		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_CREATE_EXT, &gem_create_ext);
+		if (ret) {
+			drv_loge("DRM_IOCTL_I915_GEM_CREATE_EXT failed (size=%llu) (ret=%d) \n",
+				 gem_create_ext.size, ret);
+			return -errno;
+		}
+
+		gem_handle = gem_create_ext.handle;
 	} else {
 		struct drm_i915_gem_create gem_create;
 		memset(&gem_create, 0, sizeof(gem_create));
