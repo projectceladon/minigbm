@@ -268,6 +268,20 @@ cros_gralloc_driver::cros_gralloc_driver()
 			DRV_INIT(drv_video_, gpu_grp_type, video_idx)
 		if ((virtio_node_idx != -1) && (virtio_node_idx != renderer_idx))
 			DRV_INIT(drv_kms_, gpu_grp_type, virtio_node_idx)
+		if (drv_kms_ && (virtio_node_idx != renderer_idx)) {
+			bool virtiopic_with_blob = drv_virtpci_with_blob(drv_kms_);
+			// The virtio pci device with blob feature could import buffers
+			// from i915, otherwise need use virtio to allocate scanout
+			// non-video buffers.
+			if (virtiopic_with_blob) {
+				drv_logi("virtio gpu device with blob\n");
+				if ((drv_kms_ != drv_render_) && drv_kms_)
+					DRV_DESTROY(drv_kms_)
+				drv_kms_ = drv_render_;
+			} else {
+				drv_logi("virtio ivshmem device or no blob\n");
+			}
+		}
 	}
 
 	for (int i = 0; i < availabe_node; i++) {

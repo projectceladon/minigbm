@@ -58,6 +58,7 @@ struct virgl_priv {
 	union virgl_caps caps;
 	int host_gbm_enabled;
 	atomic_int next_blob_id;
+	uint64_t dev_feature;
 };
 
 static uint32_t translate_format(uint32_t drm_fourcc)
@@ -595,6 +596,26 @@ static int virgl_init(struct driver *drv)
 	drv->priv = priv;
 
 	virgl_init_params_and_caps(drv);
+
+	struct virgl_priv *prv = (struct virgl_priv *)drv->priv;
+
+	prv->dev_feature = 0;
+
+        for (uint32_t i = 0; i < ARRAY_SIZE(params); i++) {
+                struct drm_virtgpu_getparam get_param = { 0 };
+
+                get_param.param = params[i].param;
+                get_param.value = (uint64_t)(uintptr_t)&params[i].value;
+                int ret = drmIoctl(drv->fd, DRM_IOCTL_VIRTGPU_GETPARAM, &get_param);
+                if (ret == 0) {
+                        if ((strcmp(params[i].name, "VIRTGPU_PARAM_QUERY_DEV") == 0) && (params[i].value == 1)) {
+                                prv->dev_feature |= VIRTGPU_PARAM_QUERY_DEV_BIT;
+                        }
+                        if ((strcmp(params[i].name, "VIRTGPU_PARAM_RESOURCE_BLOB") == 0) && (params[i].value == 1)) {
+                                prv->dev_feature |= VIRTGPU_PARAM_RESOURCE_BLOB_BIT;
+                        }
+                }
+        }
 
 	if (params[param_3d].value) {
 		/* This doesn't mean host can scanout everything, it just means host
@@ -1157,6 +1178,11 @@ static uint32_t virgl_get_max_texture_2d_size(struct driver *drv)
 		return VIRGL_2D_MAX_TEXTURE_2D_SIZE;
 }
 
+static bool virgl_virtpci_with_blob(struct driver *drv) {
+	struct virgl_priv *prv = (struct virgl_priv *)drv->priv;
+	return ((prv->dev_feature & VIRTGPU_PARAM_QUERY_DEV_BIT ) && (prv->dev_feature & VIRTGPU_PARAM_RESOURCE_BLOB_BIT));
+}
+
 const struct backend virtgpu_virgl = { .name = "virtgpu_virgl",
 				       .init = virgl_init,
 				       .close = virgl_close,
@@ -1171,4 +1197,5 @@ const struct backend virtgpu_virgl = { .name = "virtgpu_virgl",
 				       .resolve_format_and_use_flags =
 					   virgl_resolve_format_and_use_flags,
 				       .resource_info = virgl_resource_info,
-				       .get_max_texture_2d_size = virgl_get_max_texture_2d_size };
+				       .get_max_texture_2d_size = virgl_get_max_texture_2d_size,
+				       .virtpci_with_blob = virgl_virtpci_with_blob };
