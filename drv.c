@@ -833,3 +833,15 @@ uint32_t drv_get_max_texture_2d_size(struct driver *drv)
 
 	return UINT32_MAX;
 }
+
+bool drv_virtpci_with_blob(struct driver * drv)
+{
+        bool ret = false;
+        assert(drv);
+        assert(drv->backend);
+
+        if (drv->backend->virtpci_with_blob) {
+                ret = drv->backend->virtpci_with_blob(drv);
+        }
+        return ret;
+}

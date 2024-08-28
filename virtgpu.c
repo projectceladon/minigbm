@@ -16,20 +16,6 @@
 #include "util.h"
 #include "virtgpu.h"
 
-#define PARAM(x)                                                                                   \
-	(struct virtgpu_param)                                                                     \
-	{                                                                                          \
-		x, #x, 0                                                                           \
-	}
-
-struct virtgpu_param params[] = {
-	PARAM(VIRTGPU_PARAM_3D_FEATURES),	   PARAM(VIRTGPU_PARAM_CAPSET_QUERY_FIX),
-	PARAM(VIRTGPU_PARAM_RESOURCE_BLOB),	   PARAM(VIRTGPU_PARAM_HOST_VISIBLE),
-	PARAM(VIRTGPU_PARAM_CROSS_DEVICE),	   PARAM(VIRTGPU_PARAM_CONTEXT_INIT),
-	PARAM(VIRTGPU_PARAM_SUPPORTED_CAPSET_IDs), PARAM(VIRTGPU_PARAM_CREATE_GUEST_HANDLE),
-	PARAM(VIRTGPU_PARAM_RESOURCE_SYNC),	   PARAM(VIRTGPU_PARAM_GUEST_VRAM),
-};
-
 extern const struct backend virtgpu_virgl;
 extern const struct backend virtgpu_cross_domain;
 
