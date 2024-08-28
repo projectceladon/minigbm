@@ -145,6 +145,8 @@ cros_gralloc_driver::cros_gralloc_driver()
 	// destroy drivers if exist before re-initializing them
 	if (drv_video_ != drv_render_)
 		DRV_DESTROY(drv_video_)
+        if (drv_kms_ != drv_render_)
+                DRV_DESTROY(drv_kms_)
 	DRV_DESTROY(drv_render_)
 
 	for (uint32_t i = min_render_node; i < max_render_node; i++) {
@@ -248,15 +250,29 @@ cros_gralloc_driver::cros_gralloc_driver()
 					video_idx);
 		}
 
+		if ((virtio_node_idx != -1) && (virtio_node_idx != renderer_idx)) {
+			drv_kms_ = drv_create(node_fd[virtio_node_idx]);
+			if (!drv_kms_) {
+				drv_loge("Failed to create driver for the virtio-gpu device with card id %d\n",
+                                          virtio_node_idx);
+				close(node_fd[virtio_node_idx]);
+				drv_kms_ = drv_render_;
+                        }
+		} else {
+			drv_kms_ = drv_render_;
+		}
+
 		// Init drv
 		DRV_INIT(drv_render_, gpu_grp_type, renderer_idx)
 		if (video_idx != renderer_idx)
 			DRV_INIT(drv_video_, gpu_grp_type, video_idx)
+		if ((virtio_node_idx != -1) && (virtio_node_idx != renderer_idx))
+			DRV_INIT(drv_kms_, gpu_grp_type, virtio_node_idx)
 	}
 
 	for (int i = 0; i < availabe_node; i++) {
 		free(node_name[i]);
-		if ((i != renderer_idx) && (i != video_idx)) {
+		if ((i != renderer_idx) && (i != video_idx) && (i != virtio_node_idx)) {
 			close(node_fd[i]);
 		}
 	}
@@ -269,6 +285,8 @@ cros_gralloc_driver::~cros_gralloc_driver()
 
 	if (drv_video_ != drv_render_)
 		DRV_DESTROY(drv_video_)
+	if (drv_kms_ != drv_render_)
+		DRV_DESTROY(drv_kms_)
 	DRV_DESTROY(drv_render_)
 }
 
@@ -299,6 +317,9 @@ bool cros_gralloc_driver::get_resolved_format_and_use_flags(
 	struct combination *combo;
 
 	struct driver *drv = is_video_format(descriptor) ? drv_video_ : drv_render_;
+	if ((descriptor->use_flags & BO_USE_SCANOUT) && !(is_video_format(descriptor)))
+		drv = drv_kms_;
+
 	if (mt8183_camera_quirk_ && (descriptor->use_flags & BO_USE_CAMERA_READ) &&
 	    !(descriptor->use_flags & BO_USE_SCANOUT) &&
 	    descriptor->drm_format == DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED) {
@@ -342,6 +363,8 @@ bool cros_gralloc_driver::is_supported(const struct cros_gralloc_buffer_descript
 	uint32_t resolved_format;
 	uint64_t resolved_use_flags;
 	struct driver *drv = is_video_format(descriptor) ? drv_video_ : drv_render_;
+	if ((descriptor->use_flags & BO_USE_SCANOUT) && !(is_video_format(descriptor)))
+		drv = drv_kms_;
 	uint32_t max_texture_size = drv_get_max_texture_2d_size(drv);
 	if (!get_resolved_format_and_use_flags(descriptor, &resolved_format, &resolved_use_flags))
 		return false;
@@ -391,6 +414,9 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 	struct driver *drv;
 
 	drv = is_video_format(descriptor) ? drv_video_ : drv_render_;
+	if ((descriptor->use_flags & BO_USE_SCANOUT) && (!is_video_format(descriptor))) {
+		drv = drv_kms_;
+	}
 
 	if (!get_resolved_format_and_use_flags(descriptor, &resolved_format, &resolved_use_flags)) {
 		ALOGE("Failed to resolve format and use_flags.");
@@ -454,7 +480,6 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 		hnd->fds[i] = -1;
 
 	hnd->num_planes = num_planes;
-	hnd->from_kms = false; // not used, just set a default value. keep this member to be backward compatible.
 	for (size_t plane = 0; plane < num_planes; plane++) {
 		ret = drv_bo_get_plane_fd(bo, plane);
 		if (ret < 0)
@@ -546,6 +571,8 @@ int32_t cros_gralloc_driver::retain(buffer_handle_t handle)
 		.use_flags = hnd->use_flags,
 	};
 	drv = is_video_format(&descriptor) ? drv_video_ : drv_render_;
+	if ((hnd->use_flags & BO_USE_SCANOUT) && (!is_video_format(&descriptor)))
+		drv = drv_kms_;
 
 	auto hnd_it = handles_.find(hnd);
 	if (hnd_it != handles_.end()) {
