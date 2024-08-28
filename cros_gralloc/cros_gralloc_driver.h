@@ -88,6 +88,8 @@ class cros_gralloc_driver
 	// otherwise they may be the same node.
 	struct driver *drv_render_ = nullptr;
 	struct driver *drv_video_ = nullptr;
+	// the drv_kms_ is used to allocate scanout non-video buffer.
+	struct driver *drv_kms_ = nullptr;
 	std::mutex mutex_;
 	std::unordered_map<uint32_t, std::unique_ptr<cros_gralloc_buffer>> buffers_;
 	std::unordered_map<cros_gralloc_handle_t, cros_gralloc_imported_handle_info> handles_;
