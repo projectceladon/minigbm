@@ -1183,6 +1183,11 @@ static bool virgl_virtpci_with_blob(struct driver *drv) {
 	return ((prv->dev_feature & VIRTGPU_PARAM_QUERY_DEV_BIT ) && (prv->dev_feature & VIRTGPU_PARAM_RESOURCE_BLOB_BIT));
 }
 
+static bool virgl_drv_virtgpu_is_ivshm(struct driver *drv) {
+        struct virgl_priv *prv = (struct virgl_priv *)drv->priv;
+        return !(prv->dev_feature & VIRTGPU_PARAM_QUERY_DEV_BIT);
+}
+
 const struct backend virtgpu_virgl = { .name = "virtgpu_virgl",
 				       .init = virgl_init,
 				       .close = virgl_close,
@@ -1198,4 +1203,5 @@ const struct backend virtgpu_virgl = { .name = "virtgpu_virgl",
 					   virgl_resolve_format_and_use_flags,
 				       .resource_info = virgl_resource_info,
 				       .get_max_texture_2d_size = virgl_get_max_texture_2d_size,
-				       .virtpci_with_blob = virgl_virtpci_with_blob };
+				       .virtpci_with_blob = virgl_virtpci_with_blob,
+				       .virtgpu_is_ivshm = virgl_drv_virtgpu_is_ivshm };
