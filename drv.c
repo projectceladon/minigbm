@@ -845,3 +845,15 @@ bool drv_virtpci_with_blob(struct driver * drv)
         }
         return ret;
 }
+
+bool drv_virtgpu_is_ivshm(struct driver * drv)
+{
+        bool ret = false;
+        assert(drv);
+        assert(drv->backend);
+
+        if (drv->backend->virtgpu_is_ivshm) {
+                ret = drv->backend->virtgpu_is_ivshm(drv);
+        }
+        return ret;
+}

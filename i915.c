@@ -443,9 +443,7 @@ static int i915_add_combinations(struct driver *drv)
 
 	if (i915_has_tile4(i915)) {
 		// in dual gpu case, only alloc x-tiling for dgpu for render
-		if (((drv->gpu_grp_type == TWO_GPU_IGPU_DGPU) ||
-		    (drv->gpu_grp_type == THREE_GPU_IGPU_VIRTIO_DGPU))
-			&& (i915->graphics_version >= 125))
+		if ((drv->gpu_grp_type & GPU_TYPE_DUAL_IGPU_DGPU) && (i915->graphics_version >= 125))
 			return 0;
 
 		struct format_metadata metadata_4_tiled = { .tiling = I915_TILING_4,
@@ -476,8 +474,7 @@ static int i915_add_combinations(struct driver *drv)
 		struct format_metadata metadata_y_tiled = { .tiling = I915_TILING_Y,
 							    .priority = 3,
 							    .modifier = I915_FORMAT_MOD_Y_TILED };
-		if ((drv->gpu_grp_type == TWO_GPU_IGPU_DGPU) ||
-		    (drv->gpu_grp_type == THREE_GPU_IGPU_VIRTIO_DGPU)) {
+		if (drv->gpu_grp_type & GPU_TYPE_DUAL_IGPU_DGPU) {
 			scanout_and_render_not_linear = unset_flags(scanout_and_render, BO_USE_SCANOUT);
 		}
 /* Support y-tiled NV12 and P010 for libva */

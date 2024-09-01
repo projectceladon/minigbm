@@ -27,6 +27,11 @@
 // DRM Card nodes start at 0
 #define DRM_CARD_NODE_START 0
 
+#define IVSH_WIDTH 1600
+#define IVSH_HEIGHT 900
+
+#define IVSH_DEVICE_NUM 2
+
 class cros_gralloc_driver_preloader
 {
       public:
@@ -109,6 +114,54 @@ cros_gralloc_driver *cros_gralloc_driver::get_instance()
         close(fd);                   \
     }
 
+int32_t cros_gralloc_driver::reload()
+{
+	int fd;
+	drmVersionPtr version;
+	char const *str = "%s/renderD%d";
+	char *node;
+
+	// Max probe two ivshm node, the first one is used for screen cast.
+	for (uint32_t i = drv_num_; i < drv_num_ + IVSH_DEVICE_NUM; i++) {
+		if (asprintf(&node, str, DRM_DIR_NAME, i) < 0)
+			continue;
+
+		fd = open(node, O_RDWR, 0);
+		free(node);
+		if (fd < 0)
+			continue;
+
+		version = drmGetVersion(fd);
+		if (!version) {
+			close(fd);
+			continue;
+		}
+
+		drmFreeVersion(version);
+		drv_ivshmem_ = drv_create(fd);
+		if (!drv_ivshmem_) {
+			drv_loge("Failed to create driver\n");
+			close(fd);
+			continue;;
+		}
+
+		if (drv_init(drv_ivshmem_, gpu_grp_type_)) {
+			drv_loge("Failed to init driver\n");
+			DRV_DESTROY(drv_ivshmem_)
+			continue;;
+		}
+		if (drv_virtgpu_is_ivshm(drv_ivshmem_)) {
+			drv_logi("New added node is virtio-ivishmem node");
+			return 0;
+		} else {
+			drv_logi("New added node is NOT virtio-ivishmem node");
+			DRV_DESTROY(drv_ivshmem_)
+			continue;
+		}
+	}
+	return -ENODEV;
+}
+
 cros_gralloc_driver::cros_gralloc_driver()
 {
 	/*
@@ -134,9 +187,9 @@ cros_gralloc_driver::cros_gralloc_driver()
 	char *node_name[render_num] = {};
 	int availabe_node = 0;
 	int virtio_node_idx = -1;
+	int ivshm_node_idx = -1;
 	int renderer_idx = -1;
 	int video_idx = -1;
-	uint32_t gpu_grp_type = 0;
 
 	char buf[PROP_VALUE_MAX];
 	property_get("ro.product.device", buf, "unknown");
@@ -148,6 +201,10 @@ cros_gralloc_driver::cros_gralloc_driver()
         if (drv_kms_ != drv_render_)
                 DRV_DESTROY(drv_kms_)
 	DRV_DESTROY(drv_render_)
+
+	if (drv_ivshmem_) {
+		DRV_DESTROY(drv_ivshmem_)
+	}
 
 	for (uint32_t i = min_render_node; i < max_render_node; i++) {
 		if (asprintf(&node, render_nodes_fmt, DRM_DIR_NAME, i) < 0)
@@ -177,7 +234,10 @@ cros_gralloc_driver::cros_gralloc_driver()
 			continue;
 
 		if (!strcmp(version->name, "virtio_gpu")) {
-			virtio_node_idx = availabe_node;
+			if (virtio_node_idx == -1)
+				virtio_node_idx = availabe_node;
+			else if (ivshm_node_idx == -1)
+				ivshm_node_idx = availabe_node;
 		}
 
 		if (!strcmp(version->name, "i915")) {
@@ -201,23 +261,11 @@ cros_gralloc_driver::cros_gralloc_driver()
 		drmFreeVersion(version);
 	}
 
-	if (availabe_node > 0) {
-		switch (availabe_node) {
-		// only have one render node, is GVT-d/BM/VirtIO
-		case 1:
-			gpu_grp_type = (virtio_node_idx != -1)? ONE_GPU_VIRTIO: ONE_GPU_INTEL;
-			break;
-		// is SR-IOV or iGPU + dGPU
-		case 2:
-			gpu_grp_type = (virtio_node_idx != -1)? TWO_GPU_IGPU_VIRTIO: TWO_GPU_IGPU_DGPU;
-			break;
-		// is SR-IOV + dGPU
-		case 3:
-			gpu_grp_type = THREE_GPU_IGPU_VIRTIO_DGPU;
-			// TO-DO: the 3rd node is i915 or others.
-			break;
-		}
+	drv_num_ = DRM_RENDER_NODE_START + availabe_node;
 
+	if (availabe_node > 0) {
+		if ((renderer_idx != -1) && (video_idx != -1) && (video_idx != renderer_idx))
+			gpu_grp_type_ |= GPU_TYPE_DUAL_IGPU_DGPU;
 		// if no i915 node found
 		if (renderer_idx == -1) {
 			if (virtio_node_idx != -1) {
@@ -262,31 +310,48 @@ cros_gralloc_driver::cros_gralloc_driver()
 			drv_kms_ = drv_render_;
 		}
 
+		if (ivshm_node_idx != -1) {
+			if (!(drv_ivshmem_ = drv_create(node_fd[ivshm_node_idx]))) {
+				drv_loge("Failed to create driver for the ivshm device with card id %d\n",
+					ivshm_node_idx);
+				close(node_fd[ivshm_node_idx]);
+			}
+		}
+
 		// Init drv
-		DRV_INIT(drv_render_, gpu_grp_type, renderer_idx)
+		DRV_INIT(drv_render_, gpu_grp_type_, renderer_idx)
 		if (video_idx != renderer_idx)
-			DRV_INIT(drv_video_, gpu_grp_type, video_idx)
+			DRV_INIT(drv_video_, gpu_grp_type_, video_idx)
 		if ((virtio_node_idx != -1) && (virtio_node_idx != renderer_idx))
-			DRV_INIT(drv_kms_, gpu_grp_type, virtio_node_idx)
-		if (drv_kms_ && (virtio_node_idx != renderer_idx)) {
+			DRV_INIT(drv_kms_, gpu_grp_type_, virtio_node_idx)
+		if (drv_kms_ && (virtio_node_idx != renderer_idx) && (drv_kms_ != drv_render_)) {
 			bool virtiopic_with_blob = drv_virtpci_with_blob(drv_kms_);
 			// The virtio pci device with blob feature could import buffers
 			// from i915, otherwise need use virtio to allocate scanout
 			// non-video buffers.
 			if (virtiopic_with_blob) {
-				drv_logi("virtio gpu device with blob\n");
+				drv_logi("Virtio gpu device with blob\n");
 				if ((drv_kms_ != drv_render_) && drv_kms_)
 					DRV_DESTROY(drv_kms_)
 				drv_kms_ = drv_render_;
 			} else {
-				drv_logi("virtio ivshmem device or no blob\n");
+				drv_logi("Virtio ivshmem device or no blob\n");
+			}
+		}
+		if (ivshm_node_idx != -1) {
+			DRV_INIT(drv_ivshmem_, gpu_grp_type_, ivshm_node_idx)
+			if (drv_virtgpu_is_ivshm(drv_ivshmem_)) {
+				drv_logi("Node is virtio-ivishmem node");
+			} else {
+				drv_logi("Node is NOT virtio-ivishmem node");
+				DRV_DESTROY(drv_ivshmem_)
 			}
 		}
 	}
 
 	for (int i = 0; i < availabe_node; i++) {
 		free(node_name[i]);
-		if ((i != renderer_idx) && (i != video_idx) && (i != virtio_node_idx)) {
+		if ((i != renderer_idx) && (i != video_idx) && (i != virtio_node_idx) && (i != ivshm_node_idx)) {
 			close(node_fd[i]);
 		}
 	}
@@ -322,6 +387,14 @@ bool cros_gralloc_driver::is_video_format(const struct cros_gralloc_buffer_descr
 	return true;
 }
 
+bool cros_gralloc_driver::use_ivshm_drv(const struct cros_gralloc_buffer_descriptor *descriptor)
+{
+	if ((descriptor->use_flags & BO_USE_SCANOUT) &&
+            (descriptor->width == IVSH_WIDTH) && (descriptor->height == IVSH_HEIGHT))
+		return true;
+        return false;
+}
+
 bool cros_gralloc_driver::get_resolved_format_and_use_flags(
     const struct cros_gralloc_buffer_descriptor *descriptor, uint32_t *out_format,
     uint64_t *out_use_flags)
@@ -331,7 +404,9 @@ bool cros_gralloc_driver::get_resolved_format_and_use_flags(
 	struct combination *combo;
 
 	struct driver *drv = is_video_format(descriptor) ? drv_video_ : drv_render_;
-	if ((descriptor->use_flags & BO_USE_SCANOUT) && !(is_video_format(descriptor)))
+	if (drv_ivshmem_ && use_ivshm_drv(descriptor)) {
+		drv = drv_ivshmem_;
+	} else if ((descriptor->use_flags & BO_USE_SCANOUT) && !(is_video_format(descriptor)))
 		drv = drv_kms_;
 
 	if (mt8183_camera_quirk_ && (descriptor->use_flags & BO_USE_CAMERA_READ) &&
@@ -377,7 +452,13 @@ bool cros_gralloc_driver::is_supported(const struct cros_gralloc_buffer_descript
 	uint32_t resolved_format;
 	uint64_t resolved_use_flags;
 	struct driver *drv = is_video_format(descriptor) ? drv_video_ : drv_render_;
-	if ((descriptor->use_flags & BO_USE_SCANOUT) && !(is_video_format(descriptor)))
+	if (!drv_ivshmem_ && (descriptor->width == IVSH_WIDTH) && (descriptor->height == IVSH_HEIGHT)) {
+		if (reload()) {
+		}
+	}
+	if (drv_ivshmem_ && use_ivshm_drv(descriptor)) {
+		drv = drv_ivshmem_;
+	} else if ((descriptor->use_flags & BO_USE_SCANOUT) && !(is_video_format(descriptor)))
 		drv = drv_kms_;
 	uint32_t max_texture_size = drv_get_max_texture_2d_size(drv);
 	if (!get_resolved_format_and_use_flags(descriptor, &resolved_format, &resolved_use_flags))
@@ -428,9 +509,10 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 	struct driver *drv;
 
 	drv = is_video_format(descriptor) ? drv_video_ : drv_render_;
-	if ((descriptor->use_flags & BO_USE_SCANOUT) && (!is_video_format(descriptor))) {
+	if (drv_ivshmem_ && use_ivshm_drv(descriptor)) {
+		drv = drv_ivshmem_;
+	} else if ((descriptor->use_flags & BO_USE_SCANOUT) && !(is_video_format(descriptor)))
 		drv = drv_kms_;
-	}
 
 	if (!get_resolved_format_and_use_flags(descriptor, &resolved_format, &resolved_use_flags)) {
 		ALOGE("Failed to resolve format and use_flags.");
@@ -585,7 +667,9 @@ int32_t cros_gralloc_driver::retain(buffer_handle_t handle)
 		.use_flags = hnd->use_flags,
 	};
 	drv = is_video_format(&descriptor) ? drv_video_ : drv_render_;
-	if ((hnd->use_flags & BO_USE_SCANOUT) && (!is_video_format(&descriptor)))
+	if (drv_ivshmem_ && use_ivshm_drv(&descriptor)) {
+		drv = drv_ivshmem_;
+	} else if ((hnd->use_flags & BO_USE_SCANOUT) && !(is_video_format(&descriptor)))
 		drv = drv_kms_;
 
 	auto hnd_it = handles_.find(hnd);

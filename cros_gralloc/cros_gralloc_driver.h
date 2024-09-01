@@ -8,6 +8,7 @@
 #define CROS_GRALLOC_DRIVER_H
 
 #include "cros_gralloc_buffer.h"
+#include "../drv_priv.h"
 
 #include <functional>
 #include <memory>
@@ -61,6 +62,8 @@ class cros_gralloc_driver
 	~cros_gralloc_driver();
 	bool is_initialized();
 	bool is_video_format(const struct cros_gralloc_buffer_descriptor *descriptor);
+	bool use_ivshm_drv(const struct cros_gralloc_buffer_descriptor *descriptor);
+	int32_t reload();
 	cros_gralloc_buffer *get_buffer(cros_gralloc_handle_t hnd);
 	bool
 	get_resolved_format_and_use_flags(const struct cros_gralloc_buffer_descriptor *descriptor,
@@ -90,6 +93,9 @@ class cros_gralloc_driver
 	struct driver *drv_video_ = nullptr;
 	// the drv_kms_ is used to allocate scanout non-video buffer.
 	struct driver *drv_kms_ = nullptr;
+	struct driver *drv_ivshmem_ = nullptr;
+	uint32_t drv_num_ = 0;
+	uint64_t gpu_grp_type_ = GPU_TYPE_NORMAL;
 	std::mutex mutex_;
 	std::unordered_map<uint32_t, std::unique_ptr<cros_gralloc_buffer>> buffers_;
 	std::unordered_map<cros_gralloc_handle_t, cros_gralloc_imported_handle_info> handles_;

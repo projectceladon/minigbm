@@ -252,6 +252,8 @@ uint32_t drv_get_max_texture_2d_size(struct driver *drv);
 
 bool drv_virtpci_with_blob(struct driver * drv);
 
+bool drv_virtgpu_is_ivshm(struct driver * drv);
+
 enum drv_log_level {
 	DRV_LOGV,
 	DRV_LOGD,

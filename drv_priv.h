@@ -60,13 +60,8 @@ struct combination {
 	uint64_t use_flags;
 };
 
-enum CIV_GPU_TYPE {
-	ONE_GPU_INTEL = 1,
-	ONE_GPU_VIRTIO,
-	TWO_GPU_IGPU_VIRTIO,
-	TWO_GPU_IGPU_DGPU,
-	THREE_GPU_IGPU_VIRTIO_DGPU
-};
+#define GPU_TYPE_NORMAL			0
+#define GPU_TYPE_DUAL_IGPU_DGPU		(1ull << 0)
 
 struct driver {
 	int fd;
@@ -74,7 +69,7 @@ struct driver {
 	void *priv;
 	pthread_mutex_t buffer_table_lock;
 	void *buffer_table;
-	uint32_t gpu_grp_type;  	// enum CIV_GPU_TYPE
+	uint64_t gpu_grp_type;
 	pthread_mutex_t mappings_lock;
 	struct drv_array *mappings;
 	struct drv_array *combos;
@@ -112,6 +107,7 @@ struct backend {
 			     uint32_t offsets[DRV_MAX_PLANES], uint64_t *format_modifier);
 	uint32_t (*get_max_texture_2d_size)(struct driver *drv);
 	bool (*virtpci_with_blob)(struct driver *drv);
+	bool (*virtgpu_is_ivshm)(struct driver *drv);
 };
 
 // clang-format off
