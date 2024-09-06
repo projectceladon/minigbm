@@ -275,12 +275,23 @@ Return<void> CrosGralloc4Mapper::lock(void* rawBuffer, uint64_t cpuUsage, const 
         hidlCb(Error::BAD_VALUE, nullptr);
         return Void();
     }
-
-    if (region.height > crosHandle->height) {
-        drv_log("Failed to lock. Invalid region: height greater than buffer height (%d vs %d).\n",
-                region.height, crosHandle->height);
-        hidlCb(Error::BAD_VALUE, nullptr);
-        return Void();
+    /*
+     * As per mapper 4.0 doc, for HAL_PIXEL_FORMAT_BLOB format buffer width is size in bytes and
+     * height is 1. So, check the height for BLOB format with 1 rather than region height.
+     */
+    if (crosHandle->droid_format == HAL_PIXEL_FORMAT_BLOB) {
+        if (crosHandle->height != 1) {
+            drv_log("Failed to lock. Height for BLOB format should be 1.\n");
+            hidlCb(Error::BAD_VALUE, nullptr);
+            return Void();
+        }
+    } else {
+        if (region.height > crosHandle->height) {
+            drv_log("Failed to lock. Invalid region: height > buffer height (%d vs %d).\n",
+                    region.height, crosHandle->height);
+            hidlCb(Error::BAD_VALUE, nullptr);
+            return Void();
+        }
     }
 
     struct rectangle rect = {static_cast<uint32_t>(region.left), static_cast<uint32_t>(region.top),
