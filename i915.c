@@ -188,39 +188,14 @@ static uint64_t unset_flags(uint64_t current_flags, uint64_t mask)
 }
 
 /*
- * Check virtual machine type, by checking cpuid
+ * Check if in virtual machine mode, by checking cpuid
  */
-enum {
-	HYPERTYPE_NONE 	    = 0,
-	HYPERTYPE_ANY       = 0x1,
-	HYPERTYPE_TYPE_ACRN = 0x2,
-	HYPERTYPE_TYPE_KVM  = 0x4
-};
-static inline int vm_type()
+static inline bool is_in_vm()
 {
-	int type = HYPERTYPE_NONE;
-	union {
-		uint32_t sig32[3];
-		char text[13];
-	} sig = {};
-
+	int ret;
 	uint32_t eax=0, ebx=0, ecx=0, edx=0;
-	if(__get_cpuid(1, &eax, &ebx, &ecx, &edx)) {
-		if (((ecx >> 31) & 1) == 1) {
-			type |= HYPERTYPE_ANY;
-
-			__cpuid(0x40000000U, eax, ebx, ecx, edx);
-			sig.sig32[0] = ebx;
-			sig.sig32[1] = ecx;
-			sig.sig32[2] = edx;
-			if (!strncmp(sig.text, "ACRNACRNACRN", 12))
-				type |= HYPERTYPE_TYPE_ACRN;
-			else if ((!strncmp(sig.text, "KVMKVMKVM", 9)) ||
-				 (!strncmp(sig.text, "EVMMEVMMEVMM", 12)))
-				type |= HYPERTYPE_TYPE_KVM;
-		}
-	}
-	return type;
+	ret = __get_cpuid(1, &eax, &ebx, &ecx, &edx);
+	return ret && (((ecx >> 31) & 1) == 1);
 }
 
 static int i915_add_combinations(struct driver *drv)
@@ -228,7 +203,6 @@ static int i915_add_combinations(struct driver *drv)
 	struct i915_device *i915 = drv->priv;
 	struct format_metadata metadata;
 	uint64_t render, scanout_and_render, texture_only;
-	bool is_kvm = vm_type() & HYPERTYPE_TYPE_KVM;
 
 	scanout_and_render = BO_USE_RENDER_MASK | BO_USE_SCANOUT;
 #ifdef USE_GRALLOC1
@@ -282,6 +256,9 @@ static int i915_add_combinations(struct driver *drv)
 	render = unset_flags(render, linear_mask | camera_mask);
 	scanout_and_render = unset_flags(scanout_and_render, linear_mask |camera_mask);
 
+	/* On ADL-P vm mode on 5.10 kernel, BO_USE_SCANOUT is not well supported for tiled bo */
+	if (is_in_vm() && i915->is_adlp)
+	    scanout_and_render = unset_flags(scanout_and_render, BO_USE_SCANOUT);
 
 	/* On dGPU, only use linear */
 	if (i915->genx10 >= 125)
@@ -373,7 +350,27 @@ static int i915_align_dimensions(struct bo *bo, uint32_t tiling, uint32_t *strid
 		vertical_alignment = 32;
 		break;
 	}
+	if (i915->genx10 >= 125) {
+		/*
+		 * The alignment calculated above is based on the full size luma plane and to have
+		 * chroma
+		 * planes properly aligned with subsampled formats, we need to multiply luma
+		 * alignment by
+		 * subsampling factor.
+		 */
+		switch (bo->meta.format) {
+		case DRM_FORMAT_YVU420_ANDROID:
+		case DRM_FORMAT_YVU420:
+			horizontal_alignment *= 2;
 
+		/* Fall through */
+
+		case DRM_FORMAT_NV12:
+			vertical_alignment *= 2;
+			break;
+		}
+		i915_private_align_dimensions(bo->meta.format, &vertical_alignment);
+	}
 	*aligned_height = ALIGN(*aligned_height, vertical_alignment);
 
 #ifdef USE_GRALLOC1
@@ -476,6 +473,7 @@ static bool i915_bo_query_prelim_meminfo(struct driver *drv, struct i915_device 
 		return false;
 	}
 	if (item.length <= 0) {
+		drv_log("drv: Invalid memory region length\n");
 		return false;
 	}
 	struct prelim_drm_i915_query_memory_regions *meminfo = calloc(1, item.length);
@@ -566,6 +564,7 @@ static int i915_init(struct driver *drv)
 	i915->has_fence_reg = gem_param(drv->fd, I915_PARAM_NUM_FENCES_AVAIL) > 0;
 
 	if (!i915_bo_query_prelim_meminfo(drv, i915)) {
+		drv_info("drv: Kernel does not support prelim\n");
 		i915_bo_query_meminfo(drv, i915);
 	} else {
 		drv_info("drv: kernel supports prelim\n");
@@ -860,7 +859,7 @@ static int i915_bo_create_from_metadata(struct bo *bo)
 	for (plane = 0; plane < bo->meta.num_planes; plane++)
 		bo->handles[plane].u32 = gem_handle;
 
-	if (i915_dev->genx10 != 125) {
+	if (i915_dev->has_fence_reg) {
 		memset(&gem_set_tiling, 0, sizeof(gem_set_tiling));
 		gem_set_tiling.handle = bo->handles[0].u32;
 		gem_set_tiling.tiling_mode = bo->meta.tiling;
@@ -895,7 +894,7 @@ static int i915_bo_import(struct bo *bo, struct drv_import_fd_data *data)
 	if (ret)
 		return ret;
 
-	if (i915_dev->genx10 != 125) {
+	if (i915_dev->has_fence_reg) {
 		/* TODO(gsingh): export modifiers and get rid of backdoor tiling. */
 		memset(&gem_get_tiling, 0, sizeof(gem_get_tiling));
 		gem_get_tiling.handle = bo->handles[0].u32;
@@ -930,13 +929,7 @@ static void *i915_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t 
 		if (i915->has_local_mem) {
 			mmap_arg.flags = I915_MMAP_OFFSET_FIXED;
 		} else {
-                        if ((bo->meta.use_flags & BO_USE_SCANOUT) &&
-                            !(bo->meta.use_flags &
-                              (BO_USE_RENDERSCRIPT | BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SW_READ_OFTEN))) {
-                                mmap_arg.flags = I915_MMAP_OFFSET_WC;
-                        } else {
-                                mmap_arg.flags = I915_MMAP_OFFSET_WB;
-                        }
+			mmap_arg.flags = I915_MMAP_OFFSET_WC;
 		}
 
 		/* Get the fake offset back */
@@ -944,7 +937,7 @@ static void *i915_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t 
 		if (ret != 0 && mmap_arg.flags == I915_MMAP_OFFSET_FIXED) {
 			if ((bo->meta.use_flags & BO_USE_SCANOUT) &&
 			    !(bo->meta.use_flags &
-			      (BO_USE_RENDERSCRIPT | BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SW_READ_OFTEN))) {
+			      (BO_USE_RENDERSCRIPT | BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE))) {
 				mmap_arg.flags = I915_MMAP_OFFSET_WC;
 			} else {
 				mmap_arg.flags = I915_MMAP_OFFSET_WB;
@@ -979,7 +972,7 @@ static void *i915_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t 
 		 * performance-sensitive. */
 		if ((bo->meta.use_flags & BO_USE_SCANOUT) &&
 		    !(bo->meta.use_flags &
-		      (BO_USE_RENDERSCRIPT | BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SW_READ_OFTEN)))
+		      (BO_USE_RENDERSCRIPT | BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE)))
 			gem_map.flags = I915_MMAP_WC;
 
 		gem_map.handle = bo->handles[0].u32;
@@ -1006,7 +999,7 @@ static void *i915_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t 
 
 			if ((bo->meta.use_flags & BO_USE_SCANOUT) &&
 			    !(bo->meta.use_flags &
-			      (BO_USE_RENDERSCRIPT | BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SW_READ_OFTEN)))
+			      (BO_USE_RENDERSCRIPT | BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE)))
 				gem_map.flags = I915_MMAP_WC;
 			gem_map.handle = bo->handles[0].u32;
 			gem_map.offset = 0;
@@ -1040,26 +1033,23 @@ static int i915_bo_invalidate(struct bo *bo, struct mapping *mapping)
 {
 	int ret;
 	struct drm_i915_gem_set_domain set_domain;
-	struct i915_device *i915_dev = (struct i915_device *)bo->drv->priv;
 
-	if (i915_dev->genx10 != 125) {
-		memset(&set_domain, 0, sizeof(set_domain));
-		set_domain.handle = bo->handles[0].u32;
-		if (bo->meta.tiling == I915_TILING_NONE) {
-			set_domain.read_domains = I915_GEM_DOMAIN_CPU;
-			if (mapping->vma->map_flags & BO_MAP_WRITE)
-				set_domain.write_domain = I915_GEM_DOMAIN_CPU;
-		} else {
-			set_domain.read_domains = I915_GEM_DOMAIN_GTT;
-			if (mapping->vma->map_flags & BO_MAP_WRITE)
-				set_domain.write_domain = I915_GEM_DOMAIN_GTT;
-		}
+	memset(&set_domain, 0, sizeof(set_domain));
+	set_domain.handle = bo->handles[0].u32;
+	if (bo->meta.tiling == I915_TILING_NONE) {
+		set_domain.read_domains = I915_GEM_DOMAIN_CPU;
+		if (mapping->vma->map_flags & BO_MAP_WRITE)
+			set_domain.write_domain = I915_GEM_DOMAIN_CPU;
+	} else {
+		set_domain.read_domains = I915_GEM_DOMAIN_GTT;
+		if (mapping->vma->map_flags & BO_MAP_WRITE)
+			set_domain.write_domain = I915_GEM_DOMAIN_GTT;
+	}
 
-		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_SET_DOMAIN, &set_domain);
-		if (ret) {
-			drv_log("DRM_IOCTL_I915_GEM_SET_DOMAIN with %d\n", ret);
-			return ret;
-		}
+	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_SET_DOMAIN, &set_domain);
+	if (ret) {
+		drv_log("DRM_IOCTL_I915_GEM_SET_DOMAIN with %d\n", ret);
+		return ret;
 	}
 
 	return 0;
