@@ -1190,7 +1190,7 @@ static int i915_bo_create_from_metadata(struct bo *bo)
 	/* Set/Get tiling ioctl not supported  based on fence availability
 	   Refer : "https://patchwork.freedesktop.org/patch/325343/"
 	 */
-	if ((i915->graphics_version != 125) && (i915->is_mtl != true)) {
+	if (i915->graphics_version != 125 ) {
 		gem_set_tiling.handle = bo->handles[0].u32;
 		gem_set_tiling.tiling_mode = bo->meta.tiling;
 		gem_set_tiling.stride = bo->meta.strides[0];
@@ -1230,7 +1230,7 @@ static int i915_bo_import(struct bo *bo, struct drv_import_fd_data *data)
 	/* Set/Get tiling ioctl not supported  based on fence availability
 	   Refer : "https://patchwork.freedesktop.org/patch/325343/"
 	 */
-	if ((i915->graphics_version != 125) && (i915->is_mtl != true)) {
+	if (i915->graphics_version != 125) {
 		/* TODO(gsingh): export modifiers and get rid of backdoor tiling. */
 		gem_get_tiling.handle = bo->handles[0].u32;
 
