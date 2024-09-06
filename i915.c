@@ -371,6 +371,8 @@ static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t heig
 		modifier = combo->metadata.modifier;
 	}
 
+	modifier = DRM_FORMAT_MOD_LINEAR;
+
 	switch (modifier) {
 	case DRM_FORMAT_MOD_LINEAR:
 		bo->meta.tiling = I915_TILING_NONE;
