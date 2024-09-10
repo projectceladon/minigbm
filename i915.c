@@ -1277,6 +1277,7 @@ static void *i915_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags)
 	int ret;
 	void *addr = MAP_FAILED;
 	struct i915_device *i915 = bo->drv->priv;
+	vma->cpu = false;
 
 	if ((bo->meta.format_modifier == I915_FORMAT_MOD_Y_TILED_CCS) ||
 	    (bo->meta.format_modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS))
@@ -1325,6 +1326,20 @@ static void *i915_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags)
 		/* And map it */
 		addr = mmap(0, bo->meta.total_size, PROT_READ | PROT_WRITE, MAP_SHARED, bo->drv->fd,
 			    mmap_arg.offset);
+
+		// TODO: GEM_MMAP_OFFSET cannot convert ytiled to linear, we have to convert it manually.
+		// Other formats(e.g. I915_TILING_X) should also be converted.
+		if ((bo->meta.use_flags & (BO_USE_SW_READ_OFTEN | BO_USE_SW_WRITE_OFTEN)) &&
+		    (bo->meta.tiling == I915_TILING_Y)) {
+			void* tmp_addr = ytiled_to_linear(bo->meta, addr);
+
+			if (NULL != tmp_addr) {
+				// release original one and replace it with a linear address.
+				munmap(addr, bo->meta.total_size);
+				addr = tmp_addr;
+				vma->cpu = true;
+			}
+		}
 	} else if (bo->meta.tiling == I915_TILING_NONE) {
 		struct drm_i915_gem_mmap gem_map = { 0 };
 		/* TODO(b/118799155): We don't seem to have a good way to
