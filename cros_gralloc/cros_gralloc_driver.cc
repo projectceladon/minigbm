@@ -142,13 +142,13 @@ int32_t cros_gralloc_driver::reload()
 		if (!drv_ivshmem_) {
 			drv_loge("Failed to create driver\n");
 			close(fd);
-			continue;;
+			continue;
 		}
 
 		if (drv_init(drv_ivshmem_, gpu_grp_type_)) {
 			drv_loge("Failed to init driver\n");
 			DRV_DESTROY(drv_ivshmem_)
-			continue;;
+			continue;
 		}
 		if (drv_virtgpu_is_ivshm(drv_ivshmem_)) {
 			drv_logi("New added node is virtio-ivishmem node");
@@ -367,6 +367,8 @@ cros_gralloc_driver::~cros_gralloc_driver()
 	if (drv_kms_ != drv_render_)
 		DRV_DESTROY(drv_kms_)
 	DRV_DESTROY(drv_render_)
+	if (drv_ivshmem_)
+		DRV_DESTROY(drv_ivshmem_)
 }
 
 bool cros_gralloc_driver::is_initialized()
