@@ -50,6 +50,7 @@ filegroup {
         "virtgpu.c",
         "virtgpu_cross_domain.c",
         "virtgpu_virgl.c",
+        "xe.c",
     ],
 }
 
@@ -80,6 +81,11 @@ cc_defaults {
         "-Wcast-qual",
         "-Wcast-align",
         "-Wno-unused-parameter",
+        "-Wno-switch",
+        "-Wno-format",
+        "-Wno-unused-variable",
+        "-DDRV_I915",
+        "-DDRV_XE",
     ],
 
     product_variables: {
@@ -234,7 +240,12 @@ cc_library_headers {
 cc_library_shared {
     name: "libminigbm_gralloc_intel",
     defaults: ["minigbm_cros_gralloc_library_defaults"],
-    cflags: ["-DDRV_I915"],
+    cflags: [
+        "-DDRV_I915",
+        "-DDRV_XE",
+        "-Wno-cast-qual",
+        "-DHAVE_MEMFD_CREATE",
+    ],
     enabled: false,
     arch: {
         x86: {
