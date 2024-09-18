@@ -50,6 +50,7 @@ filegroup {
         "virtgpu.c",
         "virtgpu_cross_domain.c",
         "virtgpu_virgl.c",
+        "xe.c",
     ],
 }
 
@@ -89,6 +90,7 @@ cc_defaults {
         "-Wno-format",
         "-Wno-unused-variable",
         "-DDRV_I915",
+        "-DDRV_XE",
         "-DUSE_GRALLOC1",
         "-Wno-cast-qual",
     ],
@@ -266,6 +268,7 @@ cc_library_shared {
     defaults: ["minigbm_cros_gralloc_library_defaults"],
     cflags: [
         "-DDRV_I915",
+        "-DDRV_XE",
         "-DUSE_GRALLOC1",
         "-Wno-cast-qual",
         "-DHAVE_MEMFD_CREATE",
