@@ -35,6 +35,9 @@ extern const struct backend backend_msm;
 #ifdef DRV_VC4
 extern const struct backend backend_vc4;
 #endif
+#ifdef DRV_XE
+extern const struct backend backend_xe;
+#endif
 
 // Dumb / generic drivers
 extern const struct backend backend_evdi;
@@ -63,6 +66,9 @@ static const struct backend *drv_backend_list[] = {
 #endif
 #ifdef DRV_VC4
 	&backend_vc4,
+#endif
+#ifdef DRV_XE
+	&backend_xe,
 #endif
 	&backend_evdi,	    &backend_komeda,	&backend_marvell, &backend_mediatek,
 	&backend_meson,	    &backend_nouveau,	&backend_radeon,  &backend_rockchip,
