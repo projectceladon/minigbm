@@ -1185,7 +1185,7 @@ static bool virgl_virtpci_with_blob(struct driver *drv) {
 
 static bool virgl_drv_virtgpu_is_ivshm(struct driver *drv) {
         struct virgl_priv *prv = (struct virgl_priv *)drv->priv;
-        return !(prv->dev_feature & VIRTGPU_PARAM_QUERY_DEV_BIT);
+        return (!(prv->dev_feature & VIRTGPU_PARAM_QUERY_DEV_BIT) && (prv->dev_feature & VIRTGPU_PARAM_RESOURCE_BLOB_BIT));
 }
 
 const struct backend virtgpu_virgl = { .name = "virtgpu_virgl",

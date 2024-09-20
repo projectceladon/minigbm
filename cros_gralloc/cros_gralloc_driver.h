@@ -92,7 +92,10 @@ class cros_gralloc_driver
 	struct driver *drv_render_ = nullptr;
 	struct driver *drv_video_ = nullptr;
 	// the drv_kms_ is used to allocate scanout non-video buffer.
+	// in dGPU/iGPU SRIOV, BM or dual GPU scenario, the drv_kms_ = drv_render_
 	struct driver *drv_kms_ = nullptr;
+	// the drv_ivshmem_ is used to allocate scanout buffer with
+	// certain resolution(screen cast).
 	struct driver *drv_ivshmem_ = nullptr;
 	uint32_t drv_num_ = 0;
 	uint64_t gpu_grp_type_ = GPU_TYPE_NORMAL;

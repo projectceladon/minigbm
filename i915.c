@@ -1429,6 +1429,12 @@ static int i915_bo_flush(struct bo *bo, struct mapping *mapping)
 	return 0;
 }
 
+static bool i915_is_dgpu(struct driver *drv)
+{
+	struct i915_device *i915 = drv->priv;
+	return i915->has_local_mem;
+}
+
 const struct backend backend_i915 = {
 	.name = "i915",
 	.init = i915_init,
@@ -1443,6 +1449,7 @@ const struct backend backend_i915 = {
 	.bo_flush = i915_bo_flush,
 	.resolve_format_and_use_flags = drv_resolve_format_and_use_flags_helper,
 	.num_planes_from_modifier = i915_num_planes_from_modifier,
+	.is_dgpu = i915_is_dgpu,
 };
 
 #endif

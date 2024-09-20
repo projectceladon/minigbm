@@ -108,6 +108,7 @@ struct backend {
 	uint32_t (*get_max_texture_2d_size)(struct driver *drv);
 	bool (*virtpci_with_blob)(struct driver *drv);
 	bool (*virtgpu_is_ivshm)(struct driver *drv);
+	bool (*is_dgpu)(struct driver *drv);
 };
 
 // clang-format off
