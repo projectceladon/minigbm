@@ -857,3 +857,15 @@ bool drv_virtgpu_is_ivshm(struct driver * drv)
         }
         return ret;
 }
+
+bool drv_is_dgpu(struct driver * drv)
+{
+	bool ret = false;
+	assert(drv);
+	assert(drv->backend);
+
+	if (drv->backend->is_dgpu) {
+		ret = drv->backend->is_dgpu(drv);
+	}
+	return ret;
+}

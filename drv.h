@@ -254,6 +254,8 @@ bool drv_virtpci_with_blob(struct driver * drv);
 
 bool drv_virtgpu_is_ivshm(struct driver * drv);
 
+bool drv_is_dgpu(struct driver * drv);
+
 enum drv_log_level {
 	DRV_LOGV,
 	DRV_LOGD,

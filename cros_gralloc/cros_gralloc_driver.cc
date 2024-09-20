@@ -310,14 +310,6 @@ cros_gralloc_driver::cros_gralloc_driver()
 			drv_kms_ = drv_render_;
 		}
 
-		if (ivshm_node_idx != -1) {
-			if (!(drv_ivshmem_ = drv_create(node_fd[ivshm_node_idx]))) {
-				drv_loge("Failed to create driver for the ivshm device with card id %d\n",
-					ivshm_node_idx);
-				close(node_fd[ivshm_node_idx]);
-			}
-		}
-
 		// Init drv
 		DRV_INIT(drv_render_, gpu_grp_type_, renderer_idx)
 		if (video_idx != renderer_idx)
@@ -326,25 +318,39 @@ cros_gralloc_driver::cros_gralloc_driver()
 			DRV_INIT(drv_kms_, gpu_grp_type_, virtio_node_idx)
 		if (drv_kms_ && (virtio_node_idx != renderer_idx) && (drv_kms_ != drv_render_)) {
 			bool virtiopic_with_blob = drv_virtpci_with_blob(drv_kms_);
-			// The virtio pci device with blob feature could import buffers
-			// from i915, otherwise need use virtio to allocate scanout
-			// non-video buffers.
 			if (virtiopic_with_blob) {
+				//igpu SRIOV or dGPU SRIOV case
 				drv_logi("Virtio gpu device with blob\n");
 				if ((drv_kms_ != drv_render_) && drv_kms_)
 					DRV_DESTROY(drv_kms_)
 				drv_kms_ = drv_render_;
+			} else if (drv_is_dgpu(drv_video_) && drv_virtgpu_is_ivshm(drv_kms_)){
+				//is dgpu passthrough + ivshm case
+				drv_logi("dGPU with Virtio ivshm\n");
+				drv_ivshmem_ = drv_kms_;
+				drv_kms_ = drv_render_;
+				if (ivshm_node_idx != -1) {
+					close(node_fd[ivshm_node_idx]);
+					ivshm_node_idx = -1;
+				}
 			} else {
-				drv_logi("Virtio ivshmem device or no blob\n");
+				// is QNX or redhat case
+				drv_logi("Virtio ivshm or no blob\n");
 			}
 		}
 		if (ivshm_node_idx != -1) {
-			DRV_INIT(drv_ivshmem_, gpu_grp_type_, ivshm_node_idx)
-			if (drv_virtgpu_is_ivshm(drv_ivshmem_)) {
-				drv_logi("Node is virtio-ivishmem node");
+			if (!(drv_ivshmem_ = drv_create(node_fd[ivshm_node_idx]))) {
+				drv_loge("Failed to create driver for the ivshm device with card id %d\n",
+					ivshm_node_idx);
+				close(node_fd[ivshm_node_idx]);
 			} else {
-				drv_logi("Node is NOT virtio-ivishmem node");
-				DRV_DESTROY(drv_ivshmem_)
+				DRV_INIT(drv_ivshmem_, gpu_grp_type_, ivshm_node_idx)
+				if (drv_virtgpu_is_ivshm(drv_ivshmem_)) {
+					drv_logi("Node is virtio-ivishmem node");
+				} else {
+					drv_logi("Node is NOT virtio-ivishmem node");
+						DRV_DESTROY(drv_ivshmem_)
+				}
 			}
 		}
 	}
