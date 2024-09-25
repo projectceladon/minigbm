@@ -419,6 +419,9 @@ bool cros_gralloc_driver::get_resolved_format_and_use_flags(
 		return true;
 	}
 
+	if ((descriptor->use_flags & BO_USE_PRIVATE_1)) {
+		ALOGI("prop set, sepeical flag BO_USE_PRIVATE_1\n");
+	}
 	drv_resolve_format_and_use_flags(drv, descriptor->drm_format, descriptor->use_flags,
 					 &resolved_format, &resolved_use_flags);
 
