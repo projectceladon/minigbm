@@ -138,8 +138,8 @@ uint64_t cros_gralloc_convert_usage(uint64_t usage)
 	handle_usage(&usage, GRALLOC_USAGE_HW_RENDER, &use_flags, BO_USE_RENDERING);
 	handle_usage(&usage, GRALLOC_USAGE_HW_2D, &use_flags, BO_USE_RENDERING);
 	/* HWC wants to use display hardware, but can defer to OpenGL. */
-	handle_usage(&usage, GRALLOC_USAGE_HW_COMPOSER, &use_flags,
-		     BO_USE_SCANOUT | BO_USE_TEXTURE);
+	handle_usage(&usage, GRALLOC_USAGE_HW_COMPOSER, &use_flags, BO_USE_TEXTURE);
+	handle_usage(&usage, GRALLOC_USAGE_PRIVATE_1, &use_flags, BO_USE_SCANOUT);
 	handle_usage(&usage, GRALLOC_USAGE_HW_FB, &use_flags, BO_USE_NONE);
 	/*
 	 * This flag potentially covers external display for the normal drivers (i915/rockchip) and
