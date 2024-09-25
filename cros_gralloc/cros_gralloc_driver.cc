@@ -186,7 +186,6 @@ cros_gralloc_driver::cros_gralloc_driver()
 	int node_fd[render_num];
 	char *node_name[render_num] = {};
 	int availabe_node = 0;
-	int virtio_node_idx = -1;
 	int ivshm_node_idx = -1;
 	int renderer_idx = -1;
 	int video_idx = -1;
@@ -198,8 +197,6 @@ cros_gralloc_driver::cros_gralloc_driver()
 	// destroy drivers if exist before re-initializing them
 	if (drv_video_ != drv_render_)
 		DRV_DESTROY(drv_video_)
-        if (drv_kms_ != drv_render_)
-                DRV_DESTROY(drv_kms_)
 	DRV_DESTROY(drv_render_)
 
 	if (drv_ivshmem_) {
@@ -234,9 +231,7 @@ cros_gralloc_driver::cros_gralloc_driver()
 			continue;
 
 		if (!strcmp(version->name, "virtio_gpu")) {
-			if (virtio_node_idx == -1)
-				virtio_node_idx = availabe_node;
-			else if (ivshm_node_idx == -1)
+			if (ivshm_node_idx == -1)
 				ivshm_node_idx = availabe_node;
 		}
 
@@ -268,9 +263,9 @@ cros_gralloc_driver::cros_gralloc_driver()
 			gpu_grp_type_ |= GPU_TYPE_DUAL_IGPU_DGPU;
 		// if no i915 node found
 		if (renderer_idx == -1) {
-			if (virtio_node_idx != -1) {
+			if (ivshm_node_idx != -1) {
 				// Fallback to virtio-GPU
-				video_idx = renderer_idx = virtio_node_idx;
+				video_idx = renderer_idx = ivshm_node_idx;
 			} else {
 				drv_loge("Weird scenario! Neither of i915 nor virtio-GPU device is"
 					" found. Use the first deivice.\n");
@@ -298,18 +293,6 @@ cros_gralloc_driver::cros_gralloc_driver()
 					video_idx);
 		}
 
-		if ((virtio_node_idx != -1) && (virtio_node_idx != renderer_idx)) {
-			drv_kms_ = drv_create(node_fd[virtio_node_idx]);
-			if (!drv_kms_) {
-				drv_loge("Failed to create driver for the virtio-gpu device with card id %d\n",
-                                          virtio_node_idx);
-				close(node_fd[virtio_node_idx]);
-				drv_kms_ = drv_render_;
-                        }
-		} else {
-			drv_kms_ = drv_render_;
-		}
-
 		if (ivshm_node_idx != -1) {
 			if (!(drv_ivshmem_ = drv_create(node_fd[ivshm_node_idx]))) {
 				drv_loge("Failed to create driver for the ivshm device with card id %d\n",
@@ -322,22 +305,6 @@ cros_gralloc_driver::cros_gralloc_driver()
 		DRV_INIT(drv_render_, gpu_grp_type_, renderer_idx)
 		if (video_idx != renderer_idx)
 			DRV_INIT(drv_video_, gpu_grp_type_, video_idx)
-		if ((virtio_node_idx != -1) && (virtio_node_idx != renderer_idx))
-			DRV_INIT(drv_kms_, gpu_grp_type_, virtio_node_idx)
-		if (drv_kms_ && (virtio_node_idx != renderer_idx) && (drv_kms_ != drv_render_)) {
-			bool virtiopic_with_blob = drv_virtpci_with_blob(drv_kms_);
-			// The virtio pci device with blob feature could import buffers
-			// from i915, otherwise need use virtio to allocate scanout
-			// non-video buffers.
-			if (virtiopic_with_blob) {
-				drv_logi("Virtio gpu device with blob\n");
-				if ((drv_kms_ != drv_render_) && drv_kms_)
-					DRV_DESTROY(drv_kms_)
-				drv_kms_ = drv_render_;
-			} else {
-				drv_logi("Virtio ivshmem device or no blob\n");
-			}
-		}
 		if (ivshm_node_idx != -1) {
 			DRV_INIT(drv_ivshmem_, gpu_grp_type_, ivshm_node_idx)
 			if (drv_virtgpu_is_ivshm(drv_ivshmem_)) {
@@ -351,7 +318,7 @@ cros_gralloc_driver::cros_gralloc_driver()
 
 	for (int i = 0; i < availabe_node; i++) {
 		free(node_name[i]);
-		if ((i != renderer_idx) && (i != video_idx) && (i != virtio_node_idx) && (i != ivshm_node_idx)) {
+		if ((i != renderer_idx) && (i != video_idx) && (i != ivshm_node_idx)) {
 			close(node_fd[i]);
 		}
 	}
@@ -364,8 +331,6 @@ cros_gralloc_driver::~cros_gralloc_driver()
 
 	if (drv_video_ != drv_render_)
 		DRV_DESTROY(drv_video_)
-	if (drv_kms_ != drv_render_)
-		DRV_DESTROY(drv_kms_)
 	DRV_DESTROY(drv_render_)
 	if (drv_ivshmem_)
 		DRV_DESTROY(drv_ivshmem_)
@@ -408,8 +373,7 @@ bool cros_gralloc_driver::get_resolved_format_and_use_flags(
 	struct driver *drv = is_video_format(descriptor) ? drv_video_ : drv_render_;
 	if (drv_ivshmem_ && use_ivshm_drv(descriptor)) {
 		drv = drv_ivshmem_;
-	} else if ((descriptor->use_flags & BO_USE_SCANOUT) && !(is_video_format(descriptor)))
-		drv = drv_kms_;
+	}
 
 	if (mt8183_camera_quirk_ && (descriptor->use_flags & BO_USE_CAMERA_READ) &&
 	    !(descriptor->use_flags & BO_USE_SCANOUT) &&
@@ -460,8 +424,7 @@ bool cros_gralloc_driver::is_supported(const struct cros_gralloc_buffer_descript
 	}
 	if (drv_ivshmem_ && use_ivshm_drv(descriptor)) {
 		drv = drv_ivshmem_;
-	} else if ((descriptor->use_flags & BO_USE_SCANOUT) && !(is_video_format(descriptor)))
-		drv = drv_kms_;
+	}
 	uint32_t max_texture_size = drv_get_max_texture_2d_size(drv);
 	if (!get_resolved_format_and_use_flags(descriptor, &resolved_format, &resolved_use_flags))
 		return false;
@@ -513,9 +476,7 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 	drv = is_video_format(descriptor) ? drv_video_ : drv_render_;
 	if (drv_ivshmem_ && use_ivshm_drv(descriptor)) {
 		drv = drv_ivshmem_;
-	} else if ((descriptor->use_flags & BO_USE_SCANOUT) && !(is_video_format(descriptor)))
-		drv = drv_kms_;
-
+	}
 	if (!get_resolved_format_and_use_flags(descriptor, &resolved_format, &resolved_use_flags)) {
 		ALOGE("Failed to resolve format and use_flags.");
 		return -EINVAL;
@@ -671,9 +632,7 @@ int32_t cros_gralloc_driver::retain(buffer_handle_t handle)
 	drv = is_video_format(&descriptor) ? drv_video_ : drv_render_;
 	if (drv_ivshmem_ && use_ivshm_drv(&descriptor)) {
 		drv = drv_ivshmem_;
-	} else if ((hnd->use_flags & BO_USE_SCANOUT) && !(is_video_format(&descriptor)))
-		drv = drv_kms_;
-
+	}
 	auto hnd_it = handles_.find(hnd);
 	if (hnd_it != handles_.end()) {
 		// The underlying buffer (as multiple handles can refer to the same buffer)
