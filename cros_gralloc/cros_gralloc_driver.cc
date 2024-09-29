@@ -192,11 +192,19 @@ cros_gralloc_driver::cros_gralloc_driver()
 			break;
 		// is SR-IOV + dGPU
 		case 3:
-			if (!strcmp(node_name[1], "i915")) {
-				close(node_fd[1]);
-			}
 			if (virtio_node_idx != -1) {
 				close(node_fd[virtio_node_idx]);
+			}
+
+			{
+				if (!drv_render_) {
+					fd = drv_get_fd(drv_render_);
+					drv_destroy(drv_render_);
+					close(fd);
+					drv_render_ = nullptr;
+				}
+
+				drv_render_ = drv_create(node_fd[2]);
 			}
 			gpu_grp_type = THREE_GPU_IGPU_VIRTIO_DGPU;
 			// TO-DO: the 3rd node is i915 or others.

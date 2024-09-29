@@ -427,6 +427,7 @@ static int i915_add_combinations(struct driver *drv)
                              &metadata_x_tiled, texture_flags_video | BO_USE_CAMERA_MASK);
 
 
+#if 0
 	if (i915_has_tile4(i915)) {
 		struct format_metadata metadata_4_tiled = { .tiling = I915_TILING_4,
 							    .priority = 3,
@@ -486,6 +487,7 @@ static int i915_add_combinations(struct driver *drv)
 				     texture_flags | BO_USE_NON_GPU_HW);
 
 	}
+#endif
 	return 0;
 }
 
