@@ -675,7 +675,7 @@ int32_t cros_gralloc_driver::retain(buffer_handle_t handle)
 		.use_flags = hnd->use_flags,
 	};
 	drv = is_video_format(&descriptor) ? drv_video_ : drv_render_;
-	if (drv_ivshmem_ && use_ivshm_drv(&descriptor)) {
+	if (drv_ivshmem_ && (hnd->width == IVSH_WIDTH) && (hnd->height == IVSH_HEIGHT)) {
 		drv = drv_ivshmem_;
 	} else if ((hnd->use_flags & BO_USE_SCANOUT) && !(is_video_format(&descriptor)))
 		drv = drv_kms_;
