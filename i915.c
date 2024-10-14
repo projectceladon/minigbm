@@ -1258,7 +1258,8 @@ static void *i915_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags)
 		} else {
 			if ((bo->meta.use_flags & BO_USE_SCANOUT) &&
 				!(bo->meta.use_flags &
-					(BO_USE_RENDERSCRIPT | BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SW_READ_OFTEN))) {
+					(BO_USE_RENDERSCRIPT | BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SW_READ_OFTEN)) &&
+				(bo->meta.tiling != I915_TILING_NONE)) {
 					mmap_arg.flags = I915_MMAP_OFFSET_WC;
 			} else {
 					mmap_arg.flags = I915_MMAP_OFFSET_WB;
