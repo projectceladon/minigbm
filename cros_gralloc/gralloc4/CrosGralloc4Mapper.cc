@@ -968,7 +968,7 @@ Return<void> CrosGralloc4Mapper::dumpBuffer(const cros_gralloc_buffer* crosBuffe
     auto metadata_get_callback = [&](Error, hidl_vec<uint8_t> metadata) {
         MetadataDump metadataDump;
         metadataDump.metadataType = metadataType;
-        metadataDump.metadata = metadata;
+        metadataDump.metadata = std::move(metadata);
         metadataDumps.push_back(metadataDump);
     };
 

@@ -35,6 +35,12 @@ class cros_gralloc_driver_preloader
 		drv_preload(true);
 	}
 
+	//Copy Constructor
+	cros_gralloc_driver_preloader(const cros_gralloc_driver_preloader&) = default;
+
+	//Copy Assignment Operator
+	cros_gralloc_driver_preloader& operator=(const cros_gralloc_driver_preloader&) = default;
+
 	~cros_gralloc_driver_preloader()
 	{
 		drv_preload(false);

@@ -58,6 +58,10 @@ class cros_gralloc_driver
 
       private:
 	cros_gralloc_driver();
+	//Copy Constructor
+	cros_gralloc_driver(const cros_gralloc_driver&) = delete;
+	//Copy Assignment Operator
+	cros_gralloc_driver& operator=(const cros_gralloc_driver&) = delete;
 	~cros_gralloc_driver();
 	bool is_initialized();
 	cros_gralloc_buffer *get_buffer(cros_gralloc_handle_t hnd);
