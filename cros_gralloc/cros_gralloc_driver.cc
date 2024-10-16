@@ -536,6 +536,8 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
         if (resolved_format == DRM_FORMAT_NV12)
                 resolved_use_flags |= BO_USE_LINEAR;
 
+        if (is_video_format(descriptor))
+                resolved_use_flags &= ~BO_USE_SW_READ_OFTEN;
         /*
          * This unmask is a backup in the case DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED is resolved
          * to non-YUV formats.
