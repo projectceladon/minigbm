@@ -614,6 +614,9 @@ static int virgl_init(struct driver *drv)
                         if ((strcmp(params[i].name, "VIRTGPU_PARAM_RESOURCE_BLOB") == 0) && (params[i].value == 1)) {
                                 prv->dev_feature |= VIRTGPU_PARAM_RESOURCE_BLOB_BIT;
                         }
+                        if ((strcmp(params[i].name, "VIRTGPU_PARAM_ALLOW_P2P") == 0) && (params[i].value == 1)) {
+                                prv->dev_feature |= VIRTGPU_PARAM_RESOURCE_BLOB_BIT;
+                        }
                 }
         }
 
@@ -1178,14 +1181,22 @@ static uint32_t virgl_get_max_texture_2d_size(struct driver *drv)
 		return VIRGL_2D_MAX_TEXTURE_2D_SIZE;
 }
 
-static bool virgl_virtpci_with_blob(struct driver *drv) {
+static bool virgl_is_feature_supported(struct driver *drv, uint64_t feature) {
 	struct virgl_priv *prv = (struct virgl_priv *)drv->priv;
-	return ((prv->dev_feature & VIRTGPU_PARAM_QUERY_DEV_BIT ) && (prv->dev_feature & VIRTGPU_PARAM_RESOURCE_BLOB_BIT));
-}
-
-static bool virgl_drv_virtgpu_is_ivshm(struct driver *drv) {
-        struct virgl_priv *prv = (struct virgl_priv *)drv->priv;
-        return (!(prv->dev_feature & VIRTGPU_PARAM_QUERY_DEV_BIT) && (prv->dev_feature & VIRTGPU_PARAM_RESOURCE_BLOB_BIT));
+	switch (feature) {
+	case DRIVER_DEVICE_FEATURE_VIRGL_RESOURCE_BLOB:
+		feature = VIRTGPU_PARAM_RESOURCE_BLOB_BIT;
+		break;
+	case DRIVER_DEVICE_FEATURE_VIRGL_QUERY_DEV:
+		feature = VIRTGPU_PARAM_QUERY_DEV_BIT;
+		break;
+	case DRIVER_DEVICE_FEATURE_VIRGL_ALLOW_P2P:
+		feature = VIRTGPU_PARAM_ALLOW_P2P_BIT;
+		break;
+	default:
+		return false;
+	}
+	return !!(prv->dev_feature & feature);
 }
 
 const struct backend virtgpu_virgl = { .name = "virtgpu_virgl",
@@ -1203,5 +1214,4 @@ const struct backend virtgpu_virgl = { .name = "virtgpu_virgl",
 					   virgl_resolve_format_and_use_flags,
 				       .resource_info = virgl_resource_info,
 				       .get_max_texture_2d_size = virgl_get_max_texture_2d_size,
-				       .virtpci_with_blob = virgl_virtpci_with_blob,
-				       .virtgpu_is_ivshm = virgl_drv_virtgpu_is_ivshm };
+				       .is_feature_supported = virgl_is_feature_supported, };

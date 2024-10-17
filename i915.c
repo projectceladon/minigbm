@@ -4,6 +4,7 @@
  * found in the LICENSE file.
  */
 
+#include "drv.h"
 #ifdef DRV_I915
 
 #include <assert.h>
@@ -22,6 +23,7 @@
 // #include "external/i915_drm.h"
 #include "util.h"
 #include "i915_prelim.h"
+#include "intel_device.h"
 
 #define I915_CACHELINE_SIZE 64
 #define I915_CACHELINE_MASK (I915_CACHELINE_SIZE - 1)
@@ -142,145 +144,6 @@ flags_to_heap(struct i915_device *i915, unsigned flags)
 	} else {
 		return IRIS_HEAP_SYSTEM_MEMORY;
 	}
-}
-
-static void i915_info_from_device_id(struct i915_device *i915)
-{
-	const uint16_t gen4_ids[] = { 0x29A2, 0x2992, 0x2982, 0x2972, 0x2A02, 0x2A12, 0x2A42,
-				      0x2E02, 0x2E12, 0x2E22, 0x2E32, 0x2E42, 0x2E92 };
-	const uint16_t gen5_ids[] = { 0x0042, 0x0046 };
-	const uint16_t gen6_ids[] = { 0x0102, 0x0112, 0x0122, 0x0106, 0x0116, 0x0126, 0x010A };
-	const uint16_t gen7_ids[] = {
-		0x0152, 0x0162, 0x0156, 0x0166, 0x015a, 0x016a, 0x0402, 0x0412, 0x0422,
-		0x0406, 0x0416, 0x0426, 0x040A, 0x041A, 0x042A, 0x040B, 0x041B, 0x042B,
-		0x040E, 0x041E, 0x042E, 0x0C02, 0x0C12, 0x0C22, 0x0C06, 0x0C16, 0x0C26,
-		0x0C0A, 0x0C1A, 0x0C2A, 0x0C0B, 0x0C1B, 0x0C2B, 0x0C0E, 0x0C1E, 0x0C2E,
-		0x0A02, 0x0A12, 0x0A22, 0x0A06, 0x0A16, 0x0A26, 0x0A0A, 0x0A1A, 0x0A2A,
-		0x0A0B, 0x0A1B, 0x0A2B, 0x0A0E, 0x0A1E, 0x0A2E, 0x0D02, 0x0D12, 0x0D22,
-		0x0D06, 0x0D16, 0x0D26, 0x0D0A, 0x0D1A, 0x0D2A, 0x0D0B, 0x0D1B, 0x0D2B,
-		0x0D0E, 0x0D1E, 0x0D2E, 0x0F31, 0x0F32, 0x0F33, 0x0157, 0x0155
-	};
-	const uint16_t gen8_ids[] = { 0x22B0, 0x22B1, 0x22B2, 0x22B3, 0x1602, 0x1606,
-				      0x160A, 0x160B, 0x160D, 0x160E, 0x1612, 0x1616,
-				      0x161A, 0x161B, 0x161D, 0x161E, 0x1622, 0x1626,
-				      0x162A, 0x162B, 0x162D, 0x162E };
-	const uint16_t gen9_ids[] = {
-		0x1902, 0x1906, 0x190A, 0x190B, 0x190E, 0x1912, 0x1913, 0x1915, 0x1916, 0x1917,
-		0x191A, 0x191B, 0x191D, 0x191E, 0x1921, 0x1923, 0x1926, 0x1927, 0x192A, 0x192B,
-		0x192D, 0x1932, 0x193A, 0x193B, 0x193D, 0x0A84, 0x1A84, 0x1A85, 0x5A84, 0x5A85,
-		0x3184, 0x3185, 0x5902, 0x5906, 0x590A, 0x5908, 0x590B, 0x590E, 0x5913, 0x5915,
-		0x5917, 0x5912, 0x5916, 0x591A, 0x591B, 0x591D, 0x591E, 0x5921, 0x5923, 0x5926,
-		0x5927, 0x593B, 0x591C, 0x87C0, 0x87CA, 0x3E90, 0x3E93, 0x3E99, 0x3E9C, 0x3E91,
-		0x3E92, 0x3E96, 0x3E98, 0x3E9A, 0x3E9B, 0x3E94, 0x3EA9, 0x3EA5, 0x3EA6, 0x3EA7,
-		0x3EA8, 0x3EA1, 0x3EA4, 0x3EA0, 0x3EA3, 0x3EA2, 0x9B21, 0x9BA0, 0x9BA2, 0x9BA4,
-		0x9BA5, 0x9BA8, 0x9BAA, 0x9BAB, 0x9BAC, 0x9B41, 0x9BC0, 0x9BC2, 0x9BC4, 0x9BC5,
-		0x9BC6, 0x9BC8, 0x9BCA, 0x9BCB, 0x9BCC, 0x9BE6, 0x9BF6
-	};
-	const uint16_t gen11_ids[] = { 0x8A50, 0x8A51, 0x8A52, 0x8A53, 0x8A54, 0x8A56, 0x8A57,
-				       0x8A58, 0x8A59, 0x8A5A, 0x8A5B, 0x8A5C, 0x8A5D, 0x8A71,
-				       0x4500, 0x4541, 0x4551, 0x4555, 0x4557, 0x4571, 0x4E51,
-				       0x4E55, 0x4E57, 0x4E61, 0x4E71 };
-	const uint16_t gen12_ids[] = {
-		0x4c8a, 0x4c8b, 0x4c8c, 0x4c90, 0x4c9a, 0x4680, 0x4681, 0x4682, 0x4683, 0x4688,
-		0x4689, 0x4690, 0x4691, 0x4692, 0x4693, 0x4698, 0x4699, 0x4626, 0x4628, 0x462a,
-		0x46a0, 0x46a1, 0x46a2, 0x46a3, 0x46a6, 0x46a8, 0x46aa, 0x46b0, 0x46b1, 0x46b2,
-		0x46b3, 0x46c0, 0x46c1, 0x46c2, 0x46c3, 0x9A40, 0x9A49, 0x9A59, 0x9A60, 0x9A68,
-		0x9A70, 0x9A78, 0x9AC0, 0x9AC9, 0x9AD9, 0x9AF8, 0x4905, 0x4906, 0x4907, 0x4908
-	};
-	const uint16_t adlp_ids[] = { 0x46A0, 0x46A1, 0x46A2, 0x46A3, 0x46A6, 0x46A8, 0x46AA,
-				      0x462A, 0x4626, 0x4628, 0x46B0, 0x46B1, 0x46B2, 0x46B3,
-				      0x46C0, 0x46C1, 0x46C2, 0x46C3, 0x46D0, 0x46D1, 0x46D2 };
-
-	const uint16_t dg2_ids[] = { // DG2 Val-Only Super-SKU: 4F80 - 4F87
-			0x4F80, 0x4F81, 0x4F82, 0x4F83, 0x4F84, 0x4F85, 0x4F86, 0x4F87,
-
-			// DG2 Desktop Reserved:  56A0 to 56AF
-			0x56A0, 0x56A1, 0x56A2, 0x56A3, 0x56A4, 0x56A5, 0x56A6, 0x56A7,
-			0x56A8, 0x56A9, 0x56AA, 0x56AB, 0x56AC, 0x56AD, 0x56AE, 0x56AF,
-
-			// DG2 Notebook Reserved:  5690 to 569F
-			0x5690, 0x5691, 0x5692, 0x5693, 0x5694, 0x5695, 0x5696, 0x5697,
-			0x5698, 0x5699, 0x569A, 0x569B, 0x569C, 0x569D, 0x569E, 0x569F,
-
-			// Workstation Reserved:  56B0 to 56BF
-			0x56B0, 0x56B1, 0x56B2, 0x56B3, 0x56B4, 0x56B5, 0x56B6, 0x56B7,
-			0x56B8, 0x56B9, 0x56BA, 0x56BB, 0x56BC, 0x56BD, 0x56BE, 0x56BF,
-
-			// Server Reserved:  56C0 to 56CF
-			0x56C0, 0x56C1, 0x56C2, 0x56C3, 0x56C4, 0x56C5, 0x56C6, 0x56C7,
-			0x56C8, 0x56C9, 0x56CA, 0x56CB, 0x56CC, 0x56CD, 0x56CE, 0x56CF
-	};
-
-	const uint16_t rplp_ids[] = { 0xA720, 0xA721, 0xA7A0, 0xA7A1, 0xA7A8, 0xA7A9 };
-
-	const uint16_t mtl_ids[] = { 0x7D40, 0x7D60, 0x7D45, 0x7D55, 0x7DD5 };
-
-	unsigned i;
-	i915->graphics_version = 12;
-	i915->is_xelpd = false;
-	/* Gen 4 */
-	for (i = 0; i < ARRAY_SIZE(gen4_ids); i++)
-		if (gen4_ids[i] == i915->device_id)
-			i915->graphics_version = 4;
-
-	/* Gen 5 */
-	for (i = 0; i < ARRAY_SIZE(gen5_ids); i++)
-		if (gen5_ids[i] == i915->device_id)
-			i915->graphics_version = 5;
-
-	/* Gen 6 */
-	for (i = 0; i < ARRAY_SIZE(gen6_ids); i++)
-		if (gen6_ids[i] == i915->device_id)
-			i915->graphics_version = 6;
-
-	/* Gen 7 */
-	for (i = 0; i < ARRAY_SIZE(gen7_ids); i++)
-		if (gen7_ids[i] == i915->device_id)
-			i915->graphics_version = 7;
-
-	/* Gen 8 */
-	for (i = 0; i < ARRAY_SIZE(gen8_ids); i++)
-		if (gen8_ids[i] == i915->device_id)
-			i915->graphics_version = 8;
-
-	/* Gen 9 */
-	for (i = 0; i < ARRAY_SIZE(gen9_ids); i++)
-		if (gen9_ids[i] == i915->device_id)
-			i915->graphics_version = 9;
-
-	/* Gen 11 */
-	for (i = 0; i < ARRAY_SIZE(gen11_ids); i++)
-		if (gen11_ids[i] == i915->device_id)
-			i915->graphics_version = 11;
-
-	/* Gen 12 */
-	for (i = 0; i < ARRAY_SIZE(gen12_ids); i++)
-		if (gen12_ids[i] == i915->device_id)
-			i915->graphics_version = 12;
-
-	for (i = 0; i < ARRAY_SIZE(dg2_ids); i++)
-		if (dg2_ids[i] == i915->device_id) {
-			i915->graphics_version = 12;
-			i915->sub_version = 5;
-			return;
-		}
-
-	for (i = 0; i < ARRAY_SIZE(adlp_ids); i++)
-		if (adlp_ids[i] == i915->device_id) {
-			i915->is_xelpd = true;
-			i915->graphics_version = 12;
-		}
-
-	for (i = 0; i < ARRAY_SIZE(rplp_ids); i++)
-		if (rplp_ids[i] == i915->device_id) {
-			i915->is_xelpd = true;
-			i915->graphics_version = 12;
-		}
-
-	for (i = 0; i < ARRAY_SIZE(mtl_ids); i++)
-		if (mtl_ids[i] == i915->device_id) {
-			i915->graphics_version = 14;
-		}
 }
 
 bool i915_has_tile4(struct i915_device *i915)
@@ -439,11 +302,12 @@ static int i915_add_combinations(struct driver *drv)
 	drv_add_combinations(drv, linear_source_formats, ARRAY_SIZE(linear_source_formats),
                              &metadata_x_tiled, texture_flags_video | BO_USE_CAMERA_MASK);
 
-
 	if (i915_has_tile4(i915)) {
 		// in dual gpu case, only alloc x-tiling for dgpu for render
-		if ((drv->gpu_grp_type & GPU_TYPE_DUAL_IGPU_DGPU) && (GEN_VERSION_X10(i915) >= 125))
+		if ((drv->gpu_grp_type & GPU_GRP_TYPE_HAS_INTEL_IGPU_BIT) ||
+		    (drv->gpu_grp_type & GPU_GRP_TYPE_HAS_VIRTIO_GPU_BLOB_BIT)) {
 			return 0;
+		}
 
 		struct format_metadata metadata_4_tiled = { .tiling = I915_TILING_4,
 							    .priority = 3,
@@ -473,8 +337,9 @@ static int i915_add_combinations(struct driver *drv)
 		struct format_metadata metadata_y_tiled = { .tiling = I915_TILING_Y,
 							    .priority = 3,
 							    .modifier = I915_FORMAT_MOD_Y_TILED };
-		if (drv->gpu_grp_type & GPU_TYPE_DUAL_IGPU_DGPU) {
-			scanout_and_render_not_linear = unset_flags(scanout_and_render, BO_USE_SCANOUT);
+		if ((drv->gpu_grp_type & GPU_GRP_TYPE_HAS_INTEL_DGPU_BIT) ||
+		    (drv->gpu_grp_type & GPU_GRP_TYPE_HAS_VIRTIO_GPU_BLOB_P2P_BIT)) {
+			return 0;
 		}
 /* Support y-tiled NV12 and P010 for libva */
 #ifdef I915_SCANOUT_Y_TILED
@@ -719,6 +584,7 @@ static int i915_init(struct driver *drv)
 {
 	int ret, val;
 	struct i915_device *i915;
+	struct intel_gpu_info info;
 
 	i915 = calloc(1, sizeof(*i915));
 	if (!i915)
@@ -733,7 +599,17 @@ static int i915_init(struct driver *drv)
 	i915->device_id = ret;
 
 	/* must call before i915->graphics_version is used anywhere else */
-	i915_info_from_device_id(i915);
+	memset(&info, 0, sizeof(info));
+	ret = intel_gpu_info_from_device_id(i915->device_id, &info);
+	if (ret != 0) {
+		drv_loge("%s: Failed to get device info\n", __func__);
+		free(i915);
+		return -EINVAL;
+	}
+	i915->graphics_version = info.graphics_version;
+	i915->sub_version = info.sub_version;
+	i915->is_xelpd = info.is_xelpd;
+
 	i915_get_modifier_order(i915);
 
 	ret = gem_param(drv->fd, I915_PARAM_HAS_LLC);
@@ -1395,10 +1271,16 @@ static int i915_bo_flush(struct bo *bo, struct mapping *mapping)
 	return 0;
 }
 
-static bool i915_is_dgpu(struct driver *drv)
+static bool i915_is_feature_supported(struct driver *drv, uint64_t feature)
 {
 	struct i915_device *i915 = drv->priv;
-	return i915->has_local_mem;
+	switch (feature) {
+	case DRIVER_DEVICE_FEATURE_I915_DGPU:
+		return i915->has_local_mem;
+	default:
+		return false;
+	}
+	return false;
 }
 
 const struct backend backend_i915 = {
@@ -1415,7 +1297,7 @@ const struct backend backend_i915 = {
 	.bo_flush = i915_bo_flush,
 	.resolve_format_and_use_flags = drv_resolve_format_and_use_flags_helper,
 	.num_planes_from_modifier = i915_num_planes_from_modifier,
-	.is_dgpu = i915_is_dgpu,
+	.is_feature_supported = i915_is_feature_supported,
 };
 
 #endif

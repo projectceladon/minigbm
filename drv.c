@@ -102,7 +102,7 @@ static const struct backend *drv_get_backend(int fd)
 	return NULL;
 }
 
-struct driver *drv_create(int fd)
+struct driver *drv_create(int fd, uint64_t gpu_grp_type)
 {
 	struct driver *drv;
 	int ret;
@@ -118,6 +118,7 @@ struct driver *drv_create(int fd)
 
 	drv->fd = fd;
 	drv->backend = drv_get_backend(fd);
+	drv->gpu_grp_type = gpu_grp_type;
 
 	if (!drv->backend)
 		goto free_driver;
@@ -140,6 +141,14 @@ struct driver *drv_create(int fd)
 	if (!drv->combos)
 		goto free_mappings;
 
+	if (drv->backend->init) {
+		ret = drv->backend->init(drv);
+		if (ret) {
+			drv_array_destroy(drv->combos);
+			goto free_mappings;
+		}
+	}
+
 	return drv;
 
 free_mappings:
@@ -155,20 +164,13 @@ free_driver:
 	return NULL;
 }
 
-int drv_init(struct driver * drv, uint32_t grp_type)
+int drv_set_gpu_grp_type(struct driver *drv, uint64_t type)
 {
 	int ret = 0;
 	assert(drv);
 	assert(drv->backend);
 
-	drv->gpu_grp_type = grp_type;
-	if (drv->backend->init) {
-		ret = drv->backend->init(drv);
-		if (ret) {
-			drv_array_destroy(drv->combos);
-			drv_array_destroy(drv->mappings);
-		}
-	}
+	drv->gpu_grp_type = type;
 	return ret;
 }
 
@@ -834,38 +836,15 @@ uint32_t drv_get_max_texture_2d_size(struct driver *drv)
 	return UINT32_MAX;
 }
 
-bool drv_virtpci_with_blob(struct driver * drv)
-{
-        bool ret = false;
-        assert(drv);
-        assert(drv->backend);
-
-        if (drv->backend->virtpci_with_blob) {
-                ret = drv->backend->virtpci_with_blob(drv);
-        }
-        return ret;
-}
-
-bool drv_virtgpu_is_ivshm(struct driver * drv)
-{
-        bool ret = false;
-        assert(drv);
-        assert(drv->backend);
-
-        if (drv->backend->virtgpu_is_ivshm) {
-                ret = drv->backend->virtgpu_is_ivshm(drv);
-        }
-        return ret;
-}
-
-bool drv_is_dgpu(struct driver * drv)
+bool drv_is_feature_supported(struct driver * drv, uint64_t feature)
 {
 	bool ret = false;
 	assert(drv);
 	assert(drv->backend);
 
-	if (drv->backend->is_dgpu) {
-		ret = drv->backend->is_dgpu(drv);
+	if (drv->backend->is_feature_supported) {
+		ret = drv->backend->is_feature_supported(drv, feature);
 	}
 	return ret;
 }
+

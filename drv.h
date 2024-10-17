@@ -164,9 +164,9 @@ struct mapping {
 
 void drv_preload(bool load);
 
-struct driver *drv_create(int fd);
+struct driver *drv_create(int fd, uint64_t gpu_grp_type);
 
-int drv_init(struct driver * drv, uint32_t grp_type);
+int drv_init(struct driver * drv);
 
 void drv_destroy(struct driver *drv);
 
@@ -250,11 +250,9 @@ int drv_resource_info(struct bo *bo, uint32_t strides[DRV_MAX_PLANES],
 
 uint32_t drv_get_max_texture_2d_size(struct driver *drv);
 
-bool drv_virtpci_with_blob(struct driver * drv);
+int drv_set_gpu_grp_type(struct driver *drv, uint64_t type);
 
-bool drv_virtgpu_is_ivshm(struct driver * drv);
-
-bool drv_is_dgpu(struct driver * drv);
+bool drv_is_feature_supported(struct driver * drv, uint64_t feature);
 
 enum drv_log_level {
 	DRV_LOGV,

@@ -49,6 +49,7 @@ filegroup {
         "virtgpu.c",
         "virtgpu_cross_domain.c",
         "virtgpu_virgl.c",
+        "intel_device.c",
     ],
 }
 
