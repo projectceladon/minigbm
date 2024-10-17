@@ -69,6 +69,7 @@ class cros_gralloc_driver
 	static int select_kms_driver(uint64_t gpu_grp_type);
 	static int select_video_driver(uint64_t gpu_grp_type);
 	void set_gpu_grp_type();
+	struct driver *select_driver(const struct cros_gralloc_buffer_descriptor *descriptor);
 	int32_t reload();
 	cros_gralloc_buffer *get_buffer(cros_gralloc_handle_t hnd);
 	bool

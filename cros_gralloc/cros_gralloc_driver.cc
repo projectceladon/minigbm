@@ -384,6 +384,26 @@ bool cros_gralloc_driver::use_ivshm_drv(const struct cros_gralloc_buffer_descrip
 	return (descriptor->width == IVSH_WIDTH) && (descriptor->height == IVSH_HEIGHT);
 }
 
+struct driver *cros_gralloc_driver::select_driver(const struct cros_gralloc_buffer_descriptor *descriptor)
+{
+	if (use_ivshm_drv(descriptor)) {
+		// Give it a chance to re-scan devices.
+		if (drv_ivshmem_ == nullptr) {
+			reload();
+		}
+		if (drv_ivshmem_) {
+			return drv_ivshmem_;
+		}
+	}
+	if (is_video_format(descriptor)) {
+		return drv_video_;
+	}
+	if (descriptor->use_flags & BO_USE_SCANOUT) {
+		return drv_kms_;
+	}
+	return drv_render_;
+}
+
 bool cros_gralloc_driver::get_resolved_format_and_use_flags(
     const struct cros_gralloc_buffer_descriptor *descriptor, uint32_t *out_format,
     uint64_t *out_use_flags)
@@ -392,11 +412,7 @@ bool cros_gralloc_driver::get_resolved_format_and_use_flags(
 	uint64_t resolved_use_flags;
 	struct combination *combo;
 
-	struct driver *drv = is_video_format(descriptor) ? drv_video_ : drv_render_;
-	if (drv_ivshmem_ && use_ivshm_drv(descriptor)) {
-		drv = drv_ivshmem_;
-	} else if ((descriptor->use_flags & BO_USE_SCANOUT) && !(is_video_format(descriptor)))
-		drv = drv_kms_;
+	struct driver *drv = select_driver(descriptor);
 
 	if (mt8183_camera_quirk_ && (descriptor->use_flags & BO_USE_CAMERA_READ) &&
 	    !(descriptor->use_flags & BO_USE_SCANOUT) &&
@@ -440,21 +456,7 @@ bool cros_gralloc_driver::is_supported(const struct cros_gralloc_buffer_descript
 {
 	uint32_t resolved_format;
 	uint64_t resolved_use_flags;
-	struct driver *drv;
-	if (is_video_format(descriptor)) {
-		drv = drv_video_;
-	} else {
-		drv = drv_render_;
-	};
-	if (!drv_ivshmem_ && (descriptor->width == IVSH_WIDTH) && (descriptor->height == IVSH_HEIGHT)) {
-		if (reload()) {
-		}
-	}
-	if (drv_ivshmem_ && use_ivshm_drv(descriptor)) {
-		drv = drv_ivshmem_;
-	} else if ((descriptor->use_flags & BO_USE_SCANOUT) && !(is_video_format(descriptor))) {
-		drv = drv_kms_;
-	}
+	struct driver *drv = select_driver(descriptor);
 	uint32_t max_texture_size = drv_get_max_texture_2d_size(drv);
 	if (!get_resolved_format_and_use_flags(descriptor, &resolved_format, &resolved_use_flags))
 		return false;
@@ -501,13 +503,7 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 	struct cros_gralloc_handle *hnd;
 	std::unique_ptr<cros_gralloc_buffer> buffer;
 
-	struct driver *drv;
-
-	drv = is_video_format(descriptor) ? drv_video_ : drv_render_;
-	if (drv_ivshmem_ && use_ivshm_drv(descriptor)) {
-		drv = drv_ivshmem_;
-	} else if ((descriptor->use_flags & BO_USE_SCANOUT) && !(is_video_format(descriptor)))
-		drv = drv_kms_;
+	struct driver *drv = select_driver(descriptor);
 
 	if (!get_resolved_format_and_use_flags(descriptor, &resolved_format, &resolved_use_flags)) {
 		ALOGE("Failed to resolve format and use_flags.");
@@ -661,11 +657,7 @@ int32_t cros_gralloc_driver::retain(buffer_handle_t handle)
 		.drm_format = hnd->format,
 		.use_flags = hnd->use_flags,
 	};
-	drv = is_video_format(&descriptor) ? drv_video_ : drv_render_;
-	if (drv_ivshmem_ && (hnd->width == IVSH_WIDTH) && (hnd->height == IVSH_HEIGHT)) {
-		drv = drv_ivshmem_;
-	} else if ((hnd->use_flags & BO_USE_SCANOUT) && !(is_video_format(&descriptor)))
-		drv = drv_kms_;
+	drv = select_driver(&descriptor);
 
 	auto hnd_it = handles_.find(hnd);
 	if (hnd_it != handles_.end()) {
