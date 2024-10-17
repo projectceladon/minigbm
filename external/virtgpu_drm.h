@@ -86,6 +86,7 @@ struct drm_virtgpu_execbuffer {
 #define VIRTGPU_PARAM_RESOURCE_SYNC 9 /* Synchronization resources */
 #define VIRTGPU_PARAM_GUEST_VRAM 10 /* All guest allocations happen via virtgpu dedicated heap. */
 #define VIRTGPU_PARAM_QUERY_DEV 11 /* Query the virtio device name. */
+#define VIRTGPU_PARAM_ALLOW_P2P 12 /* Supports P2P, implying its display is backed by dGPU. */
 
 #define VIRTGPU_PARAM_3D_FEATURES_BIT (1ull << VIRTGPU_PARAM_3D_FEATURES)
 #define VIRTGPU_PARAM_CAPSET_QUERY_FIX_BIT (1ull << VIRTGPU_PARAM_CAPSET_QUERY_FIX)
@@ -98,6 +99,7 @@ struct drm_virtgpu_execbuffer {
 #define VIRTGPU_PARAM_RESOURCE_SYNC_BIT (1ull << VIRTGPU_PARAM_RESOURCE_SYNC)
 #define VIRTGPU_PARAM_GUEST_VRAM_BIT (1ull << VIRTGPU_PARAM_GUEST_VRAM)
 #define VIRTGPU_PARAM_QUERY_DEV_BIT (1ull << VIRTGPU_PARAM_QUERY_DEV)
+#define VIRTGPU_PARAM_ALLOW_P2P_BIT (1ull << VIRTGPU_PARAM_ALLOW_P2P)
 
 struct drm_virtgpu_getparam {
 	__u64 param;

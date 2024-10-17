@@ -4,6 +4,7 @@
  * found in the LICENSE file.
  */
 
+#include "drv.h"
 #ifdef DRV_I915
 
 #include <assert.h>
@@ -439,10 +440,9 @@ static int i915_add_combinations(struct driver *drv)
 	drv_add_combinations(drv, linear_source_formats, ARRAY_SIZE(linear_source_formats),
                              &metadata_x_tiled, texture_flags_video | BO_USE_CAMERA_MASK);
 
-
 	if (i915_has_tile4(i915)) {
 		// in dual gpu case, only alloc x-tiling for dgpu for render
-		if ((drv->gpu_grp_type & GPU_TYPE_DUAL_IGPU_DGPU) && (GEN_VERSION_X10(i915) >= 125))
+		if (!(drv->gpu_grp_type & GPU_GRP_TYPE_HAS_VIRTIO_GPU_BLOB_P2P_BIT))
 			return 0;
 
 		struct format_metadata metadata_4_tiled = { .tiling = I915_TILING_4,
@@ -473,7 +473,8 @@ static int i915_add_combinations(struct driver *drv)
 		struct format_metadata metadata_y_tiled = { .tiling = I915_TILING_Y,
 							    .priority = 3,
 							    .modifier = I915_FORMAT_MOD_Y_TILED };
-		if (drv->gpu_grp_type & GPU_TYPE_DUAL_IGPU_DGPU) {
+		if ((drv->gpu_grp_type & GPU_GRP_TYPE_HAS_INTEL_DGPU_BIT) ||
+		    (drv->gpu_grp_type & GPU_GRP_TYPE_HAS_VIRTIO_GPU_BLOB_P2P_BIT)) {
 			scanout_and_render_not_linear = unset_flags(scanout_and_render, BO_USE_SCANOUT);
 		}
 /* Support y-tiled NV12 and P010 for libva */
@@ -944,6 +945,7 @@ static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t heig
 			 tiling_to_string(bo->meta.tiling), modifier);
 	}
 
+	drv_logd("wf -- format=0x%x,modifier=0x%lx\n", format, bo->meta.format_modifier);
 	if (format == DRM_FORMAT_YVU420_ANDROID) {
 		/*
 		 * We only need to be able to use this as a linear texture,
@@ -1398,10 +1400,16 @@ static int i915_bo_flush(struct bo *bo, struct mapping *mapping)
 	return 0;
 }
 
-static bool i915_is_dgpu(struct driver *drv)
+static bool i915_is_feature_supported(struct driver *drv, uint64_t feature)
 {
 	struct i915_device *i915 = drv->priv;
-	return i915->has_local_mem;
+	switch (feature) {
+	case DRIVER_DEVICE_FEATURE_I915_DGPU:
+		return i915->has_local_mem;
+	default:
+		return false;
+	}
+	return false;
 }
 
 const struct backend backend_i915 = {
@@ -1418,7 +1426,7 @@ const struct backend backend_i915 = {
 	.bo_flush = i915_bo_flush,
 	.resolve_format_and_use_flags = drv_resolve_format_and_use_flags_helper,
 	.num_planes_from_modifier = i915_num_planes_from_modifier,
-	.is_dgpu = i915_is_dgpu,
+	.is_feature_supported = i915_is_feature_supported,
 };
 
 #endif
