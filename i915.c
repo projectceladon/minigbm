@@ -1285,9 +1285,6 @@ static void *i915_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags)
 			return MAP_FAILED;
 		}
 
-		drv_logi("%s : %d : handle = %x, size = %zd, mmpa_arg.offset = %llx", __func__,
-			__LINE__, mmap_arg.handle, bo->meta.total_size, mmap_arg.offset);
-
 		/* And map it */
 		addr = mmap(0, bo->meta.total_size, PROT_READ | PROT_WRITE, MAP_SHARED, bo->drv->fd,
 			    mmap_arg.offset);
