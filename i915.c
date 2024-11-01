@@ -217,7 +217,6 @@ static int i915_add_combinations(struct driver *drv)
 	const uint64_t scanout_and_render = BO_USE_RENDER_MASK | BO_USE_SCANOUT;
 	const uint64_t render = BO_USE_RENDER_MASK;
 	const uint64_t texture_only = BO_USE_TEXTURE_MASK;
-	uint64_t render_flags = BO_USE_RENDER_MASK;
 	uint64_t texture_flags = BO_USE_TEXTURE_MASK;
 	bool is_kvm = vm_type() & HYPERTYPE_TYPE_KVM;
 
@@ -915,14 +914,17 @@ static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t heig
 
 static bool is_need_local(int64_t use_flags)
 {
-	static bool local = true;
+	static bool local = false;
+
+	if (use_flags & BO_USE_LOCAL_MEMORY) {
+		local = true;
+	}
 
 	if (use_flags & BO_USE_SW_READ_RARELY || use_flags & BO_USE_SW_READ_OFTEN ||
 	    use_flags & BO_USE_SW_WRITE_RARELY || use_flags & BO_USE_SW_WRITE_OFTEN) {
 		local = false;
-	} else {
-		local = true;
 	}
+
 	return local;
 }
 
