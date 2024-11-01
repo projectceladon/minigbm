@@ -122,6 +122,17 @@ static inline void handle_usage(uint64_t *gralloc_usage, uint64_t gralloc_mask,
 	}
 }
 
+static inline void unset_usage(uint64_t *gralloc_usage, uint64_t *bo_use_flags)
+{
+	if ((*gralloc_usage) & GRALLOC_USAGE_PRIVATE_2) {
+		(*gralloc_usage) &= ~GRALLOC_USAGE_PRIVATE_2;
+		(*bo_use_flags) &= ~(BO_USE_SW_READ_RARELY | BO_USE_SW_READ_OFTEN |
+				     BO_USE_SW_WRITE_RARELY | BO_USE_SW_WRITE_OFTEN);
+	} else {
+		(*bo_use_flags) |= BO_USE_SW_READ_RARELY;
+	}
+}
+
 uint64_t cros_gralloc_convert_usage(uint64_t usage)
 {
 	uint64_t use_flags = BO_USE_NONE;
@@ -160,6 +171,7 @@ uint64_t cros_gralloc_convert_usage(uint64_t usage)
 		     BO_USE_SENSOR_DIRECT_DATA);
 	handle_usage(&usage, BUFFER_USAGE_GPU_DATA_BUFFER, &use_flags, BO_USE_GPU_DATA_BUFFER);
 	handle_usage(&usage, BUFFER_USAGE_FRONT_RENDERING_MASK, &use_flags, BO_USE_FRONT_RENDERING);
+	unset_usage(&usage, &use_flags);
 
 	if (usage) {
 		ALOGE("Unhandled gralloc usage: %llx", (unsigned long long)usage);
