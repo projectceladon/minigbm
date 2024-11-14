@@ -21,7 +21,7 @@
 
 // Constants taken from pipe_loader_drm.c in Mesa
 
-#define DRM_NUM_NODES 63
+#define DRM_NUM_NODES 8
 
 // DRM Render nodes start at 128
 #define DRM_RENDER_NODE_START 128
