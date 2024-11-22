@@ -45,6 +45,7 @@ extern "C" {
 #define BO_USE_RENDERSCRIPT		(1ull << 17)
 #define BO_USE_GPU_DATA_BUFFER		(1ull << 18)
 #define BO_USE_SENSOR_DIRECT_DATA	(1ull << 19)
+#define BO_USE_PRIVATE_1               (1ull << 29)
 
 #define BO_USE_ARC_SCREEN_CAP_PROBED	(1ull << 63)
 

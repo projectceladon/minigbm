@@ -26,6 +26,9 @@
 /* Define to match AIDL PixelFormat::R_8. */
 #define HAL_PIXEL_FORMAT_R8 0x38
 
+/* Define to match BufferUsage::GRALLOC_USAGE_PRIVATE_0. */
+#define GRALLOC_USAGE_PRIVATE_1 (1 << 29)
+
 const char *drmFormat2Str(int drm_format)
 {
 	static char buf[5];
@@ -160,6 +163,7 @@ uint64_t cros_gralloc_convert_usage(uint64_t usage)
 		     BO_USE_SENSOR_DIRECT_DATA);
 	handle_usage(&usage, BUFFER_USAGE_GPU_DATA_BUFFER, &use_flags, BO_USE_GPU_DATA_BUFFER);
 	handle_usage(&usage, BUFFER_USAGE_FRONT_RENDERING_MASK, &use_flags, BO_USE_FRONT_RENDERING);
+	handle_usage(&usage, GRALLOC_USAGE_PRIVATE_1, &use_flags, BO_USE_PRIVATE_1);
 
 	if (usage) {
 		ALOGE("Unhandled gralloc usage: %llx", (unsigned long long)usage);
