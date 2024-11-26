@@ -132,7 +132,7 @@ int32_t cros_gralloc_driver::reload()
 		}
 
 		drmFreeVersion(version);
-		if (!isVirtioGpuPciDevice(fd)) {
+		if (get_gpu_type(fd) == GPU_GRP_TYPE_VIRTIO_GPU_IVSHMEM_IDX) {
 			drv_logi("New added node is virtio-ivishmem node");
 			gpu_grp_type_ |= GPU_GRP_TYPE_HAS_VIRTIO_GPU_IVSHMEM_BIT;
 			struct driver *drv = drv_create(fd, gpu_grp_type_);
