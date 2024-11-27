@@ -958,8 +958,16 @@ int cros_gralloc_driver::select_render_driver(uint64_t gpu_grp_type)
 
 int cros_gralloc_driver::select_kms_driver(uint64_t gpu_grp_type)
 {
+	// virtio-GPU without blob cannot import external buffers.
 	if (gpu_grp_type & GPU_GRP_TYPE_HAS_VIRTIO_GPU_NO_BLOB_BIT) {
 		return GPU_GRP_TYPE_VIRTIO_GPU_NO_BLOB_IDX;
+	}
+	// QNX case: virtio-GPU is ivshmem backed device and cannot import external buffers.
+	// Screen cast also uses ivshmem virtio-GPU but we have virtio-GPU supporting blob.
+	if ((gpu_grp_type & GPU_GRP_TYPE_HAS_VIRTIO_GPU_IVSHMEM_BIT) &&
+	    !(gpu_grp_type & GPU_GRP_TYPE_HAS_VIRTIO_GPU_BLOB_BIT) &&
+	    !(gpu_grp_type & GPU_GRP_TYPE_HAS_VIRTIO_GPU_BLOB_P2P_BIT)) {
+		return GPU_GRP_TYPE_VIRTIO_GPU_IVSHMEM_IDX;
 	}
 	if (gpu_grp_type & GPU_GRP_TYPE_HAS_INTEL_DGPU_BIT) {
 		return GPU_GRP_TYPE_INTEL_DGPU_IDX;
