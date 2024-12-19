@@ -44,6 +44,7 @@ bool isVirtioGpuPciDevice(int virtgpu_fd);
 bool isVirtioGpuWithBlob(int virtgpu_fd);
 
 int get_gpu_type(int fd);
+char *gpu_type_str(uint32_t idx);
 
 #ifdef __cplusplus
 }

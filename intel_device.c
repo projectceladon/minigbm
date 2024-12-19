@@ -313,3 +313,21 @@ int get_gpu_type(int fd)
 	return type;
 }
 
+char *gpu_type_str(uint32_t idx) {
+	switch (idx) {
+	case GPU_GRP_TYPE_INTEL_IGPU_IDX:
+		return "Intel iGPU";
+	case GPU_GRP_TYPE_INTEL_DGPU_IDX:
+		return "Intel dGPU";
+	case GPU_GRP_TYPE_VIRTIO_GPU_BLOB_IDX:
+		return "virtio-GPU (blob)";
+	case GPU_GRP_TYPE_VIRTIO_GPU_BLOB_P2P_IDX:
+		return "virtio-GPU (blob, p2p)";
+	case GPU_GRP_TYPE_VIRTIO_GPU_NO_BLOB_IDX:
+		return "virtio-GPU (noblob)";
+	case GPU_GRP_TYPE_VIRTIO_GPU_IVSHMEM_IDX:
+		return "virtio-GPU (ivshmem)";
+	}
+	return "unknown";
+}
+

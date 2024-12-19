@@ -239,6 +239,7 @@ cros_gralloc_driver::cros_gralloc_driver(): drivers_(GPU_GRP_TYPE_NR, nullptr)
 		//   case. This kind doesn't support importing external buffers neither, and it's
 		//   needed only when the buffers shall be shared for casting.
 		int gpu_grp_type_idx = get_gpu_type(fd);
+		drv_logi("device detected: type %s\n", gpu_type_str(gpu_grp_type_idx));
 
 		if (gpu_grp_type_idx != -1 &&
 		    !(gpu_grp_type_ & (1ull << gpu_grp_type_idx))) {
@@ -289,14 +290,17 @@ restart:
 	int idx = select_render_driver(gpu_grp_type_);
 	if (idx != -1) {
 		drv_render_ = drivers_[idx];
+		drv_logi("Use %s as render device\n", gpu_type_str(idx));
 	}
 	idx = select_kms_driver(gpu_grp_type_);
 	if (idx != -1) {
 		drv_kms_ = drivers_[idx];
+		drv_logi("Use %s as kms device\n", gpu_type_str(idx));
 	}
 	idx = select_video_driver(gpu_grp_type_);
 	if (idx != -1) {
 		drv_video_ = drivers_[idx];
+		drv_logi("Use %s as video device\n", gpu_type_str(idx));
 	}
 	if (gpu_grp_type_ & GPU_GRP_TYPE_HAS_VIRTIO_GPU_IVSHMEM_BIT) {
 		drv_ivshmem_ = drivers_[GPU_GRP_TYPE_VIRTIO_GPU_IVSHMEM_IDX];
@@ -358,15 +362,19 @@ struct driver *cros_gralloc_driver::select_driver(const struct cros_gralloc_buff
 			reload();
 		}
 		if (drv_ivshmem_) {
+			drv_logi("%s: use ivshmem driver for allocation\n", __func__);
 			return drv_ivshmem_;
 		}
 	}
 	if (is_video_format(descriptor)) {
+		drv_logi("%s: use video driver for allocation\n", __func__);
 		return drv_video_;
 	}
 	if (descriptor->use_flags & BO_USE_SCANOUT) {
+		drv_logi("%s: use kms driver for allocation\n", __func__);
 		return drv_kms_;
 	}
+	drv_logi("%s: use render driver for allocation\n", __func__);
 	return drv_render_;
 }
 
