@@ -914,11 +914,7 @@ static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t heig
 
 static bool is_need_local(int64_t use_flags)
 {
-	static bool local = false;
-
-	if (use_flags & BO_USE_LOCAL_MEMORY) {
-		local = true;
-	}
+	static bool local = true;
 
 	if (use_flags & BO_USE_SW_READ_RARELY || use_flags & BO_USE_SW_READ_OFTEN ||
 	    use_flags & BO_USE_SW_WRITE_RARELY || use_flags & BO_USE_SW_WRITE_OFTEN) {
