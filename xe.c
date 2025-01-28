@@ -101,7 +101,7 @@ static void xe_info_from_device_id(struct xe_device *xe)
 
 	const uint16_t lnl_ids[] = { 0x6420, 0x64A0, 0x64B0};
 
-	const uint16_t ptl_ids[] = { 0xB080, 0xB090, 0xB0A0, 0xB0FF};
+	const uint16_t ptl_ids[] = { 0xB080, 0xB090, 0xB0A0, 0xB0B0, 0xB0FF};
 
 	unsigned i;
 	xe->graphics_version = 0;
