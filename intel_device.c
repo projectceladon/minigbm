@@ -298,7 +298,7 @@ int get_gpu_type(int fd)
 	if (version == NULL) {
 		return type;
 	}
-	if (strcmp(version->name, "i915") == 0) {
+	if (strcmp(version->name, "i915") == 0 || strcmp(version->name, "xe") == 0) {
 		if (isIntelDg2(fd)) {
 			type = GPU_GRP_TYPE_INTEL_DGPU_IDX;
 		} else {
