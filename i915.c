@@ -303,12 +303,6 @@ static int i915_add_combinations(struct driver *drv)
                              &metadata_x_tiled, texture_flags_video | BO_USE_CAMERA_MASK);
 
 	if (i915_has_tile4(i915)) {
-		// in dual gpu case, only alloc x-tiling for dgpu for render
-		if ((drv->gpu_grp_type & GPU_GRP_TYPE_HAS_INTEL_IGPU_BIT) ||
-		    (drv->gpu_grp_type & GPU_GRP_TYPE_HAS_VIRTIO_GPU_BLOB_BIT)) {
-			return 0;
-		}
-
 		struct format_metadata metadata_4_tiled = { .tiling = I915_TILING_4,
 							    .priority = 3,
 							    .modifier = I915_FORMAT_MOD_4_TILED };
@@ -325,22 +319,22 @@ static int i915_add_combinations(struct driver *drv)
 		drv_add_combination(drv, DRM_FORMAT_NV12, &metadata_4_tiled, nv12_usage);
 		drv_add_combination(drv, DRM_FORMAT_P010, &metadata_4_tiled, p010_usage);
 		drv_add_combination(drv, DRM_FORMAT_P010_INTEL, &metadata_4_tiled, p010_usage);
-		drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats),
-				     &metadata_4_tiled, render_not_linear);
-		drv_add_combinations(drv, scanout_render_formats,
-				     ARRAY_SIZE(scanout_render_formats), &metadata_4_tiled,
-				     render_not_linear);
-                drv_add_combinations(drv, source_formats, ARRAY_SIZE(source_formats), &metadata_4_tiled,
-                                     texture_flags | BO_USE_NON_GPU_HW);
+		drv_add_combinations(drv, source_formats, ARRAY_SIZE(source_formats), &metadata_4_tiled,
+								texture_flags | BO_USE_NON_GPU_HW);
 
+		// in dual gpu case, only alloc x-tiling for dgpu for render
+		if (!(drv->gpu_grp_type & GPU_GRP_TYPE_HAS_INTEL_IGPU_BIT) &&
+			!(drv->gpu_grp_type & GPU_GRP_TYPE_HAS_VIRTIO_GPU_BLOB_BIT)) {
+			drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats),
+								&metadata_4_tiled, render_not_linear);
+			drv_add_combinations(drv, scanout_render_formats,
+								ARRAY_SIZE(scanout_render_formats), &metadata_4_tiled,
+								render_not_linear);
+		}
 	} else {
 		struct format_metadata metadata_y_tiled = { .tiling = I915_TILING_Y,
 							    .priority = 3,
 							    .modifier = I915_FORMAT_MOD_Y_TILED };
-		if ((drv->gpu_grp_type & GPU_GRP_TYPE_HAS_INTEL_DGPU_BIT) ||
-		    (drv->gpu_grp_type & GPU_GRP_TYPE_HAS_VIRTIO_GPU_BLOB_P2P_BIT)) {
-			return 0;
-		}
 /* Support y-tiled NV12 and P010 for libva */
 #ifdef I915_SCANOUT_Y_TILED
 		const uint64_t nv12_usage =
@@ -355,17 +349,20 @@ static int i915_add_combinations(struct driver *drv)
 		drv_add_combination(drv, DRM_FORMAT_NV12, &metadata_y_tiled, nv12_usage);
 		drv_add_combination(drv, DRM_FORMAT_P010, &metadata_y_tiled, p010_usage);
 		drv_add_combination(drv, DRM_FORMAT_P010_INTEL, &metadata_y_tiled, p010_usage);
-		drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats),
-				     &metadata_y_tiled, render_not_linear);
-		/* Y-tiled scanout isn't available on old platforms so we add
-		 * |scanout_render_formats| without that USE flag.
-		 */
-		drv_add_combinations(drv, scanout_render_formats,
-				     ARRAY_SIZE(scanout_render_formats), &metadata_y_tiled,
-				     scanout_and_render_not_linear);
 		drv_add_combinations(drv, source_formats, ARRAY_SIZE(source_formats), &metadata_y_tiled,
 				     texture_flags | BO_USE_NON_GPU_HW);
 
+		if (!(drv->gpu_grp_type & GPU_GRP_TYPE_HAS_INTEL_DGPU_BIT) &&
+			!(drv->gpu_grp_type & GPU_GRP_TYPE_HAS_VIRTIO_GPU_BLOB_P2P_BIT)) {
+			drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats),
+								&metadata_y_tiled, render_not_linear);
+			/* Y-tiled scanout isn't available on old platforms so we add
+			* |scanout_render_formats| without that USE flag.
+			*/
+			drv_add_combinations(drv, scanout_render_formats,
+								ARRAY_SIZE(scanout_render_formats), &metadata_y_tiled,
+								scanout_and_render_not_linear);
+		}
 	}
 	return 0;
 }
@@ -1265,7 +1262,9 @@ static int i915_bo_invalidate(struct bo *bo, struct mapping *mapping)
 static int i915_bo_flush(struct bo *bo, struct mapping *mapping)
 {
 	struct i915_device *i915 = bo->drv->priv;
-	if (!i915->has_llc && bo->meta.tiling == I915_TILING_NONE)
+	if (!i915->has_llc
+		&& (bo->meta.tiling == I915_TILING_NONE)
+		&& (bo->meta.use_flags & BO_USE_SW_WRITE_OFTEN))
 		i915_clflush(mapping->vma->addr, mapping->vma->length);
 
 	return 0;
