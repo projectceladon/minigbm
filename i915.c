@@ -86,9 +86,16 @@ static const uint32_t kDefaultCursorHeight = 64;
 static const uint64_t gen_modifier_order[] = { I915_FORMAT_MOD_Y_TILED_CCS, I915_FORMAT_MOD_Y_TILED,
 					       I915_FORMAT_MOD_X_TILED, DRM_FORMAT_MOD_LINEAR };
 
-static const uint64_t gen12_modifier_order[] = { I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS,
-						 I915_FORMAT_MOD_Y_TILED, I915_FORMAT_MOD_X_TILED,
-						 DRM_FORMAT_MOD_LINEAR };
+static const uint64_t gen12_modifier_order_without_mc[] = { I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS,
+							    I915_FORMAT_MOD_Y_TILED,
+							    I915_FORMAT_MOD_X_TILED,
+							    DRM_FORMAT_MOD_LINEAR };
+
+static const uint64_t gen12_modifier_order_with_mc[] = { I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS,
+								I915_FORMAT_MOD_Y_TILED_GEN12_MC_CCS,
+								I915_FORMAT_MOD_Y_TILED,
+								I915_FORMAT_MOD_X_TILED,
+								DRM_FORMAT_MOD_LINEAR };
 
 static const uint64_t gen11_modifier_order[] = { I915_FORMAT_MOD_Y_TILED, I915_FORMAT_MOD_X_TILED,
 						 DRM_FORMAT_MOD_LINEAR };
@@ -117,6 +124,7 @@ struct i915_device {
 	uint32_t has_mmap_offset	: 1;
 	uint32_t has_local_mem		: 1;
 	uint32_t force_mem_local	: 1;
+	uint32_t is_media_compression_enabled	: 1;
 };
 
 /*
@@ -158,8 +166,13 @@ static void i915_get_modifier_order(struct i915_device *i915)
 		i915->modifier.order = xe_lpdp_modifier_order;
 		i915->modifier.count = ARRAY_SIZE(xe_lpdp_modifier_order);
 	} else if (i915->graphics_version == 12) {
-		i915->modifier.order = gen12_modifier_order;
-		i915->modifier.count = ARRAY_SIZE(gen12_modifier_order);
+		if (i915->is_media_compression_enabled) {
+			i915->modifier.order = gen12_modifier_order_with_mc;
+			i915->modifier.count = ARRAY_SIZE(gen12_modifier_order_with_mc);
+		} else {
+			i915->modifier.order = gen12_modifier_order_without_mc;
+			i915->modifier.count = ARRAY_SIZE(gen12_modifier_order_without_mc);
+		}
 	} else if (i915->graphics_version == 11) {
 		i915->modifier.order = gen11_modifier_order;
 		i915->modifier.count = ARRAY_SIZE(gen11_modifier_order);
@@ -336,9 +349,13 @@ static int i915_add_combinations(struct driver *drv)
                                      texture_flags | BO_USE_NON_GPU_HW);
 
 	} else {
-		struct format_metadata metadata_y_tiled = { .tiling = I915_TILING_Y,
-							    .priority = 3,
-							    .modifier = I915_FORMAT_MOD_Y_TILED };
+		struct format_metadata metadata_y_tiled = {
+			.tiling = I915_TILING_Y,
+			.priority = 3,
+			.modifier =
+			    (i915->graphics_version == 12 && i915->is_media_compression_enabled)
+				? I915_FORMAT_MOD_Y_TILED_GEN12_MC_CCS
+				: I915_FORMAT_MOD_Y_TILED};
 		if ((drv->gpu_grp_type & GPU_GRP_TYPE_HAS_INTEL_DGPU_BIT) ||
 		    (drv->gpu_grp_type & GPU_GRP_TYPE_HAS_VIRTIO_GPU_BLOB_P2P_BIT)) {
 			return 0;
@@ -357,6 +374,13 @@ static int i915_add_combinations(struct driver *drv)
 		drv_add_combination(drv, DRM_FORMAT_NV12, &metadata_y_tiled, nv12_usage);
 		drv_add_combination(drv, DRM_FORMAT_P010, &metadata_y_tiled, p010_usage);
 		drv_add_combination(drv, DRM_FORMAT_P010_INTEL, &metadata_y_tiled, p010_usage);
+		drv_add_combinations(drv, source_formats, ARRAY_SIZE(source_formats), &metadata_y_tiled,
+				     texture_flags | BO_USE_NON_GPU_HW);
+
+		/* Don't allocate media compressed buffers for formats other than NV12
+		 * and P010.
+		 */
+		metadata_y_tiled.modifier = I915_FORMAT_MOD_Y_TILED;
 		drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats),
 				     &metadata_y_tiled, render_not_linear);
 		/* Y-tiled scanout isn't available on old platforms so we add
@@ -365,9 +389,6 @@ static int i915_add_combinations(struct driver *drv)
 		drv_add_combinations(drv, scanout_render_formats,
 				     ARRAY_SIZE(scanout_render_formats), &metadata_y_tiled,
 				     scanout_and_render_not_linear);
-		drv_add_combinations(drv, source_formats, ARRAY_SIZE(source_formats), &metadata_y_tiled,
-				     texture_flags | BO_USE_NON_GPU_HW);
-
 	}
 	return 0;
 }
@@ -592,6 +613,17 @@ static int i915_init(struct driver *drv)
 	if (!i915)
 		return -ENOMEM;
 
+	const char *enable_intel_media_compression_env_var =
+	    getenv("ENABLE_INTEL_MEDIA_COMPRESSION");
+	if (enable_intel_media_compression_env_var == NULL) {
+		drv_logd("Failed to get ENABLE_INTEL_MEDIA_COMPRESSION");
+		i915->is_media_compression_enabled = false;
+	} else {
+		i915->is_media_compression_enabled =
+		    (drv->compression) &&
+		    (strcmp(enable_intel_media_compression_env_var, "1") == 0);
+	}
+
 	ret = gem_param(drv->fd, I915_PARAM_CHIPSET_ID);
 	if (ret == -1) {
 		drv_loge("Failed to get I915_PARAM_CHIPSET_ID\n");
@@ -733,6 +765,13 @@ static size_t i915_num_planes_from_modifier(struct driver *drv, uint32_t format,
 	    modifier == I915_FORMAT_MOD_4_TILED_MTL_RC_CCS) {
 		assert(num_planes == 1);
 		return 2;
+	} else if (modifier == I915_FORMAT_MOD_Y_TILED_GEN12_MC_CCS) {
+		assert(drv);
+		struct i915_device *i915 = drv->priv;
+		assert(i915 && i915->is_media_compression_enabled);
+
+		assert(num_planes == 2);
+		return 4;
 	}
 
 	return num_planes;
@@ -793,6 +832,9 @@ static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t heig
 		modifier = DRM_FORMAT_MOD_LINEAR;
 	}
 
+	assert(modifier != I915_FORMAT_MOD_Y_TILED_GEN12_MC_CCS ||
+	       i915->is_media_compression_enabled);
+
 	switch (modifier) {
 	case DRM_FORMAT_MOD_LINEAR:
 		bo->meta.tiling = I915_TILING_NONE;
@@ -809,6 +851,7 @@ static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t heig
 	 * IPs(render/media/display)
 	 */
 	case I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS:
+	case I915_FORMAT_MOD_Y_TILED_GEN12_MC_CCS:
 		bo->meta.tiling = I915_TILING_Y;
 		break;
 	case I915_FORMAT_MOD_4_TILED:
@@ -876,8 +919,17 @@ static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t heig
 
 		bo->meta.num_planes = i915_num_planes_from_modifier(bo->drv, format, modifier);
 		bo->meta.total_size = offset;
-	} else if (modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS) {
+	} else if (modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS ||
+		   modifier == I915_FORMAT_MOD_Y_TILED_GEN12_MC_CCS) {
+		assert(modifier != I915_FORMAT_MOD_Y_TILED_GEN12_MC_CCS ||
+		       i915->is_media_compression_enabled);
+		assert(modifier != I915_FORMAT_MOD_Y_TILED_GEN12_MC_CCS ||
+		       (format == DRM_FORMAT_NV12 || format == DRM_FORMAT_P010));
+		assert(drv_num_planes_from_format(format) > 0);
 
+		uint32_t offset = 0;
+		size_t plane = 0;
+		size_t a_plane = 0;
 		/*
 		 * considering only 128 byte compression and one cache line of
 		 * aux buffer(64B) contains compression status of 4-Y tiles.
@@ -885,32 +937,49 @@ static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t heig
 		 * line stride(bytes) is 4 * 128B
 		 * and tile stride(lines) is 32L
 		 */
-		uint32_t stride = ALIGN(drv_stride_from_format(format, width, 0), 512);
+		for (plane = 0; plane < drv_num_planes_from_format(format); plane++) {
+			uint32_t stride = ALIGN(drv_stride_from_format(format, width, plane), 512);
 
-		height = ALIGN(drv_height_from_format(format, height, 0), 32);
+			const uint32_t plane_height = drv_height_from_format(format, height, plane);
+			uint32_t aligned_height = ALIGN(plane_height, 32);
 
-		if (i915->is_xelpd && (stride > 1)) {
-			stride = 1 << (32 - __builtin_clz(stride - 1));
-			height = ALIGN(drv_height_from_format(format, height, 0), 128);
+			if (i915->is_xelpd && (stride > 1)) {
+				stride = 1 << (32 - __builtin_clz(stride - 1));
+				aligned_height = ALIGN(plane_height, 128);
+			}
+
+			bo->meta.strides[plane] = stride;
+			/* size calculation & alignment are 64KB aligned
+			 * size as per spec
+			 */
+			bo->meta.sizes[plane] = ALIGN(stride * aligned_height, 512 * 128);
+			bo->meta.offsets[plane] = offset;
+			/* next buffer offset */
+			offset += bo->meta.sizes[plane];
 		}
-
-		bo->meta.strides[0] = stride;
-		/* size calculation and alignment are 64KB aligned
-		 * size as per spec
-		 */
-		bo->meta.sizes[0] = ALIGN(stride * height, 65536);
-		bo->meta.offsets[0] = 0;
 
 		/* Aux buffer is linear and page aligned. It is placed after
 		 * other planes and aligned to main buffer stride.
 		 */
-		bo->meta.strides[1] = bo->meta.strides[0] / 8;
-		/* Aligned to page size */
-		bo->meta.sizes[1] = ALIGN(bo->meta.sizes[0] / 256, getpagesize());
-		bo->meta.offsets[1] = bo->meta.sizes[0];
+		for (a_plane = 0; a_plane < plane; a_plane++) {
+			/* Every 64 bytes in the aux plane contain compression information for a
+			 * sub-row of 4 Y tiles of the corresponding main plane, so the pitch in
+			 * bytes of the aux plane should be the pitch of the main plane in units of
+			 * 4 tiles multiplied by 64 (or equivalently, the pitch of the main plane in
+			 * bytes divided by 8).
+			 */
+			bo->meta.strides[plane + a_plane] = bo->meta.strides[a_plane] / 8;
+			/* Aligned to page size */
+			bo->meta.sizes[plane + a_plane] =
+			    ALIGN(bo->meta.sizes[a_plane] / 256, 4 * 1024);
+			bo->meta.offsets[plane + a_plane] = offset;
+
+			/* next buffer offset */
+			offset += bo->meta.sizes[plane + a_plane];
+		}
 		/* Total number of planes & sizes */
-		bo->meta.num_planes = i915_num_planes_from_modifier(bo->drv, format, modifier);
-		bo->meta.total_size = bo->meta.sizes[0] + bo->meta.sizes[1];
+		bo->meta.num_planes = plane + a_plane;
+		bo->meta.total_size = offset;
 	} else if (modifier == I915_FORMAT_MOD_4_TILED_MTL_RC_CCS) {
 
 		/*
@@ -1158,6 +1227,7 @@ static void *i915_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags)
 
 	if ((bo->meta.format_modifier == I915_FORMAT_MOD_Y_TILED_CCS) ||
 	    (bo->meta.format_modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS) ||
+	    (bo->meta.format_modifier == I915_FORMAT_MOD_Y_TILED_GEN12_MC_CCS) ||
 	    (bo->meta.format_modifier == I915_FORMAT_MOD_4_TILED_MTL_RC_CCS))
 		return MAP_FAILED;
 
