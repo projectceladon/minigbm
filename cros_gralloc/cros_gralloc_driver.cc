@@ -180,7 +180,7 @@ cros_gralloc_driver::cros_gralloc_driver()
 			virtio_node_idx = availabe_node;
 		}
 
-		if (!strcmp(version->name, "i915")) {
+		if (!strcmp(version->name, "i915") || strcmp(version->name, "xe") == 0) {
 			// Prefer i915 for performance consideration.
 			//
 			// TODO: We might have multiple i915 devices in the system and in
