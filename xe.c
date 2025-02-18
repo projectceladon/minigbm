@@ -309,9 +309,8 @@ static int xe_add_combinations(struct driver *drv)
 static int xe_align_dimensions(struct bo *bo, uint32_t format, uint32_t tiling, uint32_t *stride,
 				 uint32_t *aligned_height)
 {
-	struct xe_device *xe = bo->drv->priv;
-	uint32_t horizontal_alignment;
-	uint32_t vertical_alignment;
+	uint32_t horizontal_alignment = 0;
+	uint32_t vertical_alignment = 0;
 
 	switch (tiling) {
 	default:
@@ -441,9 +440,9 @@ static int xe_init(struct driver *drv)
 
 	uint64_t width = 0, height = 0;
 	if (drmGetCap(drv->fd, DRM_CAP_CURSOR_WIDTH, &width)) {
-		drv_loge("cannot get cursor width. \n");
+		drv_logi("cannot get cursor width. \n");
 	} else if (drmGetCap(drv->fd, DRM_CAP_CURSOR_HEIGHT, &height)) {
-		drv_loge("cannot get cursor height. \n");
+		drv_logi("cannot get cursor height. \n");
 	}
 
 	if (!width)
@@ -684,7 +683,16 @@ static int xe_bo_create_from_metadata(struct bo *bo)
 	size_t plane;
 	uint32_t gem_handle;
 	uint32_t vm = 0;
-	struct xe_device *xe = bo->drv->priv;
+
+	struct drm_xe_vm_create create = {
+        	.flags = DRM_XE_VM_CREATE_FLAG_SCRATCH_PAGE,
+	};
+
+	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_XE_VM_CREATE, &create);
+	if (ret) {
+        	drv_loge("DRM_IOCTL_XE_VM_CREATE failed\n");
+	        return -errno;
+	 }
 
 	/* From xe_drm.h: If a VM is specified, this BO must:
 	 * 1. Only ever be bound to that VM.
@@ -707,7 +715,7 @@ static int xe_bo_create_from_metadata(struct bo *bo)
 
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_XE_GEM_CREATE, &gem_create);
 	if (ret) {
-		drv_loge("DRM_IOCTL_I915_GEM_CREATE failed (size=%llu)\n", gem_create.size);
+		drv_loge("DRM_IOCTL_XE_GEM_CREATE failed (size=%llu)\n", gem_create.size);
 		return -errno;
 	}
 
@@ -751,7 +759,7 @@ static void *xe_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags)
 	    (bo->meta.format_modifier == I915_FORMAT_MOD_4_TILED))
 		return MAP_FAILED;
 
-	if (bo->meta.tiling == XE_TILING_NONE) {
+	if ((bo->meta.tiling == XE_TILING_NONE) || (addr == MAP_FAILED)) {
 		struct drm_xe_gem_mmap_offset gem_map = { 0 };
 		gem_map.handle = bo->handles[0].u32;
 
