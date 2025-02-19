@@ -428,6 +428,8 @@ static int xe_init(struct driver *drv)
 
 	if (!xe_query_device_info(drv, xe)) {
 		drv_loge("Failed to query device id using DRM_IOCTL_XE_DEVICE_QUERY");
+		if (!xe)
+			free(xe);
 		return -EINVAL;
 	}
 
