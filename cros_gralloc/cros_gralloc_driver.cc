@@ -204,11 +204,8 @@ cros_gralloc_driver::cros_gralloc_driver(): drivers_(GPU_GRP_TYPE_NR, nullptr)
 		}
 
 		// hit any of undesired render node
-		if (j < ARRAY_SIZE(undesired)) {
-			drmFreeVersion(version);
-			close(fd);
+		if (j < ARRAY_SIZE(undesired))
 			continue;
-		}
 
 		if (fallback_fd == -1)
 			fallback_fd = fd;
