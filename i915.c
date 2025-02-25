@@ -290,16 +290,16 @@ static int i915_add_combinations(struct driver *drv)
            unset_flags(texture_flags, BO_USE_RENDERSCRIPT | BO_USE_SW_WRITE_OFTEN |
                                           BO_USE_SW_READ_OFTEN | BO_USE_LINEAR);
 
-	struct format_metadata metadata_x_tiled = { .tiling = I915_TILING_X,
-						    .priority = 2,
-						    .modifier = I915_FORMAT_MOD_X_TILED };
+	// struct format_metadata metadata_x_tiled = { .tiling = I915_TILING_X,
+	// 					    .priority = 2,
+	// 					    .modifier = I915_FORMAT_MOD_X_TILED };
 
-	drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats), &metadata_x_tiled,
-			     render_not_linear);
-	drv_add_combinations(drv, scanout_render_formats, ARRAY_SIZE(scanout_render_formats),
-			     &metadata_x_tiled, scanout_and_render_not_linear);
-	drv_add_combinations(drv, linear_source_formats, ARRAY_SIZE(linear_source_formats),
-                             &metadata_x_tiled, texture_flags_video | BO_USE_CAMERA_MASK);
+	// drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats), &metadata_x_tiled,
+	// 		     render_not_linear);
+	// drv_add_combinations(drv, scanout_render_formats, ARRAY_SIZE(scanout_render_formats),
+	// 		     &metadata_x_tiled, scanout_and_render_not_linear);
+	// drv_add_combinations(drv, linear_source_formats, ARRAY_SIZE(linear_source_formats),
+        //                      &metadata_x_tiled, texture_flags_video | BO_USE_CAMERA_MASK);
 
 	if (i915_has_tile4(i915)) {
 		struct format_metadata metadata_4_tiled = { .tiling = I915_TILING_4,
