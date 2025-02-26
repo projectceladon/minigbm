@@ -60,28 +60,13 @@ struct combination {
 	uint64_t use_flags;
 };
 
-enum {
-	GPU_GRP_TYPE_INTEL_IGPU_IDX = 0,
-	GPU_GRP_TYPE_INTEL_DGPU_IDX = 1,
-	GPU_GRP_TYPE_VIRTIO_GPU_BLOB_IDX = 2,
-	// virtio-GPU with allow-p2p feature, implying its display is backed by dGPU
-	GPU_GRP_TYPE_VIRTIO_GPU_BLOB_P2P_IDX = 3,
-	GPU_GRP_TYPE_VIRTIO_GPU_NO_BLOB_IDX = 4,
-	GPU_GRP_TYPE_VIRTIO_GPU_IVSHMEM_IDX = 5,
-	GPU_GRP_TYPE_NR,
+enum CIV_GPU_TYPE {
+	ONE_GPU_INTEL = 1,
+	ONE_GPU_VIRTIO,
+	TWO_GPU_IGPU_VIRTIO,
+	TWO_GPU_IGPU_DGPU,
+	THREE_GPU_IGPU_VIRTIO_DGPU
 };
-
-#define GPU_GRP_TYPE_HAS_INTEL_IGPU_BIT			(1ull << GPU_GRP_TYPE_INTEL_IGPU_IDX)
-#define GPU_GRP_TYPE_HAS_INTEL_DGPU_BIT			(1ull << GPU_GRP_TYPE_INTEL_DGPU_IDX)
-#define GPU_GRP_TYPE_HAS_VIRTIO_GPU_BLOB_BIT		(1ull << GPU_GRP_TYPE_VIRTIO_GPU_BLOB_IDX)
-#define GPU_GRP_TYPE_HAS_VIRTIO_GPU_BLOB_P2P_BIT	(1ull << GPU_GRP_TYPE_VIRTIO_GPU_BLOB_P2P_IDX)
-#define GPU_GRP_TYPE_HAS_VIRTIO_GPU_NO_BLOB_BIT		(1ull << GPU_GRP_TYPE_VIRTIO_GPU_NO_BLOB_IDX)
-#define GPU_GRP_TYPE_HAS_VIRTIO_GPU_IVSHMEM_BIT		(1ull << GPU_GRP_TYPE_VIRTIO_GPU_IVSHMEM_IDX)
-
-#define DRIVER_DEVICE_FEATURE_I915_DGPU			(1ull << 1)
-#define DRIVER_DEVICE_FEATURE_VIRGL_RESOURCE_BLOB	(1ull << 2)
-#define DRIVER_DEVICE_FEATURE_VIRGL_QUERY_DEV		(1ull << 3)
-#define DRIVER_DEVICE_FEATURE_VIRGL_ALLOW_P2P		(1ull << 4)
 
 struct driver {
 	int fd;
@@ -89,7 +74,7 @@ struct driver {
 	void *priv;
 	pthread_mutex_t buffer_table_lock;
 	void *buffer_table;
-	uint64_t gpu_grp_type;
+	uint32_t gpu_grp_type;  	// enum CIV_GPU_TYPE
 	pthread_mutex_t mappings_lock;
 	struct drv_array *mappings;
 	struct drv_array *combos;
@@ -126,7 +111,6 @@ struct backend {
 	int (*resource_info)(struct bo *bo, uint32_t strides[DRV_MAX_PLANES],
 			     uint32_t offsets[DRV_MAX_PLANES], uint64_t *format_modifier);
 	uint32_t (*get_max_texture_2d_size)(struct driver *drv);
-	bool (*is_feature_supported)(struct driver *drv, uint64_t feature);
 };
 
 // clang-format off
