@@ -101,7 +101,7 @@ static void xe_info_from_device_id(struct xe_device *xe)
 
 	const uint16_t lnl_ids[] = { 0x6420, 0x64A0, 0x64B0};
 
-	const uint16_t ptl_ids[] = { 0xB080, 0xB090, 0xB0A0, 0xB0B0, 0xB0FF};
+	const uint16_t ptl_ids[] = { 0xB080, 0xB090, 0xB0A0, 0xB0FF};
 
 	unsigned i;
 	xe->graphics_version = 0;
@@ -198,8 +198,8 @@ static int xe_add_combinations(struct driver *drv)
 	/* IPU3 camera ISP supports only NV12 output. */
 	drv_modify_combination(drv, DRM_FORMAT_NV12, &metadata_linear,
 			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SCANOUT |
-			       BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER |
-			       hw_protected);
+				   BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER |
+				   hw_protected);
 
 	/* Android CTS tests require this. */
 	drv_add_combination(drv, DRM_FORMAT_BGR888, &metadata_linear, BO_USE_SW_MASK);
@@ -213,23 +213,24 @@ static int xe_add_combinations(struct driver *drv)
 			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER |
 				   BO_USE_HW_VIDEO_ENCODER | BO_USE_GPU_DATA_BUFFER |
 				   BO_USE_SENSOR_DIRECT_DATA);
-	drv_modify_combination(drv, DRM_FORMAT_ABGR8888, &metadata_linear, BO_USE_CURSOR | BO_USE_SCANOUT);
-	drv_modify_combination(drv, DRM_FORMAT_NV12, &metadata_linear,
-			       BO_USE_RENDERING | BO_USE_TEXTURE | BO_USE_CAMERA_MASK);
-	drv_modify_combination(drv, DRM_FORMAT_YUYV, &metadata_linear,
-			       BO_USE_TEXTURE | BO_USE_CAMERA_MASK | BO_USE_RENDERING);
-	drv_modify_combination(drv, DRM_FORMAT_VYUY, &metadata_linear,
-			       BO_USE_TEXTURE | BO_USE_CAMERA_MASK | BO_USE_RENDERING);
-	drv_modify_combination(drv, DRM_FORMAT_UYVY, &metadata_linear,
-			       BO_USE_TEXTURE | BO_USE_CAMERA_MASK | BO_USE_RENDERING);
-	drv_modify_combination(drv, DRM_FORMAT_YVYU, &metadata_linear,
-			       BO_USE_TEXTURE | BO_USE_CAMERA_MASK | BO_USE_RENDERING);
-	drv_modify_combination(drv, DRM_FORMAT_YVU420_ANDROID, &metadata_linear,
-			       BO_USE_TEXTURE | BO_USE_CAMERA_MASK);
+       drv_modify_combination(drv, DRM_FORMAT_ABGR8888, &metadata_linear, BO_USE_CURSOR | BO_USE_SCANOUT);
+       drv_modify_combination(drv, DRM_FORMAT_NV12, &metadata_linear,
+                              BO_USE_RENDERING | BO_USE_TEXTURE | BO_USE_CAMERA_MASK);
+       drv_modify_combination(drv, DRM_FORMAT_YUYV, &metadata_linear,
+                              BO_USE_TEXTURE | BO_USE_CAMERA_MASK | BO_USE_RENDERING);
+       drv_modify_combination(drv, DRM_FORMAT_VYUY, &metadata_linear,
+                              BO_USE_TEXTURE | BO_USE_CAMERA_MASK | BO_USE_RENDERING);
+       drv_modify_combination(drv, DRM_FORMAT_UYVY, &metadata_linear,
+                              BO_USE_TEXTURE | BO_USE_CAMERA_MASK | BO_USE_RENDERING);
+       drv_modify_combination(drv, DRM_FORMAT_YVYU, &metadata_linear,
+                              BO_USE_TEXTURE | BO_USE_CAMERA_MASK | BO_USE_RENDERING);
+       drv_modify_combination(drv, DRM_FORMAT_YVU420_ANDROID, &metadata_linear,
+                              BO_USE_TEXTURE | BO_USE_CAMERA_MASK);
 
-	/* Media/Camera expect these formats support. */
-	drv_add_combinations(drv, linear_source_formats, ARRAY_SIZE(linear_source_formats),
-			     &metadata_linear, texture_flags | BO_USE_CAMERA_MASK);
+       /* Media/Camera expect these formats support. */
+       drv_add_combinations(drv, linear_source_formats, ARRAY_SIZE(linear_source_formats),
+                            &metadata_linear, texture_flags | BO_USE_CAMERA_MASK);
+
 
 	const uint64_t render_not_linear = unset_flags(render, linear_mask);
 	const uint64_t scanout_and_render_not_linear = render_not_linear | BO_USE_SCANOUT;
@@ -308,8 +309,9 @@ static int xe_add_combinations(struct driver *drv)
 static int xe_align_dimensions(struct bo *bo, uint32_t format, uint32_t tiling, uint32_t *stride,
 				 uint32_t *aligned_height)
 {
-	uint32_t horizontal_alignment = 0;
-	uint32_t vertical_alignment = 0;
+	struct xe_device *xe = bo->drv->priv;
+	uint32_t horizontal_alignment;
+	uint32_t vertical_alignment;
 
 	switch (tiling) {
 	default:
@@ -439,9 +441,9 @@ static int xe_init(struct driver *drv)
 
 	uint64_t width = 0, height = 0;
 	if (drmGetCap(drv->fd, DRM_CAP_CURSOR_WIDTH, &width)) {
-		drv_logi("cannot get cursor width. \n");
+		drv_loge("cannot get cursor width. \n");
 	} else if (drmGetCap(drv->fd, DRM_CAP_CURSOR_HEIGHT, &height)) {
-		drv_logi("cannot get cursor height. \n");
+		drv_loge("cannot get cursor height. \n");
 	}
 
 	if (!width)
@@ -567,8 +569,8 @@ static int xe_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t height
 		break;
 	case I915_FORMAT_MOD_Y_TILED:
 	case I915_FORMAT_MOD_Y_TILED_CCS:
-	case I915_FORMAT_MOD_Yf_TILED:
-	case I915_FORMAT_MOD_Yf_TILED_CCS:
+       case I915_FORMAT_MOD_Yf_TILED:
+       case I915_FORMAT_MOD_Yf_TILED_CCS:
 
 	/* For now support only XE_TILING_Y as this works with all
 	 * IPs(render/media/display)
@@ -682,16 +684,7 @@ static int xe_bo_create_from_metadata(struct bo *bo)
 	size_t plane;
 	uint32_t gem_handle;
 	uint32_t vm = 0;
-
-	struct drm_xe_vm_create create = {
-		.flags = DRM_XE_VM_CREATE_FLAG_SCRATCH_PAGE,
-	};
-
-	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_XE_VM_CREATE, &create);
-	if (ret) {
-		drv_loge("DRM_IOCTL_XE_VM_CREATE failed\n");
-		return -errno;
-        }
+	struct xe_device *xe = bo->drv->priv;
 
 	/* From xe_drm.h: If a VM is specified, this BO must:
 	 * 1. Only ever be bound to that VM.
@@ -714,7 +707,7 @@ static int xe_bo_create_from_metadata(struct bo *bo)
 
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_XE_GEM_CREATE, &gem_create);
 	if (ret) {
-		drv_loge("DRM_IOCTL_XE_GEM_CREATE failed (size=%llu)\n", gem_create.size);
+		drv_loge("DRM_IOCTL_I915_GEM_CREATE failed (size=%llu)\n", gem_create.size);
 		return -errno;
 	}
 
@@ -758,7 +751,7 @@ static void *xe_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags)
 	    (bo->meta.format_modifier == I915_FORMAT_MOD_4_TILED))
 		return MAP_FAILED;
 
-	if ((bo->meta.tiling == XE_TILING_NONE) || (addr == MAP_FAILED)) {
+	if (bo->meta.tiling == XE_TILING_NONE) {
 		struct drm_xe_gem_mmap_offset gem_map = { 0 };
 		gem_map.handle = bo->handles[0].u32;
 
