@@ -8,15 +8,12 @@
 #define CROS_GRALLOC_DRIVER_H
 
 #include "cros_gralloc_buffer.h"
-#include "../drv_priv.h"
 
 #include <functional>
 #include <memory>
 #include <mutex>
 #include <string>
 #include <unordered_map>
-
-#include <vector>
 
 #if ANDROID_API_LEVEL >= 31 && defined(HAS_DMABUF_SYSTEM_HEAP)
 #include <BufferAllocator/BufferAllocator.h>
@@ -64,13 +61,6 @@ class cros_gralloc_driver
 	~cros_gralloc_driver();
 	bool is_initialized();
 	bool is_video_format(const struct cros_gralloc_buffer_descriptor *descriptor);
-	bool use_ivshm_drv(const struct cros_gralloc_buffer_descriptor *descriptor, bool retain);
-	static int select_render_driver(uint64_t gpu_grp_type);
-	static int select_kms_driver(uint64_t gpu_grp_type);
-	static int select_video_driver(uint64_t gpu_grp_type);
-	void set_gpu_grp_type();
-	struct driver *select_driver(const struct cros_gralloc_buffer_descriptor *descriptor, bool retain = false);
-	int32_t reload();
 	cros_gralloc_buffer *get_buffer(cros_gralloc_handle_t hnd);
 	bool
 	get_resolved_format_and_use_flags(const struct cros_gralloc_buffer_descriptor *descriptor,
@@ -99,15 +89,7 @@ class cros_gralloc_driver
 	struct driver *drv_render_ = nullptr;
 	struct driver *drv_video_ = nullptr;
 	// the drv_kms_ is used to allocate scanout non-video buffer.
-	// in dGPU/iGPU SRIOV, BM or dual GPU scenario, the drv_kms_ = drv_render_
 	struct driver *drv_kms_ = nullptr;
-	// the drv_ivshmem_ is used to allocate scanout buffer with
-	// certain resolution(screen cast).
-	struct driver *drv_ivshmem_ = nullptr;
-	struct driver *drv_fallback_ = nullptr;
-	// This owns the drivers.
-	std::vector<struct driver *> drivers_;
-	uint64_t gpu_grp_type_ = 0;
 	std::mutex mutex_;
 	std::unordered_map<uint32_t, std::unique_ptr<cros_gralloc_buffer>> buffers_;
 	std::unordered_map<cros_gralloc_handle_t, cros_gralloc_imported_handle_info> handles_;
