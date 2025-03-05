@@ -322,8 +322,10 @@ static int i915_add_combinations(struct driver *drv)
 								texture_flags | BO_USE_NON_GPU_HW);
 
 		// in dual gpu case, only alloc x-tiling for dgpu for render
-		if (!(drv->gpu_grp_type & GPU_GRP_TYPE_HAS_INTEL_IGPU_BIT) &&
-			!(drv->gpu_grp_type & GPU_GRP_TYPE_HAS_VIRTIO_GPU_BLOB_BIT)) {
+		if ((!(drv->gpu_grp_type & GPU_GRP_TYPE_HAS_INTEL_IGPU_BIT) &&
+		     !(drv->gpu_grp_type & GPU_GRP_TYPE_HAS_VIRTIO_GPU_BLOB_BIT)) ||
+		    // For VDE use case, QEMU webrtc as display backend.
+		    ((drv->gpu_grp_type & GPU_GRP_TYPE_HAS_VIRTIO_GPU_BLOB_BIT) && is_kvm)) {
 			drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats),
 								&metadata_4_tiled, render_not_linear);
 			drv_add_combinations(drv, scanout_render_formats,
