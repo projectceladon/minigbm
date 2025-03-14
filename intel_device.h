@@ -44,6 +44,7 @@ bool is_virtio_gpu_with_blob(int virtgpu_fd);
 bool is_virtio_gpu_pci_device(int virtgpu_fd);
 
 int get_gpu_type(int fd);
+bool is_virtio_gpu_owned_by_lic(int fd);
 
 #ifdef __cplusplus
 }
