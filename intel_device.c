@@ -20,6 +20,7 @@
 
 #include <drm.h>
 #include <fcntl.h>
+#include <errno.h>
 #include <i915_drm.h>
 #include <log/log.h>
 #include <stdint.h>
@@ -279,6 +280,27 @@ bool is_virtio_gpu_with_blob(int virtgpu_fd)
 		return false;
 	}
 	return true;
+}
+
+bool is_virtio_gpu_owned_by_lic(int fd) {
+	drmDevicePtr drm_device = NULL;
+	bool result = false;
+
+	if (drmGetDevice(fd, &drm_device) < 0) {
+		ALOGE("Failed to get drm device info: %s\n", strerror(errno));
+		return false;
+	}
+
+	// virtio-GPU with subdevice id 0x201 should be owned by LIC, don't touch it.
+	if (drm_device->bustype == DRM_BUS_PCI &&
+	    drm_device->deviceinfo.pci->vendor_id == 0x1af4 &&
+	    drm_device->deviceinfo.pci->device_id == 0x1110 &&
+	    drm_device->deviceinfo.pci->subvendor_id == 0x8086 &&
+	    drm_device->deviceinfo.pci->subdevice_id == 0x201) {
+		result = true;
+	}
+	drmFreeDevice(&drm_device);
+	return result;
 }
 
 int get_gpu_type(int fd)

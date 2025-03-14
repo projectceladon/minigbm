@@ -108,24 +108,29 @@ cros_gralloc_driver *cros_gralloc_driver::get_instance()
 int32_t cros_gralloc_driver::reload()
 {
 	int fd;
-	drmVersionPtr version;
 	char const *str = "%s/renderD%d";
-	char *node;
+	char node[64];
 
 	if (gpu_grp_type_ & GPU_GRP_TYPE_HAS_VIRTIO_GPU_IVSHMEM_BIT) {
 		return 0;
 	}
 	// Max probe two ivshm node, the first one is used for screen cast.
 	for (int i = 0; i < DRM_NUM_NODES; ++i) {
-		if (asprintf(&node, str, DRM_DIR_NAME, DRM_RENDER_NODE_START + i) < 0)
+		if (snprintf(node, sizeof(node), str, DRM_DIR_NAME,
+			     DRM_RENDER_NODE_START + i) < 0)
 			continue;
 
 		fd = open(node, O_RDWR, 0);
-		free(node);
 		if (fd < 0)
 			continue;
 
-		version = drmGetVersion(fd);
+		if (is_virtio_gpu_owned_by_lic(fd)) {
+			ALOGI("Skip virtio-GPU owned by LIC: %s\n", node);
+			close(fd);
+			continue;
+		}
+
+		drmVersionPtr version = drmGetVersion(fd);
 		if (!version) {
 			close(fd);
 			continue;
@@ -169,10 +174,9 @@ cros_gralloc_driver::cros_gralloc_driver(): drivers_(GPU_GRP_TYPE_NR, nullptr)
 
 	const char *undesired[2] = { "vgem", nullptr };
 	uint32_t j;
-	char *node;
+	char node[64];
 	int fd;
 	int fallback_fd = -1;
-	drmVersionPtr version;
 	const int render_num = 10;
 	std::vector<int> driver_fds{GPU_GRP_TYPE_NR, -1};
 
@@ -181,15 +185,21 @@ cros_gralloc_driver::cros_gralloc_driver(): drivers_(GPU_GRP_TYPE_NR, nullptr)
 	mt8183_camera_quirk_ = !strncmp(buf, "kukui", strlen("kukui"));
 
 	for (uint32_t i = min_render_node; i < max_render_node; i++) {
-		if (asprintf(&node, render_nodes_fmt, DRM_DIR_NAME, i) < 0)
+		if (snprintf(node, sizeof(node), render_nodes_fmt,
+			     DRM_DIR_NAME, i) < 0)
 			continue;
 
 		fd = open(node, O_RDWR, 0);
-		free(node);
 		if (fd < 0)
 			continue;
 
-		version = drmGetVersion(fd);
+		if (is_virtio_gpu_owned_by_lic(fd)) {
+			ALOGI("Skip virtio-GPU owned by LIC: %s\n", node);
+			close(fd);
+			continue;
+		}
+
+		drmVersionPtr version = drmGetVersion(fd);
 		if (!version) {
 			close(fd);
 			continue;
