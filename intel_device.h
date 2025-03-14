@@ -38,10 +38,10 @@ struct intel_gpu_info {
 
 int intel_gpu_info_from_device_id(uint16_t device_id, struct intel_gpu_info *info);
 
-bool isIntelDg2(int fd);
-bool isVirtioGpuAllowP2p(int virtgpu_fd);
-bool isVirtioGpuPciDevice(int virtgpu_fd);
-bool isVirtioGpuWithBlob(int virtgpu_fd);
+bool is_intel_dg2(int fd);
+bool is_virtio_gpu_with_allow_p2p(int virtgpu_fd);
+bool is_virtio_gpu_with_blob(int virtgpu_fd);
+bool is_virtio_gpu_pci_device(int virtgpu_fd);
 
 int get_gpu_type(int fd);
 
