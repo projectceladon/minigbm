@@ -108,7 +108,6 @@ cros_gralloc_driver *cros_gralloc_driver::get_instance()
 int32_t cros_gralloc_driver::reload()
 {
 	int fd;
-	drmVersionPtr version;
 	char const *str = "%s/renderD%d";
 	char *node;
 
@@ -125,7 +124,13 @@ int32_t cros_gralloc_driver::reload()
 		if (fd < 0)
 			continue;
 
-		version = drmGetVersion(fd);
+		if (is_virtio_gpu_owned_by_lic(fd)) {
+			ALOGI("Skip virtio-GPU owned by LIC: %s\n", node);
+			close(fd);
+			continue;
+		}
+
+		drmVersionPtr version = drmGetVersion(fd);
 		if (!version) {
 			close(fd);
 			continue;
@@ -172,7 +177,6 @@ cros_gralloc_driver::cros_gralloc_driver(): drivers_(GPU_GRP_TYPE_NR, nullptr)
 	char *node;
 	int fd;
 	int fallback_fd = -1;
-	drmVersionPtr version;
 	const int render_num = 10;
 	std::vector<int> driver_fds{GPU_GRP_TYPE_NR, -1};
 
@@ -189,7 +193,13 @@ cros_gralloc_driver::cros_gralloc_driver(): drivers_(GPU_GRP_TYPE_NR, nullptr)
 		if (fd < 0)
 			continue;
 
-		version = drmGetVersion(fd);
+		if (is_virtio_gpu_owned_by_lic(fd)) {
+			ALOGI("Skip virtio-GPU owned by LIC: %s\n", node);
+			close(fd);
+			continue;
+		}
+
+		drmVersionPtr version = drmGetVersion(fd);
 		if (!version) {
 			close(fd);
 			continue;
