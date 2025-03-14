@@ -227,7 +227,7 @@ int intel_gpu_info_from_device_id(uint16_t device_id, struct intel_gpu_info *i91
 	return -1;
 }
 
-bool isIntelDg2(int fd)
+bool is_intel_dg2(int fd)
 {
 	int ret;
 	uint16_t device_id;
@@ -242,7 +242,7 @@ bool isIntelDg2(int fd)
 	return GEN_VERSION_X10(&info) == 125;
 }
 
-bool isVirtioGpuAllowP2p(int virtgpu_fd)
+bool is_virtio_gpu_with_allow_p2p(int virtgpu_fd)
 {
 	struct drm_virtgpu_getparam get_param = { 0, 0 };
 	uint64_t value = 0;
@@ -255,7 +255,7 @@ bool isVirtioGpuAllowP2p(int virtgpu_fd)
 	return true;
 }
 
-bool isVirtioGpuPciDevice(int virtgpu_fd)
+bool is_virtio_gpu_pci_device(int virtgpu_fd)
 {
 	struct drm_virtgpu_getparam get_param = { 0, 0 };
 	uint64_t value = 0;
@@ -268,7 +268,7 @@ bool isVirtioGpuPciDevice(int virtgpu_fd)
 	return true;
 }
 
-bool isVirtioGpuWithBlob(int virtgpu_fd)
+bool is_virtio_gpu_with_blob(int virtgpu_fd)
 {
 	struct drm_virtgpu_getparam get_param = { 0, 0 };
 	uint64_t value = 0;
@@ -289,23 +289,21 @@ int get_gpu_type(int fd)
 		return type;
 	}
 	if (strcmp(version->name, "i915") == 0) {
-		if (isIntelDg2(fd)) {
+		if (is_intel_dg2(fd)) {
 			type = GPU_GRP_TYPE_INTEL_DGPU_IDX;
 		} else {
 			type = GPU_GRP_TYPE_INTEL_IGPU_IDX;
 		}
 	} else if (strcmp(version->name, "virtio_gpu") == 0) {
-		if (!isVirtioGpuPciDevice(fd)) {
+		if (!is_virtio_gpu_pci_device(fd)) {
 			type = GPU_GRP_TYPE_VIRTIO_GPU_IVSHMEM_IDX;
 		} else {
-			if (!isVirtioGpuWithBlob(fd)) {
+			if (!is_virtio_gpu_with_blob(fd)) {
 				type = GPU_GRP_TYPE_VIRTIO_GPU_NO_BLOB_IDX;
+			} else if (is_virtio_gpu_with_allow_p2p(fd)){
+				type = GPU_GRP_TYPE_VIRTIO_GPU_BLOB_P2P_IDX;
 			} else {
-				if (isVirtioGpuAllowP2p(fd)) {
-					type = GPU_GRP_TYPE_VIRTIO_GPU_BLOB_P2P_IDX;
-				} else {
-					type = GPU_GRP_TYPE_VIRTIO_GPU_BLOB_IDX;
-				}
+				type = GPU_GRP_TYPE_VIRTIO_GPU_BLOB_IDX;
 			}
 		}
 	}
