@@ -380,7 +380,7 @@ int32_t CrosGralloc1::allocate(struct cros_gralloc_buffer_descriptor *descriptor
 	}
 
 	if (!supported) {
-		ALOGE("Unsupported combination -- HAL format: %u, HAL flags: %u, "
+		ALOGE("Unsupported combination -- HAL format: %u, HAL flags: %llu, "
 				   "drv_format: %u, drv_flags: %llu",
 				   descriptor->droid_format, usage, descriptor->drm_format,
 				   static_cast<unsigned long long>(descriptor->use_flags));
