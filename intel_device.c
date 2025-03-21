@@ -282,7 +282,7 @@ bool is_virtio_gpu_with_blob(int virtgpu_fd)
 	return true;
 }
 
-bool is_virtio_gpu_owned_by_lic(int fd) {
+bool is_virtio_gpu_for_screencast(int fd) {
 	drmDevicePtr drm_device = NULL;
 	bool result = false;
 
@@ -292,11 +292,15 @@ bool is_virtio_gpu_owned_by_lic(int fd) {
 	}
 
 	// virtio-GPU with subdevice id 0x201 should be owned by LIC, don't touch it.
+	// virtio-GPU with subdevice id 0x200 and 0x202 are used for android screencast.
+        // Do not use so far.
 	if (drm_device->bustype == DRM_BUS_PCI &&
 	    drm_device->deviceinfo.pci->vendor_id == 0x1af4 &&
 	    drm_device->deviceinfo.pci->device_id == 0x1110 &&
 	    drm_device->deviceinfo.pci->subvendor_id == 0x8086 &&
-	    drm_device->deviceinfo.pci->subdevice_id == 0x201) {
+	    (drm_device->deviceinfo.pci->subdevice_id == 0x201 ||
+             drm_device->deviceinfo.pci->subdevice_id == 0x200 ||
+             drm_device->deviceinfo.pci->subdevice_id == 0x202)) {
 		result = true;
 	}
 	drmFreeDevice(&drm_device);

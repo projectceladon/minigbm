@@ -124,7 +124,7 @@ int32_t cros_gralloc_driver::reload()
 		if (fd < 0)
 			continue;
 
-		if (is_virtio_gpu_owned_by_lic(fd)) {
+		if (is_virtio_gpu_for_screencast(fd)) {
 			ALOGI("Skip virtio-GPU owned by LIC: %s\n", node);
 			close(fd);
 			continue;
@@ -193,8 +193,8 @@ cros_gralloc_driver::cros_gralloc_driver(): drivers_(GPU_GRP_TYPE_NR, nullptr)
 		if (fd < 0)
 			continue;
 
-		if (is_virtio_gpu_owned_by_lic(fd)) {
-			ALOGI("Skip virtio-GPU owned by LIC: %s\n", node);
+		if (is_virtio_gpu_for_screencast(fd)) {
+			ALOGI("Skip virtio-GPU of ivshm: %s\n", node);
 			close(fd);
 			continue;
 		}
@@ -359,6 +359,8 @@ bool cros_gralloc_driver::use_ivshm_drv(const struct cros_gralloc_buffer_descrip
 
 struct driver *cros_gralloc_driver::select_driver(const struct cros_gralloc_buffer_descriptor *descriptor, bool retain)
 {
+	// The Android do not open ivshm node so far.
+/*
 	if (use_ivshm_drv(descriptor, retain)) {
 		// Give it a chance to re-scan devices.
 		if (drv_ivshmem_ == nullptr) {
@@ -368,6 +370,7 @@ struct driver *cros_gralloc_driver::select_driver(const struct cros_gralloc_buff
 			return drv_ivshmem_;
 		}
 	}
+*/
 	if (is_video_format(descriptor)) {
 		return drv_video_;
 	}
