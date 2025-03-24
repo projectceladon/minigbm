@@ -174,7 +174,7 @@ cros_gralloc_driver::cros_gralloc_driver(): drivers_(GPU_GRP_TYPE_NR, nullptr)
 	int fallback_fd = -1;
 	drmVersionPtr version;
 	const int render_num = 10;
-	std::vector<int> driver_fds{GPU_GRP_TYPE_NR, -1};
+	std::vector<int> driver_fds(GPU_GRP_TYPE_NR, -1);
 
 	char buf[PROP_VALUE_MAX];
 	property_get("ro.product.device", buf, "unknown");
@@ -252,7 +252,8 @@ restart:
 		if (!(gpu_grp_type_ & (1ull << i)))
 			continue;
 		if (drivers_[i] != nullptr) {
-			DRV_DESTROY(drivers_[i]);
+			drv_destroy(drivers_[i]);
+			drivers_[i] = nullptr;
 		}
 		struct driver *drv = drv_create(driver_fds[i], gpu_grp_type_);
 		if (!drv) {
