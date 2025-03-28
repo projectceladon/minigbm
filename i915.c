@@ -914,7 +914,7 @@ static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t heig
 	return 0;
 }
 
-static bool is_need_local(int64_t use_flags)
+static bool is_need_local(int64_t use_flags, uint64_t gpu_grp_type)
 {
 	static bool local = false;
 
@@ -927,6 +927,10 @@ static bool is_need_local(int64_t use_flags)
 		local = false;
 	}
 
+	//dGPU only use the local memory
+	if ((gpu_grp_type & GPU_GRP_TYPE_HAS_INTEL_DGPU_BIT) && !(gpu_grp_type & GPU_GRP_TYPE_HAS_INTEL_IGPU_BIT)) {
+		local = true;
+	}
 	return local;
 }
 
@@ -949,7 +953,7 @@ static int i915_bo_create_from_metadata(struct bo *bo)
 	struct drm_i915_gem_set_tiling gem_set_tiling = { 0 };
 	struct i915_device *i915 = bo->drv->priv;
 	int64_t use_flags = bo->meta.use_flags;
-	bool local = is_need_local(use_flags);
+	bool local = is_need_local(use_flags, bo->drv->gpu_grp_type);
 
 	if (local && i915->has_local_mem) {
 		if (!is_prelim_kernel) {
