@@ -917,27 +917,30 @@ static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t heig
 static bool is_need_local(int64_t use_flags, uint64_t gpu_grp_type, uint32_t format)
 {
 	static bool local = false;
-
-        for (uint32_t i = 0; i < sizeof(source_formats) / sizeof(source_formats[0]); i++) {
-                if (source_formats[i] == format) {
-                        local = true;
-                        return local;
-                }
-        }
-
-	if (use_flags & BO_USE_LOCAL_MEMORY) {
-		local = true;
+	for (uint32_t i = 0; i < sizeof(source_formats) / sizeof(source_formats[0]); i++) {
+		if (source_formats[i] == format) {
+			local = true;
+			return local;
+		}
 	}
 
 	if (use_flags & BO_USE_SW_READ_RARELY || use_flags & BO_USE_SW_READ_OFTEN ||
 	    use_flags & BO_USE_SW_WRITE_RARELY || use_flags & BO_USE_SW_WRITE_OFTEN) {
 		local = false;
+		return local;
+	}
+
+	if (use_flags & BO_USE_LOCAL_MEMORY) {
+		local = true;
+		return local;
 	}
 
 	//dGPU only use the local memory
 	if ((gpu_grp_type & GPU_GRP_TYPE_HAS_INTEL_DGPU_BIT) && !(gpu_grp_type & GPU_GRP_TYPE_HAS_INTEL_IGPU_BIT)) {
 		local = true;
+		return local;
 	}
+
 	return local;
 }
 
