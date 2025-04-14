@@ -303,8 +303,8 @@ restart:
 
 cros_gralloc_driver::~cros_gralloc_driver()
 {
-	buffers_.clear();
 	handles_.clear();
+	buffers_.clear();
 	if (gpu_grp_type_ == 0) {
 		DRV_DESTROY(drv_fallback_);
 		return;
