@@ -218,7 +218,6 @@ static int i915_add_combinations(struct driver *drv)
 	const uint64_t scanout_and_render = BO_USE_RENDER_MASK | BO_USE_SCANOUT;
 	const uint64_t render = BO_USE_RENDER_MASK;
 	const uint64_t texture_only = BO_USE_TEXTURE_MASK;
-	uint64_t render_flags = BO_USE_RENDER_MASK;
 	uint64_t texture_flags = BO_USE_TEXTURE_MASK;
 	bool is_kvm = vm_type() & HYPERTYPE_TYPE_KVM;
 
@@ -949,23 +948,33 @@ static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t heig
 	return 0;
 }
 
-static bool is_need_local(int64_t use_flags, uint32_t format)
+static bool is_need_local(int64_t use_flags, uint64_t gpu_grp_type, uint32_t format)
 {
-	static bool local = true;
-
+	static bool local = false;
 	for (uint32_t i = 0; i < sizeof(source_formats) / sizeof(source_formats[0]); i++) {
-			if (source_formats[i] == format) {
-					local = true;
-					return local;
-			}
+		if (source_formats[i] == format) {
+			local = true;
+			return local;
+		}
 	}
 
 	if (use_flags & BO_USE_SW_READ_RARELY || use_flags & BO_USE_SW_READ_OFTEN ||
 	    use_flags & BO_USE_SW_WRITE_RARELY || use_flags & BO_USE_SW_WRITE_OFTEN) {
 		local = false;
-	} else {
-		local = true;
+		return local;
 	}
+
+	if (use_flags & BO_USE_LOCAL_MEMORY) {
+		local = true;
+		return local;
+	}
+
+	//dGPU only use the local memory
+	if ((gpu_grp_type & GPU_GRP_TYPE_HAS_INTEL_DGPU_BIT) && !(gpu_grp_type & GPU_GRP_TYPE_HAS_INTEL_IGPU_BIT)) {
+		local = true;
+		return local;
+	}
+
 	return local;
 }
 
@@ -988,7 +997,7 @@ static int i915_bo_create_from_metadata(struct bo *bo)
 	struct drm_i915_gem_set_tiling gem_set_tiling = { 0 };
 	struct i915_device *i915 = bo->drv->priv;
 	int64_t use_flags = bo->meta.use_flags;
-	bool local = is_need_local(use_flags, bo->meta.format);
+	bool local = is_need_local(use_flags, bo->drv->gpu_grp_type, bo->meta.format);
 
 	if (local && i915->has_local_mem) {
 		if (!is_prelim_kernel) {
