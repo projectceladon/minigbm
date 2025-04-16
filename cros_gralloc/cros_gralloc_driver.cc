@@ -997,11 +997,26 @@ int cros_gralloc_driver::select_kms_driver(uint64_t gpu_grp_type)
 
 int cros_gralloc_driver::select_video_driver(uint64_t gpu_grp_type)
 {
-	if (gpu_grp_type & GPU_GRP_TYPE_HAS_INTEL_DGPU_BIT) {
-		return GPU_GRP_TYPE_INTEL_DGPU_IDX;
-	}
-	if (gpu_grp_type & GPU_GRP_TYPE_HAS_INTEL_IGPU_BIT) {
-		return GPU_GRP_TYPE_INTEL_IGPU_IDX;
+	int use_dgpu;
+	char value[PROPERTY_VALUE_MAX] = {};
+
+	property_get("vendor.video.hw.dgpu", value, "1");
+	use_dgpu = atoi(value);
+
+	if (use_dgpu) {
+		if (gpu_grp_type & GPU_GRP_TYPE_HAS_INTEL_DGPU_BIT) {
+			return GPU_GRP_TYPE_INTEL_DGPU_IDX;
+		}
+		if (gpu_grp_type & GPU_GRP_TYPE_HAS_INTEL_IGPU_BIT) {
+			return GPU_GRP_TYPE_INTEL_IGPU_IDX;
+		}
+	} else {
+		if (gpu_grp_type & GPU_GRP_TYPE_HAS_INTEL_IGPU_BIT) {
+			return GPU_GRP_TYPE_INTEL_IGPU_IDX;
+		}
+		if (gpu_grp_type & GPU_GRP_TYPE_HAS_INTEL_DGPU_BIT) {
+			return GPU_GRP_TYPE_INTEL_DGPU_IDX;
+		}
 	}
 	if (gpu_grp_type & GPU_GRP_TYPE_HAS_VIRTIO_GPU_BLOB_BIT) {
 		return GPU_GRP_TYPE_VIRTIO_GPU_BLOB_IDX;
