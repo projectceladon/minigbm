@@ -304,7 +304,7 @@ int get_gpu_type(int fd)
 		} else {
 			type = GPU_GRP_TYPE_INTEL_IGPU_IDX;
 		}
-	} else if (strcmp(version->name, "xe")) {
+	} else if (strcmp(version->name, "xe") == 0) {
 		type = GPU_GRP_TYPE_INTEL_DGPU_IDX;
 	} else if (strcmp(version->name, "virtio_gpu") == 0) {
 		if (!isVirtioGpuPciDevice(fd)) {
