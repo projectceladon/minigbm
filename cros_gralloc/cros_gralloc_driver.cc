@@ -303,6 +303,7 @@ restart:
 
 cros_gralloc_driver::~cros_gralloc_driver()
 {
+	std::lock_guard<std::mutex> lock(mutex_);
 	handles_.clear();
 	buffers_.clear();
 	if (gpu_grp_type_ == 0) {
