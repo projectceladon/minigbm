@@ -87,7 +87,7 @@ cc_defaults {
         "-DUSE_GRALLOC1",
         "-Wno-cast-qual",
     ],
-
+    sanitize: { address: true },
     product_variables: {
         platform_sdk_version: {
             cflags: ["-DANDROID_API_LEVEL=33"],
