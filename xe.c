@@ -707,7 +707,7 @@ static int xe_bo_create_from_metadata(struct bo *bo)
 
 	struct drm_xe_gem_create gem_create = {
 		.vm_id = vm,
-		.size = bo->meta.total_size,
+		.size = ALIGN(bo->meta.total_size, PAGE_SIZE),
 		.flags = DRM_XE_GEM_CREATE_FLAG_SCANOUT,
 	};
 
