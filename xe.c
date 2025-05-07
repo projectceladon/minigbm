@@ -40,7 +40,7 @@ static const uint32_t linear_source_formats[] = { DRM_FORMAT_R16,    DRM_FORMAT_
                                                  DRM_FORMAT_YUV444, DRM_FORMAT_NV21,
                                                  DRM_FORMAT_P010 };
 
-static const uint32_t source_formats[] = { DRM_FORMAT_P010, DRM_FORMAT_NV12_INTEL };
+static const uint32_t source_formats[] = { DRM_FORMAT_P010_INTEL, DRM_FORMAT_NV12_INTEL };
 
 #if !defined(DRM_CAP_CURSOR_WIDTH)
 #define DRM_CAP_CURSOR_WIDTH 0x8
@@ -103,6 +103,8 @@ static void xe_info_from_device_id(struct xe_device *xe)
 
 	const uint16_t ptl_ids[] = { 0xB080, 0xB090, 0xB0A0, 0xB0B0, 0xB0FF};
 
+	const uint16_t bmg_ids[] = { 0xE20B, 0xE20C, 0xE210, 0xE211 };
+
 	unsigned i;
 	xe->graphics_version = 0;
 	xe->is_xelpd = false;
@@ -140,6 +142,13 @@ static void xe_info_from_device_id(struct xe_device *xe)
 	for (i = 0; i < ARRAY_SIZE(lnl_ids); i++)
 		if (lnl_ids[i] == xe->device_id) {
 			xe->graphics_version = 12;
+			xe->is_mtl_or_newer = true;
+		}
+
+	/* BMG */
+	for (i = 0; i < ARRAY_SIZE(bmg_ids); i++)
+		if (bmg_ids[i] == xe->device_id) {
+			xe->graphics_version = 20;
 			xe->is_mtl_or_newer = true;
 		}
 }
@@ -267,6 +276,7 @@ static int xe_add_combinations(struct driver *drv)
 #endif
 		drv_add_combination(drv, DRM_FORMAT_NV12, &metadata_4_tiled, nv12_usage);
 		drv_add_combination(drv, DRM_FORMAT_P010, &metadata_4_tiled, p010_usage);
+		drv_add_combination(drv, DRM_FORMAT_P010_INTEL, &metadata_4_tiled, p010_usage);
 		drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats),
 				     &metadata_4_tiled, render_not_linear);
 		drv_add_combinations(drv, scanout_render_formats,
@@ -291,6 +301,7 @@ static int xe_add_combinations(struct driver *drv)
 #endif
 		drv_add_combination(drv, DRM_FORMAT_NV12, &metadata_y_tiled, nv12_usage);
 		drv_add_combination(drv, DRM_FORMAT_P010, &metadata_y_tiled, p010_usage);
+		drv_add_combination(drv, DRM_FORMAT_P010_INTEL, &metadata_y_tiled, p010_usage);
 		drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats),
 				     &metadata_y_tiled, render_not_linear);
 		/* Y-tiled scanout isn't available on old platforms so we add
@@ -309,9 +320,8 @@ static int xe_add_combinations(struct driver *drv)
 static int xe_align_dimensions(struct bo *bo, uint32_t format, uint32_t tiling, uint32_t *stride,
 				 uint32_t *aligned_height)
 {
-	struct xe_device *xe = bo->drv->priv;
-	uint32_t horizontal_alignment;
-	uint32_t vertical_alignment;
+	uint32_t horizontal_alignment = 0;
+	uint32_t vertical_alignment = 0;
 
 	switch (tiling) {
 	default:
@@ -442,9 +452,9 @@ static int xe_init(struct driver *drv)
 
 	uint64_t width = 0, height = 0;
 	if (drmGetCap(drv->fd, DRM_CAP_CURSOR_WIDTH, &width)) {
-		drv_loge("cannot get cursor width. \n");
+		drv_logi("cannot get cursor width. \n");
 	} else if (drmGetCap(drv->fd, DRM_CAP_CURSOR_HEIGHT, &height)) {
-		drv_loge("cannot get cursor height. \n");
+		drv_logi("cannot get cursor height. \n");
 	}
 
 	if (!width)
@@ -570,8 +580,8 @@ static int xe_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t height
 		break;
 	case I915_FORMAT_MOD_Y_TILED:
 	case I915_FORMAT_MOD_Y_TILED_CCS:
-       case I915_FORMAT_MOD_Yf_TILED:
-       case I915_FORMAT_MOD_Yf_TILED_CCS:
+	case I915_FORMAT_MOD_Yf_TILED:
+	case I915_FORMAT_MOD_Yf_TILED_CCS:
 
 	/* For now support only XE_TILING_Y as this works with all
 	 * IPs(render/media/display)
@@ -679,6 +689,15 @@ static int xe_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t height
 	return 0;
 }
 
+inline bool is_use_local(int64_t use_flags)
+{
+	if (use_flags & BO_USE_SW_READ_RARELY || use_flags & BO_USE_SW_READ_OFTEN ||
+	    use_flags & BO_USE_SW_WRITE_RARELY || use_flags & BO_USE_SW_WRITE_OFTEN) {
+		return false;
+	}
+	return true;
+}
+
 static int xe_bo_create_from_metadata(struct bo *bo)
 {
 	int ret;
@@ -686,6 +705,16 @@ static int xe_bo_create_from_metadata(struct bo *bo)
 	uint32_t gem_handle;
 	uint32_t vm = 0;
 	struct xe_device *xe = bo->drv->priv;
+
+	struct drm_xe_vm_create create = {
+		.flags = DRM_XE_VM_CREATE_FLAG_SCRATCH_PAGE,
+	};
+
+	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_XE_VM_CREATE, &create);
+	if (ret) {
+		drv_loge("DRM_IOCTL_XE_VM_CREATE failed\n");
+		return -errno;
+        }
 
 	/* From xe_drm.h: If a VM is specified, this BO must:
 	 * 1. Only ever be bound to that VM.
@@ -698,17 +727,22 @@ static int xe_bo_create_from_metadata(struct bo *bo)
 
 	struct drm_xe_gem_create gem_create = {
 		.vm_id = vm,
-		.size = bo->meta.total_size,
+		.size = ALIGN(bo->meta.total_size, PAGE_SIZE),
 		.flags = DRM_XE_GEM_CREATE_FLAG_SCANOUT,
 	};
 
-	/* FIXME: let's assume iGPU with SYSMEM is only supported */
-	gem_create.placement |= BITFIELD_BIT(DRM_XE_MEM_REGION_CLASS_SYSMEM);
+	bool use_local = is_use_local(bo->meta.use_flags);
+	if (use_local && (xe->has_local_mem)) {
+		gem_create.placement |= BITFIELD_BIT(DRM_XE_MEM_REGION_CLASS_VRAM);
+	} else {
+		gem_create.placement |= BITFIELD_BIT(DRM_XE_MEM_REGION_CLASS_SYSMEM);
+	}
+
 	gem_create.cpu_caching = DRM_XE_GEM_CPU_CACHING_WC;
 
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_XE_GEM_CREATE, &gem_create);
 	if (ret) {
-		drv_loge("DRM_IOCTL_I915_GEM_CREATE failed (size=%llu)\n", gem_create.size);
+		drv_loge("DRM_IOCTL_XE_GEM_CREATE failed (size=%llu)\n", gem_create.size);
 		return -errno;
 	}
 
@@ -763,7 +797,7 @@ static void *xe_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags)
 				    MAP_SHARED, bo->drv->fd, gem_map.offset);
 	}
 
-	if (addr == MAP_FAILED) {
+	if ((addr == MAP_FAILED) || (addr == MAP_FAILED)) {
 		drv_loge("xe GEM mmap failed\n");
 		return addr;
 	}
