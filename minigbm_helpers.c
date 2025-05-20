@@ -119,7 +119,8 @@ static int detect_device_info(unsigned int detect_flags, int fd, struct gbm_devi
 		drmModeFreeResources(resources);
 	}
 
-	if (strncmp("i915", version->name, version->name_len) == 0) {
+	if (strncmp("i915", version->name, version->name_len) == 0 ||
+		(strncmp("xe", version->name, version->name_len) == 0)) {
 		/*
 		 * Detect Intel dGPU here when special getparam ioctl is added.
 		 */

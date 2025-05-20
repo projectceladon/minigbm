@@ -298,14 +298,12 @@ int get_gpu_type(int fd)
 	if (version == NULL) {
 		return type;
 	}
-	if (strcmp(version->name, "i915") == 0) {
+	if (strcmp(version->name, "i915") == 0 || strcmp(version->name, "xe") == 0) {
 		if (isIntelDg2(fd)) {
 			type = GPU_GRP_TYPE_INTEL_DGPU_IDX;
 		} else {
 			type = GPU_GRP_TYPE_INTEL_IGPU_IDX;
 		}
-	} else if (strcmp(version->name, "xe") == 0) {
-		type = GPU_GRP_TYPE_INTEL_DGPU_IDX;
 	} else if (strcmp(version->name, "virtio_gpu") == 0) {
 		if (!isVirtioGpuPciDevice(fd)) {
 			type = GPU_GRP_TYPE_VIRTIO_GPU_IVSHMEM_IDX;
