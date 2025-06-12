@@ -17,6 +17,7 @@
 #include <unistd.h>
 #include <xf86drm.h>
 #include <cutils/properties.h>
+#include <sys/ioctl.h> 
 
 #include "drv_helpers.h"
 #include "drv_priv.h"
