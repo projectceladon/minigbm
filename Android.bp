@@ -155,6 +155,45 @@ cc_defaults {
 
 }
 
+cc_library {
+    name: "libgbm",
+    defaults: ["minigbm_defaults"],
+    host_supported: true,
+
+    srcs: [
+        ":minigbm_core_files",
+        "gbm.c",
+        "gbm_helpers.c",
+    ],
+
+    target: {
+        host: {
+            // Avoid linking to another host copy of libdrm; this library will cause
+            // binary GPU drivers to be loaded from the host, which might be linked
+            // to a system copy of libdrm, which conflicts with the AOSP one
+            allow_undefined_symbols: true,
+            header_libs: ["libdrm_headers"],
+        },
+        android: {
+            shared_libs: [
+                "libcutils",
+                "liblog",
+            ],
+            static_libs: [
+                "libdrm",
+            ],
+        },
+    },
+    apex_available: [
+        "//apex_available:platform",
+        "//apex_available:anyapex",
+    ],
+    vendor_available: true,
+    product_available: true,
+
+    export_include_dirs: ["."],
+}
+
 // Intel
 cc_library_shared {
     name: "libminigbm_gralloc_intel",
