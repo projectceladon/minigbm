@@ -934,12 +934,46 @@ void cros_gralloc_driver::with_each_buffer(
 
 int cros_gralloc_driver::select_render_driver(uint64_t gpu_grp_type)
 {
-	if (gpu_grp_type & GPU_GRP_TYPE_HAS_INTEL_DGPU_BIT) {
-		return GPU_GRP_TYPE_INTEL_DGPU_IDX;
+	int use_dgpu = 0;
+	FILE *file;
+	int value;
+	char prop[PROPERTY_VALUE_MAX] = {};
+
+	/**
+	* Check if use dgpu in the order:
+	* 1, config file: vendor/etc/dgpu-codec.cfg
+	* 2, system property    *
+	*/
+	file = fopen("/vendor/etc/dgpu-codec.cfg", "r");
+	if (file) {
+		while (fscanf(file, "%49s %d", prop, &value) == 2) {
+			if (!strcmp(prop, "vendor.render.hw.dgpu")) {
+				use_dgpu = value;
+			}
+		}
+		fclose(file);
+	} else {
+		property_get("vendor.render.hw.dgpu", prop, "1");
+		use_dgpu = atoi(prop);
 	}
-	if (gpu_grp_type & GPU_GRP_TYPE_HAS_INTEL_IGPU_BIT) {
-		return GPU_GRP_TYPE_INTEL_IGPU_IDX;
+	ALOGI("render mem use_dgpu=%d", use_dgpu);
+
+	if (use_dgpu) {
+		if (gpu_grp_type & GPU_GRP_TYPE_HAS_INTEL_DGPU_BIT) {
+			return GPU_GRP_TYPE_INTEL_DGPU_IDX;
+		}
+		if (gpu_grp_type & GPU_GRP_TYPE_HAS_INTEL_IGPU_BIT) {
+			return GPU_GRP_TYPE_INTEL_IGPU_IDX;
+		}
+	} else {
+		if (gpu_grp_type & GPU_GRP_TYPE_HAS_INTEL_IGPU_BIT) {
+			return GPU_GRP_TYPE_INTEL_IGPU_IDX;
+		}
+		if (gpu_grp_type & GPU_GRP_TYPE_HAS_INTEL_DGPU_BIT) {
+			return GPU_GRP_TYPE_INTEL_DGPU_IDX;
+		}
 	}
+
 	if (gpu_grp_type & GPU_GRP_TYPE_HAS_VIRTIO_GPU_BLOB_BIT) {
 		return GPU_GRP_TYPE_VIRTIO_GPU_BLOB_IDX;
 	}
@@ -988,11 +1022,44 @@ int cros_gralloc_driver::select_kms_driver(uint64_t gpu_grp_type)
 
 int cros_gralloc_driver::select_video_driver(uint64_t gpu_grp_type)
 {
-	if (gpu_grp_type & GPU_GRP_TYPE_HAS_INTEL_DGPU_BIT) {
-		return GPU_GRP_TYPE_INTEL_DGPU_IDX;
+	int use_dgpu = 0;
+	FILE *file;
+	int value;
+	char prop[PROPERTY_VALUE_MAX] = {};
+
+	/**
+	* Check if use dgpu in the order:
+	* 1, config file: vendor/etc/dgpu-codec.cfg
+	* 2, system property    *
+	*/
+	file = fopen("/vendor/etc/dgpu-codec.cfg", "r");
+	if (file) {
+		while (fscanf(file, "%49s %d", prop, &value) == 2) {
+			if (!strcmp(prop, "vendor.video.hw.dgpu")) {
+				use_dgpu = value;
+			}
+		}
+		fclose(file);
+	} else {
+		property_get("vendor.video.hw.dgpu", prop, "1");
+		use_dgpu = atoi(prop);
 	}
-	if (gpu_grp_type & GPU_GRP_TYPE_HAS_INTEL_IGPU_BIT) {
-		return GPU_GRP_TYPE_INTEL_IGPU_IDX;
+	ALOGI("video mem use_dgpu=%d", use_dgpu);
+
+	if (use_dgpu) {
+		if (gpu_grp_type & GPU_GRP_TYPE_HAS_INTEL_DGPU_BIT) {
+			return GPU_GRP_TYPE_INTEL_DGPU_IDX;
+		}
+		if (gpu_grp_type & GPU_GRP_TYPE_HAS_INTEL_IGPU_BIT) {
+			return GPU_GRP_TYPE_INTEL_IGPU_IDX;
+		}
+	} else {
+		if (gpu_grp_type & GPU_GRP_TYPE_HAS_INTEL_IGPU_BIT) {
+			return GPU_GRP_TYPE_INTEL_IGPU_IDX;
+		}
+		if (gpu_grp_type & GPU_GRP_TYPE_HAS_INTEL_DGPU_BIT) {
+			return GPU_GRP_TYPE_INTEL_DGPU_IDX;
+		}
 	}
 	if (gpu_grp_type & GPU_GRP_TYPE_HAS_VIRTIO_GPU_BLOB_BIT) {
 		return GPU_GRP_TYPE_VIRTIO_GPU_BLOB_IDX;
