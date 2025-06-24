@@ -274,7 +274,7 @@ restart:
 		drv_loge("No known device found!\n");
 		if (fallback_fd >= 0) {
 			drv_fallback_ = drv_create(fallback_fd, gpu_grp_type_);
-			drv_render_ = drv_kms_ = drv_video_ = drv_fallback_;
+			drv_render_ = drv_kms_ = drv_video_ = drv_sw_video_ = drv_fallback_;
 		}
 		return;
 	}
@@ -295,6 +295,10 @@ restart:
 	idx = select_video_driver(gpu_grp_type_);
 	if (idx != -1) {
 		drv_video_ = drivers_[idx];
+	}
+	idx = select_sw_video_driver(gpu_grp_type_);
+	if (idx != -1) {
+		drv_sw_video_ = drivers_[idx];
 	}
 	if (gpu_grp_type_ & GPU_GRP_TYPE_HAS_VIRTIO_GPU_IVSHMEM_BIT) {
 		drv_ivshmem_ = drivers_[GPU_GRP_TYPE_VIRTIO_GPU_IVSHMEM_IDX];
@@ -359,6 +363,9 @@ struct driver *cros_gralloc_driver::select_driver(const struct cros_gralloc_buff
 		if (drv_ivshmem_) {
 			return drv_ivshmem_;
 		}
+	}
+	if (is_video_format(descriptor) && ((descriptor->use_flags & BO_USE_SW_READ_OFTEN) && (descriptor->use_flags & BO_USE_SW_WRITE_OFTEN))) {
+		return drv_sw_video_;
 	}
 	if (is_video_format(descriptor)) {
 		return drv_video_;
@@ -1008,4 +1015,25 @@ int cros_gralloc_driver::select_video_driver(uint64_t gpu_grp_type)
 	}
 	return -1;
 }
-
+int cros_gralloc_driver::select_sw_video_driver(uint64_t gpu_grp_type)
+{
+	if (gpu_grp_type & GPU_GRP_TYPE_HAS_INTEL_IGPU_BIT) {
+		return GPU_GRP_TYPE_INTEL_IGPU_IDX;
+	}
+	if (gpu_grp_type & GPU_GRP_TYPE_HAS_INTEL_DGPU_BIT) {
+		return GPU_GRP_TYPE_INTEL_DGPU_IDX;
+	}
+	if (gpu_grp_type & GPU_GRP_TYPE_HAS_VIRTIO_GPU_BLOB_BIT) {
+		return GPU_GRP_TYPE_VIRTIO_GPU_BLOB_IDX;
+	}
+	if (gpu_grp_type & GPU_GRP_TYPE_HAS_VIRTIO_GPU_BLOB_P2P_BIT) {
+		return GPU_GRP_TYPE_VIRTIO_GPU_BLOB_P2P_IDX;
+	}
+	if (gpu_grp_type & GPU_GRP_TYPE_HAS_VIRTIO_GPU_NO_BLOB_BIT) {
+		return GPU_GRP_TYPE_VIRTIO_GPU_NO_BLOB_IDX;
+	}
+	if (gpu_grp_type & GPU_GRP_TYPE_HAS_VIRTIO_GPU_IVSHMEM_BIT) {
+		return GPU_GRP_TYPE_VIRTIO_GPU_IVSHMEM_IDX;
+	}
+	return -1;
+}

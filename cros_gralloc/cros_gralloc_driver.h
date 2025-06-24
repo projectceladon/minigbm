@@ -68,6 +68,7 @@ class cros_gralloc_driver
 	static int select_render_driver(uint64_t gpu_grp_type);
 	static int select_kms_driver(uint64_t gpu_grp_type);
 	static int select_video_driver(uint64_t gpu_grp_type);
+	static int select_sw_video_driver(uint64_t gpu_grp_type);
 	void set_gpu_grp_type();
 	struct driver *select_driver(const struct cros_gralloc_buffer_descriptor *descriptor, bool retain = false);
 	int32_t reload();
@@ -98,6 +99,7 @@ class cros_gralloc_driver
 	// otherwise they may be the same node.
 	struct driver *drv_render_ = nullptr;
 	struct driver *drv_video_ = nullptr;
+	struct driver *drv_sw_video_ = nullptr;
 	// the drv_kms_ is used to allocate scanout non-video buffer.
 	// in dGPU/iGPU SRIOV, BM or dual GPU scenario, the drv_kms_ = drv_render_
 	struct driver *drv_kms_ = nullptr;
