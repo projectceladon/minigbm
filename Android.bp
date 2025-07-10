@@ -166,6 +166,7 @@ cc_library_shared {
         "-Wno-cast-qual",
         "-Wno-unused-function",
         "-DHAVE_MEMFD_CREATE",
+        "-mclflushopt",
     ],
     enabled: false,
     local_include_dirs: [
