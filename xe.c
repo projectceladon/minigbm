@@ -237,7 +237,7 @@ static int xe_add_combinations(struct driver *drv)
 
 	/* Media/Camera expect these formats support. */
 	drv_add_combinations(drv, linear_source_formats, ARRAY_SIZE(linear_source_formats),
-			     &metadata_linear, texture_flags | BO_USE_CAMERA_MASK);
+			       &metadata_linear, texture_flags | BO_USE_CAMERA_MASK);
 
 	const uint64_t render_not_linear = unset_flags(render, linear_mask);
 	const uint64_t scanout_and_render_not_linear = render_not_linear | BO_USE_SCANOUT;
@@ -386,7 +386,11 @@ static void xe_clflush(void *start, size_t size)
 
 	__builtin_ia32_mfence();
 	while (p < end) {
-		__builtin_ia32_clflush(p);
+		#if defined(__CLFLUSHOPT__)
+				__builtin_ia32_clflushopt(p);
+		#else
+				__builtin_ia32_clflush(p);
+		#endif
 		p = (void *)((uintptr_t)p + XE_CACHELINE_SIZE);
 	}
 }
@@ -706,12 +710,17 @@ static int xe_bo_create_from_metadata(struct bo *bo)
 	struct drm_xe_gem_create gem_create = {
 		.vm_id = vm,
 		.size = ALIGN(bo->meta.total_size, PAGE_SIZE),
-		.flags = DRM_XE_GEM_CREATE_FLAG_SCANOUT,
+		.flags = 0,
 	};
 
 	/* FIXME: let's assume iGPU with SYSMEM is only supported */
 	gem_create.placement |= BITFIELD_BIT(DRM_XE_MEM_REGION_CLASS_SYSMEM);
-	gem_create.cpu_caching = DRM_XE_GEM_CPU_CACHING_WC;
+	if (bo->meta.use_flags & BO_USE_SCANOUT) {
+		gem_create.flags |= DRM_XE_GEM_CREATE_FLAG_SCANOUT;
+		gem_create.cpu_caching = DRM_XE_GEM_CPU_CACHING_WC;
+	} else {
+		gem_create.cpu_caching = DRM_XE_GEM_CPU_CACHING_WB;
+	}
 
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_XE_GEM_CREATE, &gem_create);
 	if (ret) {
@@ -788,7 +797,8 @@ static int xe_bo_invalidate(struct bo *bo, struct mapping *mapping)
 static int xe_bo_flush(struct bo *bo, struct mapping *mapping)
 {
 	struct xe_device *xe = bo->drv->priv;
-	if (bo->meta.tiling == XE_TILING_NONE)
+	if ((bo->meta.tiling == XE_TILING_NONE)
+		&& (bo->meta.use_flags & BO_USE_SW_WRITE_OFTEN))
 		xe_clflush(mapping->vma->addr, mapping->vma->length);
 
 	return 0;
