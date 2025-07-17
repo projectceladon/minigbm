@@ -40,7 +40,7 @@ static const uint32_t linear_source_formats[] = { DRM_FORMAT_R16,    DRM_FORMAT_
                                                  DRM_FORMAT_YUV444, DRM_FORMAT_NV21,
                                                  DRM_FORMAT_P010 };
 
-static const uint32_t source_formats[] = { DRM_FORMAT_P010, DRM_FORMAT_NV12_INTEL };
+static const uint32_t source_formats[] = { DRM_FORMAT_P010_INTEL, DRM_FORMAT_NV12_INTEL };
 
 #if !defined(DRM_CAP_CURSOR_WIDTH)
 #define DRM_CAP_CURSOR_WIDTH 0x8
@@ -266,6 +266,7 @@ static int xe_add_combinations(struct driver *drv)
 #endif
 		drv_add_combination(drv, DRM_FORMAT_NV12, &metadata_4_tiled, nv12_usage);
 		drv_add_combination(drv, DRM_FORMAT_P010, &metadata_4_tiled, p010_usage);
+		drv_add_combination(drv, DRM_FORMAT_P010_INTEL, &metadata_4_tiled, p010_usage);
 		drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats),
 				     &metadata_4_tiled, render_not_linear);
 		drv_add_combinations(drv, scanout_render_formats,
@@ -290,6 +291,7 @@ static int xe_add_combinations(struct driver *drv)
 #endif
 		drv_add_combination(drv, DRM_FORMAT_NV12, &metadata_y_tiled, nv12_usage);
 		drv_add_combination(drv, DRM_FORMAT_P010, &metadata_y_tiled, p010_usage);
+		drv_add_combination(drv, DRM_FORMAT_P010_INTEL, &metadata_y_tiled, p010_usage);
 		drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats),
 				     &metadata_y_tiled, render_not_linear);
 		/* Y-tiled scanout isn't available on old platforms so we add
