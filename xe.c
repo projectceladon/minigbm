@@ -221,7 +221,7 @@ static int xe_add_combinations(struct driver *drv)
 			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER |
 				   BO_USE_HW_VIDEO_ENCODER | BO_USE_GPU_DATA_BUFFER |
 				   BO_USE_SENSOR_DIRECT_DATA);
-	drv_modify_combination(drv, DRM_FORMAT_ABGR8888, &metadata_linear, BO_USE_CURSOR | BO_USE_SCANOUT);
+	drv_modify_combination(drv, DRM_FORMAT_ABGR8888, &metadata_linear, BO_USE_CURSOR | BO_USE_SCANOUT | BO_USE_HW_VIDEO_ENCODER);
 	drv_modify_combination(drv, DRM_FORMAT_NV12, &metadata_linear,
 			       BO_USE_RENDERING | BO_USE_TEXTURE | BO_USE_CAMERA_MASK);
 	drv_modify_combination(drv, DRM_FORMAT_YUYV, &metadata_linear,
@@ -280,8 +280,8 @@ static int xe_add_combinations(struct driver *drv)
 		drv_add_combinations(drv, scanout_render_formats,
 				     ARRAY_SIZE(scanout_render_formats), &metadata_4_tiled,
 				     render_not_linear);
-                drv_add_combinations(drv, source_formats, ARRAY_SIZE(source_formats), &metadata_4_tiled,
-                                     texture_flags | BO_USE_NON_GPU_HW);
+		drv_add_combinations(drv, source_formats, ARRAY_SIZE(source_formats), &metadata_4_tiled,
+								texture_flags | BO_USE_NON_GPU_HW);
 
 	} else {
 		struct format_metadata metadata_y_tiled = { .tiling = XE_TILING_Y,
@@ -712,15 +712,22 @@ static int xe_bo_create_from_metadata(struct bo *bo)
 		.size = ALIGN(bo->meta.total_size, PAGE_SIZE),
 		.flags = 0,
 	};
-
 	/* FIXME: let's assume iGPU with SYSMEM is only supported */
 	gem_create.placement |= BITFIELD_BIT(DRM_XE_MEM_REGION_CLASS_SYSMEM);
-	if (bo->meta.use_flags & BO_USE_SCANOUT) {
-		gem_create.flags |= DRM_XE_GEM_CREATE_FLAG_SCANOUT;
+	if ((bo->meta.use_flags & BO_USE_SCANOUT) &&
+					!(bo->meta.use_flags &
+									(BO_USE_RENDERSCRIPT | BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SW_READ_OFTEN))) {
+		gem_create.flags = DRM_XE_GEM_CREATE_FLAG_SCANOUT;
 		gem_create.cpu_caching = DRM_XE_GEM_CPU_CACHING_WC;
-	} else {
+	} else if (((bo->meta.use_flags & BO_USE_SW_WRITE_OFTEN) ||
+					(bo->meta.use_flags & BO_USE_SW_READ_OFTEN)) &&
+					!(bo->meta.use_flags & BO_USE_HW_VIDEO_ENCODER)) {
 		gem_create.cpu_caching = DRM_XE_GEM_CPU_CACHING_WB;
+	} else {
+		gem_create.flags = DRM_XE_GEM_CREATE_FLAG_SCANOUT;
+		gem_create.cpu_caching = DRM_XE_GEM_CPU_CACHING_WC;
 	}
+
 
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_XE_GEM_CREATE, &gem_create);
 	if (ret) {
@@ -764,20 +771,17 @@ static void *xe_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags)
 	struct xe_device *xe = bo->drv->priv;
 
 	if ((bo->meta.format_modifier == I915_FORMAT_MOD_Y_TILED_CCS) ||
-	    (bo->meta.format_modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS) ||
-	    (bo->meta.format_modifier == I915_FORMAT_MOD_4_TILED))
+	    (bo->meta.format_modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS))
 		return MAP_FAILED;
 
-	if ((bo->meta.tiling == XE_TILING_NONE) || (addr == MAP_FAILED)) {
-		struct drm_xe_gem_mmap_offset gem_map = { 0 };
-		gem_map.handle = bo->handles[0].u32;
+	struct drm_xe_gem_mmap_offset gem_map = { 0 };
+	gem_map.handle = bo->handles[0].u32;
 
-		/* Get the fake offset back */
-		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_XE_GEM_MMAP_OFFSET, &gem_map);
-		if (ret == 0)
-			addr = mmap(0, bo->meta.total_size, drv_get_prot(map_flags),
-				    MAP_SHARED, bo->drv->fd, gem_map.offset);
-	}
+	/* Get the fake offset back */
+	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_XE_GEM_MMAP_OFFSET, &gem_map);
+	if (ret == 0)
+		addr = mmap(0, bo->meta.total_size, drv_get_prot(map_flags),
+				MAP_SHARED, bo->drv->fd, gem_map.offset);
 
 	if (addr == MAP_FAILED) {
 		drv_loge("xe GEM mmap failed\n");
