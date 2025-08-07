@@ -59,11 +59,11 @@ enum { HAL_PIXEL_FORMAT_NV12_Y_TILED_INTEL = 0x100,
        HAL_PIXEL_FORMAT_YUV420PackedSemiPlanar_Tiled_INTEL = 0x7FA00F00,
 };
 
-enum { GRALLOC1_FUNCTION_SET_MODIFIER = 101,
-       GRALLOC1_FUNCTION_GET_BYTE_STRIDE = 102,
-       GRALLOC1_FUNCTION_GET_PRIME = 103,
+enum { GRALLOC1_FUNCTION_SET_MODIFIER = 26,
+       GRALLOC1_FUNCTION_GET_BYTE_STRIDE = 27,
+       GRALLOC1_FUNCTION_GET_PRIME = 28,
 
-       GRALLOC1_LAST_CUSTOM = 500 };
+       GRALLOC1_LAST_CUSTOM = 28 };
 
 typedef int32_t /*gralloc1_error_t*/ (*GRALLOC1_PFN_SET_MODIFIER)(
     gralloc1_device_t *device, gralloc1_buffer_descriptor_t descriptor, uint64_t modifier);
