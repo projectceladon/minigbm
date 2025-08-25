@@ -103,6 +103,8 @@ static void xe_info_from_device_id(struct xe_device *xe)
 
 	const uint16_t ptl_ids[] = { 0xB080, 0xB090, 0xB0A0, 0xB0B0, 0xB0FF, 0xB082};
 
+	const uint16_t arl_ids[] = { 0x7D41, 0x7D51, 0x7D67, 0x7DD1, 0xB640};
+
 	unsigned i;
 	xe->graphics_version = 0;
 	xe->is_xelpd = false;
@@ -133,6 +135,12 @@ static void xe_info_from_device_id(struct xe_device *xe)
 
 	for (i = 0; i < ARRAY_SIZE(ptl_ids); i++)
 		if (ptl_ids[i] == xe->device_id) {
+			xe->graphics_version = 12;
+			xe->is_mtl_or_newer = true;
+		}
+
+	for (i = 0; i < ARRAY_SIZE(arl_ids); i++)
+		if (arl_ids[i] == xe->device_id) {
 			xe->graphics_version = 12;
 			xe->is_mtl_or_newer = true;
 		}
