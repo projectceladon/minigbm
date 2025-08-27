@@ -692,17 +692,7 @@ static int xe_bo_create_from_metadata(struct bo *bo)
 	int ret;
 	size_t plane;
 	uint32_t gem_handle;
-	uint32_t vm = 0;
-
-	struct drm_xe_vm_create create = {
-		.flags = DRM_XE_VM_CREATE_FLAG_SCRATCH_PAGE,
-	};
-
-	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_XE_VM_CREATE, &create);
-	if (ret) {
-		drv_loge("DRM_IOCTL_XE_VM_CREATE failed\n");
-		return -errno;
-        }
+	uint32_t vm;
 
 	/* From xe_drm.h: If a VM is specified, this BO must:
 	 * 1. Only ever be bound to that VM.
