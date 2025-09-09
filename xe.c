@@ -84,54 +84,15 @@ struct xe_device {
 
 static void xe_info_from_device_id(struct xe_device *xe)
 {
-	const uint16_t gen12_ids[] = {
-		0x4c8a, 0x4c8b, 0x4c8c, 0x4c90, 0x4c9a, 0x4680, 0x4681, 0x4682, 0x4683, 0x4688,
-		0x4689, 0x4690, 0x4691, 0x4692, 0x4693, 0x4698, 0x4699, 0x4626, 0x4628, 0x462a,
-		0x46a0, 0x46a1, 0x46a2, 0x46a3, 0x46a6, 0x46a8, 0x46aa, 0x46b0, 0x46b1, 0x46b2,
-		0x46b3, 0x46c0, 0x46c1, 0x46c2, 0x46c3, 0x9A40, 0x9A49, 0x9A59, 0x9A60, 0x9A68,
-		0x9A70, 0x9A78, 0x9AC0, 0x9AC9, 0x9AD9, 0x9AF8, 0x4905, 0x4906, 0x4907, 0x4908
-	};
-	const uint16_t adlp_ids[] = { 0x46A0, 0x46A1, 0x46A2, 0x46A3, 0x46A6, 0x46A8, 0x46AA,
-				      0x462A, 0x4626, 0x4628, 0x46B0, 0x46B1, 0x46B2, 0x46B3,
-				      0x46C0, 0x46C1, 0x46C2, 0x46C3, 0x46D0, 0x46D1, 0x46D2 };
-
-	const uint16_t rplp_ids[] = { 0xA720, 0xA721, 0xA7A0, 0xA7A1, 0xA7A8, 0xA7A9 };
-
-	const uint16_t mtl_ids[] = { 0x7D40, 0x7D60, 0x7D45, 0x7D55, 0x7DD5 , 0x7D67};
-
 	const uint16_t lnl_ids[] = { 0x6420, 0x64A0, 0x64B0};
 
 	const uint16_t ptl_ids[] = { 0xB080, 0xB090, 0xB0A0, 0xB0B0, 0xB0FF, 0xB082};
-
-	const uint16_t arl_ids[] = { 0x7D41, 0x7D51, 0x7D67, 0x7DD1, 0xB640};
+	const uint16_t bmg_ids[] = { 0xE20B, 0xE20C, 0xE210, 0xE211 };
 
 	unsigned i;
 	xe->graphics_version = 0;
 	xe->is_xelpd = false;
 	xe->is_mtl_or_newer = false;
-
-	/* Gen 12 */
-	for (i = 0; i < ARRAY_SIZE(gen12_ids); i++)
-		if (gen12_ids[i] == xe->device_id)
-			xe->graphics_version = 12;
-
-	for (i = 0; i < ARRAY_SIZE(adlp_ids); i++)
-		if (adlp_ids[i] == xe->device_id) {
-			xe->is_xelpd = true;
-			xe->graphics_version = 12;
-		}
-
-	for (i = 0; i < ARRAY_SIZE(rplp_ids); i++)
-		if (rplp_ids[i] == xe->device_id) {
-			xe->is_xelpd = true;
-			xe->graphics_version = 12;
-		}
-
-	for (i = 0; i < ARRAY_SIZE(mtl_ids); i++)
-		if (mtl_ids[i] == xe->device_id) {
-			xe->graphics_version = 12;
-			xe->is_mtl_or_newer = true;
-		}
 
 	for (i = 0; i < ARRAY_SIZE(ptl_ids); i++)
 		if (ptl_ids[i] == xe->device_id) {
@@ -139,15 +100,15 @@ static void xe_info_from_device_id(struct xe_device *xe)
 			xe->is_mtl_or_newer = true;
 		}
 
-	for (i = 0; i < ARRAY_SIZE(arl_ids); i++)
-		if (arl_ids[i] == xe->device_id) {
+	for (i = 0; i < ARRAY_SIZE(lnl_ids); i++)
+		if (lnl_ids[i] == xe->device_id) {
 			xe->graphics_version = 12;
 			xe->is_mtl_or_newer = true;
 		}
 
-	for (i = 0; i < ARRAY_SIZE(lnl_ids); i++)
-		if (lnl_ids[i] == xe->device_id) {
-			xe->graphics_version = 12;
+	for (i = 0; i < ARRAY_SIZE(bmg_ids); i++)
+		if (bmg_ids[i] == xe->device_id) {
+			xe->graphics_version = 20;
 			xe->is_mtl_or_newer = true;
 		}
 }
