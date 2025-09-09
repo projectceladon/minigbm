@@ -121,7 +121,7 @@ int intel_gpu_info_from_device_id(uint16_t device_id, struct intel_gpu_info *i91
 	const uint16_t rplp_ids[] = { 0xA720, 0xA721, 0xA7A0, 0xA7A1, 0xA7A8, 0xA7A9 };
 
 	const uint16_t mtl_ids[] = { 0x7D40, 0x7D60, 0x7D45, 0x7D55, 0x7DD5 };
-	const uint16_t bmg_ids[] = { 0xE20B, 0xE20C, 0xE210, 0xE211 };
+	const uint16_t arl_ids[] = { 0x7D41, 0x7D51, 0x7D67, 0x7DD1, 0xB640};
 
 
 	unsigned i;
@@ -221,16 +221,17 @@ int intel_gpu_info_from_device_id(uint16_t device_id, struct intel_gpu_info *i91
 
 	for (i = 0; i < ARRAY_SIZE(mtl_ids); i++)
 		if (mtl_ids[i] == device_id) {
-			i915->graphics_version = 14;
+			i915->graphics_version = 12;
 			i915->sub_version = 0;
 			i915->is_xelpd = false;
 			return 0;
 		}
-	for (i = 0; i < ARRAY_SIZE(bmg_ids); i++)
-		if (bmg_ids[i] == device_id) {
-			i915->graphics_version = 20;
+
+	for (i = 0; i < ARRAY_SIZE(arl_ids); i++)
+		if (arl_ids[i] == device_id) {
+			i915->graphics_version = 12;
 			i915->sub_version = 0;
-			i915->is_xelpd = true;
+			i915->is_xelpd = false;
 			return 0;
 		}
 
