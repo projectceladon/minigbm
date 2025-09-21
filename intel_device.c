@@ -221,7 +221,7 @@ int intel_gpu_info_from_device_id(uint16_t device_id, struct intel_gpu_info *i91
 
 	for (i = 0; i < ARRAY_SIZE(mtl_ids); i++)
 		if (mtl_ids[i] == device_id) {
-			i915->graphics_version = 12;
+			i915->graphics_version = 14;
 			i915->sub_version = 0;
 			i915->is_xelpd = false;
 			return 0;
@@ -229,7 +229,7 @@ int intel_gpu_info_from_device_id(uint16_t device_id, struct intel_gpu_info *i91
 
 	for (i = 0; i < ARRAY_SIZE(arl_ids); i++)
 		if (arl_ids[i] == device_id) {
-			i915->graphics_version = 12;
+			i915->graphics_version = 14;
 			i915->sub_version = 0;
 			i915->is_xelpd = false;
 			return 0;
