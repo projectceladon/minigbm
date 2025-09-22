@@ -114,6 +114,7 @@ struct i915_device {
 	uint32_t has_llc 			: 1;
 	uint32_t has_hw_protection	: 1;
 	uint32_t is_xelpd			: 1;
+	uint32_t is_mtl_or_newer	: 1;
 	uint32_t has_mmap_offset	: 1;
 	uint32_t has_local_mem		: 1;
 	uint32_t force_mem_local	: 1;
@@ -149,7 +150,7 @@ flags_to_heap(struct i915_device *i915, unsigned flags)
 
 bool i915_has_tile4(struct i915_device *i915)
 {
-	return GEN_VERSION_X10(i915) >= 125;
+	return GEN_VERSION_X10(i915) >= 125 || i915->is_mtl_or_newer;
 }
 
 static void i915_get_modifier_order(struct i915_device *i915)
@@ -372,7 +373,7 @@ static int i915_align_dimensions(struct bo *bo, uint32_t format, uint32_t tiling
 	uint32_t horizontal_alignment = 64;
 	uint32_t vertical_alignment = 4;
 	struct i915_device *i915 = bo->drv->priv;
-	if (GEN_VERSION_X10(i915) >= 125) {
+	if (GEN_VERSION_X10(i915) >= 125 || i915->is_mtl_or_newer) {
 		horizontal_alignment = 4;
 		vertical_alignment = 4;
 	}
@@ -610,6 +611,7 @@ static int i915_init(struct driver *drv)
 	i915->graphics_version = info.graphics_version;
 	i915->sub_version = info.sub_version;
 	i915->is_xelpd = info.is_xelpd;
+	i915->is_mtl_or_newer = info.is_mtl_or_newer;
 
 	i915_get_modifier_order(i915);
 
@@ -678,7 +680,7 @@ static bool i915_format_needs_LCU_alignment(uint32_t format, size_t plane,
 	case DRM_FORMAT_NV12:
 	case DRM_FORMAT_P010:
 	case DRM_FORMAT_P016:
-		return (i915->graphics_version == 11 || i915->graphics_version == 12) && plane == 1;
+		return (i915->graphics_version == 11 || i915->graphics_version == 12) && !i915->is_mtl_or_newer && plane == 1;
 	}
 	return false;
 }
@@ -1127,7 +1129,7 @@ static int i915_bo_create_from_metadata(struct bo *bo)
 	/* Set/Get tiling ioctl not supported  based on fence availability
 	   Refer : "https://patchwork.freedesktop.org/patch/325343/"
 	 */
-	if ((GEN_VERSION_X10(i915) != 125) && (i915->graphics_version != 14)) {
+	if ((GEN_VERSION_X10(i915) != 125) && !i915->is_mtl_or_newer) {
 		gem_set_tiling.handle = bo->handles[0].u32;
 		gem_set_tiling.tiling_mode = bo->meta.tiling;
 		gem_set_tiling.stride = bo->meta.strides[0];
@@ -1167,7 +1169,7 @@ static int i915_bo_import(struct bo *bo, struct drv_import_fd_data *data)
 	/* Set/Get tiling ioctl not supported  based on fence availability
 	   Refer : "https://patchwork.freedesktop.org/patch/325343/"
 	 */
-	if ((GEN_VERSION_X10(i915) != 125) && (i915->graphics_version != 14)) {
+	if ((GEN_VERSION_X10(i915) != 125) && !i915->is_mtl_or_newer) {
 		/* TODO(gsingh): export modifiers and get rid of backdoor tiling. */
 		gem_get_tiling.handle = bo->handles[0].u32;
 

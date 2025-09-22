@@ -34,6 +34,7 @@ struct intel_gpu_info {
 	int graphics_version;
 	int sub_version;
 	bool is_xelpd;
+	bool is_mtl_or_newer;
 };
 
 int intel_gpu_info_from_device_id(uint16_t device_id, struct intel_gpu_info *info);
