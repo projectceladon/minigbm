@@ -224,6 +224,7 @@ int intel_gpu_info_from_device_id(uint16_t device_id, struct intel_gpu_info *i91
 			i915->graphics_version = 12;
 			i915->sub_version = 0;
 			i915->is_xelpd = false;
+			i915->is_mtl_or_newer = true;
 			return 0;
 		}
 
@@ -232,6 +233,7 @@ int intel_gpu_info_from_device_id(uint16_t device_id, struct intel_gpu_info *i91
 			i915->graphics_version = 12;
 			i915->sub_version = 0;
 			i915->is_xelpd = false;
+			i915->is_mtl_or_newer = true;
 			return 0;
 		}
 
