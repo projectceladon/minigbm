@@ -25,7 +25,6 @@
 
 /* Define to match AIDL PixelFormat::R_8. */
 #define HAL_PIXEL_FORMAT_R8 0x38
-#define HAL_PIXEL_FORMAT_RGBA_10101010 0x3B
 
 const char *drmFormat2Str(int drm_format)
 {
@@ -102,6 +101,10 @@ uint32_t cros_gralloc_convert_format(int format)
 	 */
 		ALOGW("RGBA_10101010 format, alpha value is cut from 10 bit to 2 bit\n");
 		return DRM_FORMAT_ABGR2101010;
+#endif
+#if ANDROID_API_LEVEL >= 36
+	case HAL_PIXEL_FORMAT_YCBCR_P210:
+		return DRM_FORMAT_P210;
 #endif
 	case HAL_PIXEL_FORMAT_NV12:
 		return DRM_FORMAT_NV12;
