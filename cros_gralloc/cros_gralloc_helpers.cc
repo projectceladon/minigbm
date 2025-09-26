@@ -25,6 +25,8 @@
 
 /* Define to match AIDL PixelFormat::R_8. */
 #define HAL_PIXEL_FORMAT_R8 0x38
+#define HAL_PIXEL_FORMAT_RGBA_10101010 0x3b
+#define HAL_PIXEL_FORMAT_YCBCR_P210 0x3c
 
 const char *drmFormat2Str(int drm_format)
 {
