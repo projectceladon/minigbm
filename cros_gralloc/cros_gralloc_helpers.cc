@@ -154,7 +154,7 @@ uint64_t cros_gralloc_convert_usage(uint64_t usage)
 	handle_usage(&usage, GRALLOC_USAGE_HW_RENDER, &use_flags, BO_USE_RENDERING);
 	handle_usage(&usage, GRALLOC_USAGE_HW_2D, &use_flags, BO_USE_RENDERING);
 	/* HWC wants to use display hardware, but can defer to OpenGL. */
-	handle_usage(&usage, GRALLOC_USAGE_HW_COMPOSER, &use_flags, BO_USE_TEXTURE | BO_USE_SCANOUT);
+	handle_usage(&usage, GRALLOC_USAGE_HW_COMPOSER, &use_flags, BO_USE_TEXTURE);
 	handle_usage(&usage, GRALLOC_USAGE_PRIVATE_1, &use_flags, BO_USE_SCANOUT);
 	handle_usage(&usage, GRALLOC_USAGE_HW_FB, &use_flags, BO_USE_NONE);
 	/*
@@ -167,7 +167,7 @@ uint64_t cros_gralloc_convert_usage(uint64_t usage)
 	handle_usage(&usage, GRALLOC_USAGE_CURSOR, &use_flags, BO_USE_NONE);
 	/* HACK: See b/30054495 for BO_USE_SW_READ_OFTEN. */
 	handle_usage(&usage, GRALLOC_USAGE_HW_VIDEO_ENCODER, &use_flags,
-		     BO_USE_HW_VIDEO_ENCODER /* | BO_USE_SW_READ_OFTEN*/);
+		     BO_USE_HW_VIDEO_ENCODER | BO_USE_SW_READ_OFTEN);
 	handle_usage(&usage, GRALLOC_USAGE_HW_CAMERA_WRITE, &use_flags, BO_USE_CAMERA_WRITE);
 	handle_usage(&usage, GRALLOC_USAGE_HW_CAMERA_READ, &use_flags, BO_USE_CAMERA_READ);
 	handle_usage(&usage, GRALLOC_USAGE_RENDERSCRIPT, &use_flags, BO_USE_RENDERSCRIPT);
